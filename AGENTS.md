@@ -394,6 +394,7 @@ A project task is done when:
 
 ## 14. Where to look next
 
+- `docs/TUTORIAL.md` — step-by-step: copy template → train → eval → sweep → report → gc.
 - `REPORT.md` — the big picture and verified results.
 - `README.md` — quickstart and commands.
 - `templates/project/AGENTS.md` — project-local rules.

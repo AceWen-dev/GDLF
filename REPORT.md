@@ -518,14 +518,15 @@ DLEF/
 
 ### 阅读顺序建议
 
-1. `README.md` — 先跑起来。
-2. 本报告 — 理解整体设计。
-3. `AGENTS.md` — 建新项目时 agent 必须读的规则（文件放哪、实验怎么组织）。
-4. `templates/project/AGENTS.md` — 项目复制后的本地规则。
-5. `docs/design/contracts-v0.md` — 看 18 个 contract。
-6. `templates/project/` — 看一个真实项目怎么接。
-7. `dlef/runner.py` / `dlef/policy.py` — 看训练循环和 AMP/DDP。
-8. `dlef/sweep.py` / `dlef/retention.py` — 看大量实验和清理。
+1. `docs/TUTORIAL.md` — 手把手从复制模板跑到 report。
+2. `README.md` — 先跑起来。
+3. 本报告 — 理解整体设计。
+4. `AGENTS.md` — 建新项目时 agent 必须读的规则（文件放哪、实验怎么组织）。
+5. `templates/project/AGENTS.md` — 项目复制后的本地规则。
+6. `docs/design/contracts-v0.md` — 看 18 个 contract。
+7. `templates/project/` — 看一个真实项目怎么接。
+8. `dlef/runner.py` / `dlef/policy.py` — 看训练循环和 AMP/DDP。
+9. `dlef/sweep.py` / `dlef/retention.py` — 看大量实验和清理。
 
 ---
 

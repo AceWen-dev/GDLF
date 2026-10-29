@@ -5,7 +5,7 @@ General deep learning experiment framework. The Python package is `dlef`.
 DLEF is domain-agnostic: it owns contracts, run records, evaluation, sweeps and
 reports; training stacks live in adapters.
 
-**Final report:** [`REPORT.md`](REPORT.md). **Agent guide:** [`AGENTS.md`](AGENTS.md).
+**Tutorial:** [`docs/TUTORIAL.md`](docs/TUTORIAL.md). **Final report:** [`REPORT.md`](REPORT.md). **Agent guide:** [`AGENTS.md`](AGENTS.md).
 
 > **Hard rule:** the core never contains domain words.
 > image / text / audio / video, bbox / depth / mm, classification / detection /
