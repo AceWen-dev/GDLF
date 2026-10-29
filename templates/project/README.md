@@ -39,13 +39,15 @@ core/                     # layer 2: project source
     eval.py
     sweep.py
   tools/                  # generic maintenance utilities
-  scripts/                # project-specific scripts, free-form
   tests/
     test_smoke.py
     test_components.py
     test_benchmark.py
     test_config_contract.py
     test_command_surface.py
+  README.md
+
+scripts/                  # project-specific scripts, intentionally free-form
   README.md
 
 output/                   # layer 3: generated results
@@ -235,10 +237,10 @@ Keep the command surface small:
 ```text
 core/commands/   train.py / eval.py / sweep.py   # core experiment execution
 core/tools/      benchmark / configs / runs / run_info  # generic project maintenance
-core/scripts/    project-specific scripts        # intentionally unstructured
+scripts/    project-specific scripts        # intentionally unstructured
 ```
 
-`core/scripts/` is the escape hatch for project-specific automation: organize it
+`scripts/` is the escape hatch for project-specific automation: organize it
 however the current task needs. `core/tools/` is for the template's generic
 maintenance utilities; don't turn it into a project script dump. If a script's
 logic becomes reusable, move it to `core/` or DLEF core/adapters.

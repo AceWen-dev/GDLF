@@ -1,6 +1,6 @@
 # Data package
 
-Reusable data code lives here; project-specific scripts under `core/scripts/` stay thin.
+Reusable data code lives here; project-specific scripts under `scripts/` stay thin.
 
 ```text
 datasets/    # runtime Dataset classes returned by build.py
@@ -15,7 +15,7 @@ benchmark.py # frozen test set + metric protocol
 build.py     # data.name / transform registry + make_loaders
 ```
 
-Example: a source-acquisition CLI belongs under `core/scripts/` (organize it however
+Example: a source-acquisition CLI belongs under `scripts/` (organize it however
 that project needs); its reusable reader/decoder belongs in
 `core/data/ingest/`. The CLI writes raw data under
 `$DLEF_DATA_ROOT/raw/...`; it does not write into `output/runs/`.

@@ -76,7 +76,7 @@ Do **not** modify `dlef/` for project-specific needs.
     and code version; `run_info` resolves config → source.
 15. **One command surface; scripts are project-specific.** `core/commands/` contains
     only the core experiment entries: train, eval, sweep. `core/tools/` contains only
-    generic template maintenance utilities. `core/scripts/` is intentionally
+    generic template maintenance utilities. `scripts/` is intentionally
     unstructured for project-specific automation; promote reusable logic to
     the project `core/` package or DLEF core/adapters. Do not use
     `core/commands/` or `core/tools/` as a dump.
@@ -159,13 +159,13 @@ A project has this shape (from `templates/project/`):
       runs.py
       run_info.py
       _bootstrap.py
-    scripts/               # project-specific scripts, intentionally unstructured
     tests/
       test_smoke.py
       test_components.py
       test_benchmark.py
       test_config_contract.py
       test_command_surface.py
+  scripts/                 # project-specific scripts, intentionally unstructured
   output/                  # layer 3: generated results
     runs/
     artifacts/
@@ -200,7 +200,7 @@ Placement rules:
 - **Config schema** → `core/config.py`; values →
   `input/configs/experiments/<experiment>/<variant>.yaml`.
 - **Core experiment entries** → `core/commands/` only: `train`, `eval`, `sweep`.
-- **Project-specific automation** → `core/scripts/` (intentionally unstructured;
+- **Project-specific automation** → `scripts/` (intentionally unstructured;
   no task-specific subdirectory assumptions).
 - **Generic maintenance utilities** → `core/tools/` (template-provided only).
 - **Reusable script logic** → `core/` or core/adapters; keep the script a

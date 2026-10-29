@@ -64,14 +64,15 @@ core/                     # layer 2: project source
     run_info.py          # run card: config -> benchmark -> source files
     _bootstrap.py        # internal: find the core when running in-repo
     README.md
-  scripts/               # project-specific scripts, intentionally unstructured
-    README.md
   tests/
     test_smoke.py
     test_components.py
     test_benchmark.py
     test_config_contract.py
     test_command_surface.py
+  README.md
+
+scripts/                 # project-specific scripts, intentionally unstructured
   README.md
 
 output/                   # layer 3: generated results
@@ -101,7 +102,7 @@ If you rename `core`, update:
 | You are adding... | Put it here | Also update |
 |---|---|---|
 | dataset reader / acquisition library code | `core/data/` | `data/build.py` if selectable |
-| project-specific automation (acquisition, cleaning, query, export) | `core/scripts/` | no fixed structure; promote reusable logic |
+| project-specific automation (acquisition, cleaning, query, export) | `scripts/` | no fixed structure; promote reusable logic |
 | transform | `core/data/transforms/<name>.py` | `data/build.py`, `DataConfig.validate` |
 | split strategy | `core/data/splits.py` | `SPLITTERS`, `DataConfig.validate` |
 | model | `core/models/<name>.py` | `models/build.py`, `ModelConfig.validate` |
@@ -116,7 +117,7 @@ If you rename `core`, update:
 | reusable cross-project code | DLEF core or `adapters/` | not in `core/` |
 | generated run output | `output/` | never edit by hand |
 
-**Rules:** no ad-hoc scripts in `core/commands/`; `core/scripts/` is intentionally
+**Rules:** no ad-hoc scripts in `core/commands/`; `scripts/` is intentionally
 unstructured and project-specific (no video/data assumptions); `core/tools/` holds
 only generic maintenance utilities. If a script grows reusable logic, move the
 logic into `core/` (or core/adapters) and leave a thin CLI. No `utils.py`
@@ -477,7 +478,7 @@ Do not edit the installed `dlef` package in place.
 - Do not put secrets in config/logs.
 - Do not commit dataset bytes or absolute data paths.
 - Do not add ad-hoc scripts to `core/commands/`; `core/commands/` is only train/eval/sweep.
-- Project-specific automation goes under `core/scripts/` (intentionally unstructured).
+- Project-specific automation goes under `scripts/` (intentionally unstructured).
   `core/tools/` is only for the template's generic maintenance utilities.
   Promote reusable logic to `core/` or core/adapters.
 - Do not add project-specific code to the installed core.

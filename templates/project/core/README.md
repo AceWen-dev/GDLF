@@ -14,9 +14,8 @@ task.py       # composition root
 runtime.py    # policy / runner wiring
 commands/     # train / eval / sweep (core entries only)
 tools/        # generic maintenance utilities
-scripts/      # project-specific scripts (free-form)
 tests/        # tests for this project
 ```
 
-Reusable logic lives here; `scripts/` stays thin. If code is reusable across
-projects, move it to DLEF core/adapters instead.
+Reusable logic lives here; the sibling `scripts/` directory stays thin. If code
+is reusable across projects, move it to DLEF core/adapters instead.

@@ -15,5 +15,5 @@ core/tools/
 Rules:
 
 - `core/commands/` is only train/eval/sweep; `core/tools/` is only generic maintenance.
-- Project-specific automation goes under `core/scripts/`, not here.
+- Project-specific automation goes under `scripts/`, not here.
 - Tools do not write run manifests, metrics or checkpoints.
