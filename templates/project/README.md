@@ -30,20 +30,24 @@ keep the wiring and entry points.
 
 ## Install
 
-From this directory, with the DLEF repo checked out two levels up:
+The core is a separate package. Install it first; the project can live anywhere
+on disk.
+
+```bash
+pip install -e /path/to/DLEF   # core + adapters
+pip install -e .               # this project
+```
+
+Special case: if you are running the template **in place** inside the DLEF repo
+(`DLEF/templates/project`), the relative core path is `../..`:
 
 ```bash
 pip install -e ../..
 pip install -e .
 ```
 
-If you copied this directory into a new repo, install the core from its real
-location instead:
-
-```bash
-pip install -e /path/to/DLEF
-pip install -e .
-```
+For a copied project, always use the absolute path (or a wheel/git URL) for the
+core.
 
 ## Run
 

@@ -8,7 +8,9 @@ version = "0.1.0"
 description = "A project skeleton for DLEF"
 readme = "README.md"
 requires-python = ">=3.10"
-# dlef is installed separately: pip install -e ../.. (or from your package index)
+# The core is installed separately (not from PyPI):
+#   pip install -e /path/to/DLEF
+# or from a wheel/git URL. Then: pip install -e .
 dependencies = [
   "torch>=2.0",
   "PyYAML>=6",
