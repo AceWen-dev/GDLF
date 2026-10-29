@@ -42,6 +42,30 @@ class ConfigSchema:
 
 
 @dataclass
+class EarlyStoppingConfig(ConfigSchema):
+    """Generic epoch-level early stopping on a validation metric."""
+
+    enabled: bool = False
+    monitor: str = ""
+    mode: str = "min"
+    patience: int = 5
+    min_delta: float = 0.0
+    min_epochs: int = 0
+
+    def validate(self) -> None:
+        if self.enabled and not self.monitor.strip():
+            raise ConfigError("early_stopping.monitor must not be empty when enabled")
+        if self.mode not in {"min", "max"}:
+            raise ConfigError("early_stopping.mode must be 'min' or 'max'")
+        if self.patience < 1:
+            raise ConfigError("early_stopping.patience must be >= 1")
+        if self.min_delta < 0:
+            raise ConfigError("early_stopping.min_delta must be >= 0")
+        if self.min_epochs < 0:
+            raise ConfigError("early_stopping.min_epochs must be >= 0")
+
+
+@dataclass
 class TrainConfig(ConfigSchema):
     """Generic training knobs owned by the core, not by any domain."""
 
@@ -52,6 +76,7 @@ class TrainConfig(ConfigSchema):
     experiment: str = "default"
     log_every: int = 1
     checkpoint_every: int = 0
+    early_stopping: EarlyStoppingConfig = field(default_factory=EarlyStoppingConfig)
 
     def validate(self) -> None:
         if self.epochs < 1:
@@ -62,6 +87,7 @@ class TrainConfig(ConfigSchema):
             raise ConfigError("log_every must be >= 0")
         if self.checkpoint_every < 0:
             raise ConfigError("checkpoint_every must be >= 0")
+        self.early_stopping.validate()
 
 
 @dataclass(frozen=True)

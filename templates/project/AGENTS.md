@@ -295,8 +295,11 @@ only. Report the comparison through `dlef compare` / `dlef report`.
 
 - `core/config.py` is the schema; `input/configs/*.yaml` are values.
 - Training loop knobs (`seed`, `epochs`, `max_steps`, `log_every`,
-  `checkpoint_every`) are top-level; loader knobs (`batch_size`, `n_train`, ...)
-  are under `data`.
+  `checkpoint_every`, `early_stopping`) are top-level; loader knobs
+  (`batch_size`, `n_train`, ...) are under `data`.
+- Early stopping monitors a validation metric (`monitor`), with `mode=min|max`,
+  `patience`, `min_delta` and `min_epochs`. It is disabled by default; log lines
+  show the best value and why it stopped.
 - **Every behavior-affecting choice is a typed config field.** Data
   name/version/seed/split/transforms, model, loss, optimizer, scheduler,
   metrics, benchmark and training policy all live in the config. No hidden

@@ -133,6 +133,8 @@ core ← adapters ← examples / templates
 - unknown key 报错；类型不匹配报错；`validate()` 做范围/互斥检查。
 - 运行前 dump `config.resolved.json`，SHA-256 digest 进 manifest。
 - manifest 记录 `config_source` 和 `code_version`；`run_info.py` 从 config 反查源码。
+- 支持 `early_stopping`：`monitor` / `mode` / `patience` / `min_delta` /
+  `min_epochs`；默认关闭，触发原因写进训练日志。
 - JSON 永远可用；YAML 在安装 PyYAML 后可用。
 
 ### 5.2 Run / Artifact

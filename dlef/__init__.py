@@ -28,7 +28,15 @@ from .contracts import (
 from .benchmark import BenchmarkSpec, canonical_digest, make_test_set_id
 from .checkpoint import CheckpointCodec, JsonCheckpointCodec
 from .claim import Claim, ClaimError, ClaimStore, TestAccessLog
-from .config import Config, ConfigError, ConfigSchema, TrainConfig, load_config, resolve_config
+from .config import (
+    Config,
+    ConfigError,
+    ConfigSchema,
+    EarlyStoppingConfig,
+    TrainConfig,
+    load_config,
+    resolve_config,
+)
 from .policy import NoOpTrainingPolicy, TrainingPolicy
 from .registry import Registry, RegistryError
 from .run import ArtifactStore, Run, RunManifest, RunStore
@@ -98,6 +106,7 @@ __all__ = [
     "Config",
     "ConfigError",
     "ConfigSchema",
+    "EarlyStoppingConfig",
     "TrainConfig",
     "load_config",
     "resolve_config",

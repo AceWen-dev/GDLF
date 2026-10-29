@@ -74,6 +74,7 @@ class Runner:
     ) -> Run | None:
         validate_task(task)
         schema = config.schema
+        early = schema.early_stopping
         policy = self.training_policy
         policy.setup()
 
@@ -102,6 +103,11 @@ class Runner:
                 f"max_steps={getattr(schema, 'max_steps', '?')} "
                 f"log_every={getattr(schema, 'log_every', '?')} "
                 f"checkpoint_every={getattr(schema, 'checkpoint_every', '?')}"
+            )
+            run.log(
+                f"Early stopping: enabled={early.enabled} monitor={early.monitor or '-'} "
+                f"mode={early.mode} patience={early.patience} "
+                f"min_delta={early.min_delta} min_epochs={early.min_epochs}"
             )
             for key in ("data", "model", "loss", "optim", "scheduler", "benchmark"):
                 value = config.resolved.get(key)
@@ -133,6 +139,10 @@ class Runner:
 
         global_step = 0
         last_epoch = 0
+        best_score: float | None = None
+        best_epoch = 0
+        bad_epochs = 0
+        early_stopped = False
         try:
             policy.on_fit_start(task, optimizer, schema)
             self._call(callbacks, "on_run_start", ctx)
@@ -243,6 +253,54 @@ class Runner:
                         )
                         run.log(f"Epoch(val) [{epoch}/{schema.epochs}] {val_text}")
 
+                if early.enabled:
+                    if not val_metrics:
+                        if run is not None:
+                            run.log("Early stopping: skipped (no val metrics)")
+                    elif early.monitor not in val_metrics:
+                        if run is not None:
+                            run.log(
+                                f"Early stopping: skipped (monitor {early.monitor!r} "
+                                "not in val metrics)"
+                            )
+                    else:
+                        score = float(val_metrics[early.monitor])
+                        if best_score is None:
+                            improved = True
+                        elif early.mode == "min":
+                            improved = score < best_score - early.min_delta
+                        else:
+                            improved = score > best_score + early.min_delta
+
+                        if improved:
+                            best_score = score
+                            best_epoch = epoch
+                            bad_epochs = 0
+                            if run is not None:
+                                run.log(
+                                    f"Early stopping: best {early.monitor}={score:.6g} "
+                                    f"at epoch {epoch}"
+                                )
+                        else:
+                            bad_epochs += 1
+                            if run is not None:
+                                run.log(
+                                    f"Early stopping: no improvement for "
+                                    f"{bad_epochs}/{early.patience} epochs "
+                                    f"({early.monitor}={score:.6g}, "
+                                    f"best={best_score:.6g} @ epoch {best_epoch})"
+                                )
+                            if (
+                                bad_epochs >= early.patience
+                                and epoch >= early.min_epochs
+                            ):
+                                early_stopped = True
+                                if run is not None:
+                                    run.log(
+                                        f"Early stopping: triggered at epoch {epoch} "
+                                        f"after {bad_epochs} bad epochs"
+                                    )
+
                 if (
                     schema.checkpoint_every
                     and epoch % schema.checkpoint_every == 0
@@ -253,7 +311,7 @@ class Runner:
                     )
 
                 self._call(callbacks, "on_epoch_end", ctx)
-                if reached_limit:
+                if reached_limit or early_stopped:
                     break
 
             if run is not None:

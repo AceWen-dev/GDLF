@@ -113,6 +113,7 @@ def main() -> int:
     print(f"  batch_size: {data.get('batch_size', '')}")
     for key in ("amp", "grad_accum_steps", "grad_clip"):
         print(f"  {key}: {config.get(key, '')}")
+    print(f"  early_stopping: {config.get('early_stopping', {})}")
     print()
 
     print("components:")

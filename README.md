@@ -100,7 +100,8 @@ examples/toy/output/
 - Eval is a separate record linked to a checkpoint digest.
 - `compare` reads eval records, not hand-copied numbers.
 - Checkpoints round-trip model/optimizer/RNG state.
-- The Runner supports epoch-based or step-limited training (`epochs`, `max_steps`).
+- The Runner supports epoch-based or step-limited training (`epochs`, `max_steps`)
+  and configurable early stopping on a validation metric.
 - Callbacks and step/epoch schedulers are lifecycle-tested.
 - Grid/random sweeps run one trial per run, with a local GPU-aware queue.
 - A failed trial is recorded as `failed` without killing the sweep.

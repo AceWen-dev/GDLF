@@ -7,6 +7,14 @@ experiment: baseline
 log_every: 10
 checkpoint_every: 0
 
+early_stopping:
+  enabled: false
+  monitor: mae
+  mode: min
+  patience: 5
+  min_delta: 0.0
+  min_epochs: 0
+
 # ---- data ----
 # Dataset bytes live outside this repo under $DLEF_DATA_ROOT.
 # Config selects logical names/versions, never absolute paths.

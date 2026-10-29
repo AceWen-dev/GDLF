@@ -270,6 +270,14 @@ max_steps: null
 log_every: 10
 checkpoint_every: 0
 
+early_stopping:
+  enabled: false  # set true to stop on plateau
+  monitor: mae
+  mode: min
+  patience: 5
+  min_delta: 0.0
+  min_epochs: 0
+
 data:
   batch_size: 32
 ```

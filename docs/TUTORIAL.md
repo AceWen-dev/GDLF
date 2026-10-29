@@ -477,6 +477,21 @@ def build_my_metric() -> Metric:
 `data.name` / `data.version` / `data.split` / `data.*_transform` 和
 `model.name` / `loss.name` 都是同一类选择器。unknown key 会报错；这是故意的。
 
+早停配置在顶层：
+
+```yaml
+early_stopping:
+  enabled: true
+  monitor: mae
+  mode: min
+  patience: 5
+  min_delta: 0.0
+  min_epochs: 0
+```
+
+`monitor` 必须是 val metrics 里的名字；`patience` 是连续多少个 epoch 没有
+改善后停止。日志会记录 best 值、bad epoch 计数和触发原因。
+
 ### task.py
 
 通常不用改。它只负责：
