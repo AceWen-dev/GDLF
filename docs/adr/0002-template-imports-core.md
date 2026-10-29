@@ -17,7 +17,8 @@
 模板只包含项目特定内容：
 
 - `myproject/config.py`、`data/`、`models/`、`losses/`、`optimizers/`、`schedulers/`、`metrics/`、`task.py`；
-- `commands/train.py`、`eval.py`、`sweep.py` 和 `scripts/`（data / analysis / ops）；
+- `commands/train.py`、`eval.py`、`sweep.py`；
+- `tools/`（模板自带的通用维护工具）和 `scripts/`（项目特定脚本，无固定结构）；
 - `configs/base.yaml`、`benchmarks/`、`tests/test_smoke.py`、`tests/test_benchmark.py`。
 
 安装时先安装 core（`pip install -e /path/to/DLEF`），再安装项目（`pip install -e .`）。真实部署时项目 pin 一个 core 版本。

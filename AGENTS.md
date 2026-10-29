@@ -74,11 +74,11 @@ Do **not** modify `dlef/` for project-specific needs.
     knob/selector is a typed config field; builders receive config instead of
     branching on names. The run manifest records config digest, config source
     and code version; `run_info` resolves config → source.
-15. **One command surface, purposeful script areas.** `commands/` contains only
-    the core experiment entries: train, eval, sweep. Peripheral scripts live
-    under `scripts/data/{acquire,prepare,split}`, `scripts/analysis/` or
-    `scripts/ops/`; reusable logic belongs in core/adapters. Do not use
-    `commands/` or a flat `scripts/` as a dump.
+15. **One command surface; scripts are project-specific.** `commands/` contains
+    only the core experiment entries: train, eval, sweep. `tools/` contains only
+    generic template maintenance utilities. `scripts/` is intentionally
+    unstructured for project-specific automation; promote reusable logic to
+    `myproject/` or core/adapters. Do not use `commands/` or `tools/` as a dump.
 
 ---
 
@@ -149,11 +149,13 @@ A project has this shape (from `templates/project/`):
     train.py               # thin entry: train + eval
     eval.py                # thin entry: separate eval run (val or sealed test)
     sweep.py               # subprocess grid/random sweep
-  scripts/
-    data/                  # acquire / prepare / split entry points
-    analysis/              # queries, plots, run inspection
-    ops/                   # benchmark, config, export maintenance
-    _bootstrap.py          # internal: find the core when running in-repo
+  tools/                   # generic maintenance: benchmark/config/run inspection
+    benchmark.py
+    configs.py
+    runs.py
+    run_info.py
+    _bootstrap.py
+  scripts/                 # project-specific scripts, intentionally unstructured
   tests/
     test_smoke.py
     test_components.py
@@ -184,12 +186,11 @@ Placement rules:
 - **Config schema** → `myproject/config.py`; values →
   `configs/experiments/<experiment>/<variant>.yaml`.
 - **Core experiment entries** → `commands/` only: `train`, `eval`, `sweep`.
-- **Data acquisition / cleaning / split scripts** →
-  `scripts/data/{acquire,prepare,split}/`; reusable logic in `myproject/data/`.
-- **Query / plot / run-inspection scripts** → `scripts/analysis/`; read-only.
-- **Benchmark / config / export maintenance** → `scripts/ops/`.
-- **Reusable script logic** → promote to core/adapters; keep the script a thin
-  CLI. No flat `scripts/*.py`, no `scripts/misc`, no `utils.py` at project root.
+- **Project-specific automation** → `scripts/` (intentionally unstructured;
+  no task-specific subdirectory assumptions).
+- **Generic maintenance utilities** → `tools/` (template-provided only).
+- **Reusable script logic** → `myproject/` or core/adapters; keep the script a
+  thin CLI. No `utils.py` at project root.
 - **Project tests** → `tests/`.
 - **Claims** → `claims/<claim_id>.json` via `ClaimStore`.
 - **Generated artifacts** → `outputs/`; never edit by hand.
@@ -219,8 +220,8 @@ Rules:
 - Sweeps describe a parameter space; generated per-trial configs live under
   `outputs/sweeps/<sweep_id>/configs/`, not in the repo.
 - The run manifest records `config_source` and `config_digest`; use
-  `scripts/analysis/runs.py` to see which config produced each run and
-  `scripts/analysis/run_info.py` for one run's config → source map.
+  `tools/runs.py` to see which config produced each run and
+  `tools/run_info.py` for one run's config → source map.
 - One seed per run. For a 3-seed result, add `seed` to the sweep params and
   compare the resulting runs; do not loop seeds inside a run.
 - Never tune on the test split. Use val for model selection; test belongs to a
@@ -292,7 +293,7 @@ Changing data/model/loss mid-experiment:
 - Every run dumps `config.resolved.json`; its SHA-256 and original
   `config_source` go into the manifest.
 - Inspect a run from its directory: `manifest.json` + `config.resolved.json` +
-  eval records. `scripts/analysis/run_info.py --run <id>` prints the config-to-source
+  eval records. `tools/run_info.py --run <id>` prints the config-to-source
   map.
 - Secrets go through environment variables, never config files.
 - Do not put paths to outputs in config; run directories are derived.
@@ -451,7 +452,6 @@ Every project should have:
   benchmark id changes with membership/metric protocol;
 - a config-contract test: every selector in the config resolves to a builder;
 - a command-surface test: `commands/` stays train/eval/sweep only;
-- a script-layout test: `scripts/` stays in purpose areas;
 - a golden metric test;
 - a checkpoint round-trip test if you touch checkpoints.
 

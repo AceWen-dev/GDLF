@@ -133,9 +133,9 @@ tail -5 "$RUN_DIR/metrics.jsonl"
 更快的入口：
 
 ```bash
-python scripts/analysis/run_info.py --run <run_id>
-python scripts/analysis/runs.py --experiment baseline
-python scripts/ops/configs.py list
+python tools/run_info.py --run <run_id>
+python tools/runs.py --experiment baseline
+python tools/configs.py list
 ```
 
 `configs/` 按 variant 组织，不按 run/seed：
@@ -398,11 +398,11 @@ benchmark = 测试集 membership + 标签版本 + eval transform + 指标实现/
 阈值。把这份 manifest 冻结并提交：
 
 ```bash
-python scripts/ops/benchmark.py create \
+python tools/benchmark.py create \
   --config configs/base.yaml \
   --out benchmarks/synthetic-test-v1.json
 
-python scripts/ops/benchmark.py verify \
+python tools/benchmark.py verify \
   --config configs/base.yaml \
   --benchmark benchmarks/synthetic-test-v1.json
 ```
@@ -552,7 +552,7 @@ outputs/runs/<project>/<experiment>/<run_id>/
 ```
 
 ```bash
-python scripts/analysis/run_info.py --run <run_id>
+python tools/run_info.py --run <run_id>
 # 或 make inspect RUN=<run_id>
 ```
 
@@ -609,11 +609,11 @@ run dir
 python commands/train.py --config configs/base.yaml
 
 # 查看 run 的 config / benchmark / 源码
-python scripts/analysis/run_info.py --run <run_id>
-python scripts/analysis/runs.py
+python tools/run_info.py --run <run_id>
+python tools/runs.py
 
 # 配置目录
-python scripts/ops/configs.py list
+python tools/configs.py list
 
 # 换模型/loss
 python commands/train.py --config configs/base.yaml \
@@ -623,7 +623,7 @@ python commands/train.py --config configs/base.yaml \
 python commands/eval.py --checkpoint outputs/runs/.../checkpoints/last.pt
 
 # 冻结 benchmark
-python scripts/ops/benchmark.py create \
+python tools/benchmark.py create \
   --config configs/base.yaml \
   --out benchmarks/synthetic-test-v1.json
 

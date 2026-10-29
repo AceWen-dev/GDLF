@@ -1,37 +1,18 @@
 # Scripts
 
-Peripheral scripts are grouped by **purpose**, not dumped in one directory.
-`commands/` is only for core experiment execution (`train`, `eval`, `sweep`).
+Project-specific scripts. **This directory is intentionally unconstrained.**
 
-```text
-scripts/
-  data/
-    acquire/     # video stream, download, import, source readers
-    prepare/     # clean, label mapping, dedup, convert
-    split/       # build membership, leakage checks
-  analysis/      # read-only queries, plots, tables, run inspection
-  ops/           # benchmark manifests, config catalog, export/migration
-  _bootstrap.py  # internal: find the core when running in-repo
-```
+It exists so one-off automation does not pollute `commands/` or the component
+packages. Organize it however the current project needs; the DLEF template does
+not prescribe subdirectories.
 
-## Decision tree
+Guidelines:
 
-1. Is the code imported by `train` / `eval` / `sweep` / tests?
-   - Yes → `myproject/` (project-specific) or DLEF `adapters/` (reusable).
-   - No → it is a standalone script, continue.
-2. Does it acquire or prepare data?
-   - → `scripts/data/acquire/`, `prepare/`, or `split/`.
-3. Is it read-only analysis / query / plot?
-   - → `scripts/analysis/`.
-4. Is it benchmark/config/run/export maintenance?
-   - → `scripts/ops/`.
+- Anything here is project-specific and outside the framework contract.
+- If logic becomes reusable by training/eval/sweep, move it into `myproject/`
+  (or DLEF core/adapters if it is cross-project) and keep a thin script.
+- Scripts do not write run manifests, metrics or checkpoints by hand.
+- Generated data belongs under `$DLEF_DATA_ROOT`; generated outputs under
+  `outputs/`.
 
-Rules:
-
-- Scripts are **thin entry points**; put reusable logic in `myproject/`.
-- Scripts write data to `$DLEF_DATA_ROOT`, reports to `reports/` or stdout;
-  they never write manifests/metrics/checkpoints by hand.
-- No `scripts/misc/`, no top-level `utils.py`, no ad-hoc scripts in
-  `commands/`.
-- If a script is needed by more than one project, promote its logic to DLEF
-  core/adapters; keep only the CLI wrapper here.
+The template's own generic maintenance utilities live in `tools/`, not here.

@@ -28,11 +28,11 @@ Rules:
 - Keep one variant per file; do not mutate `base.yaml` for every experiment.
 - The file path and the `experiment` field should agree.
 - The run manifest records `config_source` and `config_digest`; use
-  `scripts/analysis/runs.py` to list runs with their config, and `scripts/analysis/run_info.py`
+  `tools/runs.py` to list runs with their config, and `tools/run_info.py`
   to inspect one run.
 
 ```bash
-python scripts/ops/configs.py list
-python scripts/analysis/runs.py --experiment ablation-lr
-python scripts/analysis/run_info.py --run <run_id>
+python tools/configs.py list
+python tools/runs.py --experiment ablation-lr
+python tools/run_info.py --run <run_id>
 ```

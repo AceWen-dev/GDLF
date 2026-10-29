@@ -53,18 +53,14 @@ commands/
   train.py               # thin entry: train + eval
   eval.py                # thin entry: separate eval run (val or sealed test)
   sweep.py               # subprocess grid/random sweep
-scripts/
-  data/
-    acquire/             # video stream, download, import
-    prepare/             # clean, label mapping, dedup, convert
-    split/               # build membership, leakage checks
-  analysis/              # queries, plots, run inspection
-    runs.py              # list runs with config source + latest metric
-    run_info.py          # run card: config -> benchmark -> source files
-  ops/                   # benchmark/config/export maintenance
-    benchmark.py         # freeze / verify a benchmark manifest
-    configs.py           # list / validate experiment configs
+tools/
+  benchmark.py           # freeze / verify a benchmark manifest
+  configs.py             # list / validate experiment configs
+  runs.py                # list runs with config source + latest metric
+  run_info.py            # run card: config -> benchmark -> source files
   _bootstrap.py          # internal: find the core when running in-repo
+  README.md
+scripts/                 # project-specific scripts, intentionally unstructured
   README.md
 tests/
   test_smoke.py
@@ -72,7 +68,6 @@ tests/
   test_benchmark.py
   test_config_contract.py
   test_command_surface.py
-  test_scripts_layout.py
 benchmarks/              # one frozen JSON per benchmark (small, committed)
 claims/                  # one JSON per reported claim
 outputs/                 # generated; never edit by hand
@@ -82,8 +77,8 @@ AGENTS.md                # this file
 If you rename `myproject`, update:
 
 - `pyproject.toml` → `[tool.setuptools.packages.find] include`;
-- imports in `commands/*.py`, `scripts/**/*.py` and `tests/*.py`;
-- source-path prefixes in `scripts/analysis/run_info.py`;
+- imports in `commands/*.py`, `tools/*.py` and `tests/*.py`;
+- source-path prefixes in `tools/run_info.py`;
 - any project docs.
 
 ### 1.1 Placement matrix
@@ -91,28 +86,26 @@ If you rename `myproject`, update:
 | You are adding... | Put it here | Also update |
 |---|---|---|
 | dataset reader / acquisition library code | `myproject/data/` | `data/build.py` if selectable |
-| data acquisition / download CLI | `scripts/data/acquire/` | thin wrapper only |
-| cleaning / label / dedup CLI | `scripts/data/prepare/` | reusable logic in `myproject/data/` |
-| split / leakage-check CLI | `scripts/data/split/` | membership digest + benchmark |
+| project-specific automation (acquisition, cleaning, query, export) | `scripts/` | no fixed structure; promote reusable logic |
 | transform | `myproject/data/transforms/<name>.py` | `data/build.py`, `DataConfig.validate` |
 | split strategy | `myproject/data/splits.py` | `SPLITTERS`, `DataConfig.validate` |
 | model | `myproject/models/<name>.py` | `models/build.py`, `ModelConfig.validate` |
 | loss | `myproject/losses/<name>.py` | `losses/build.py`, `LossConfig.validate` |
 | optimizer / scheduler | `myproject/optimizers/<name>.py`, `myproject/schedulers/<name>.py` | matching `build.py` + config |
 | metric | `myproject/metrics/<name>.py` | `metrics/build.py` + `metrics` list |
-| benchmark manifest | `benchmarks/` | create via `scripts/ops/benchmark.py` |
-| experiment config | `configs/experiments/<experiment>/<variant>.yaml` | `scripts/ops/configs.py list --check` |
-| query / plot / run inspection | `scripts/analysis/` | read-only; no run writes |
-| benchmark / config / export maintenance | `scripts/ops/` | metadata only |
+| benchmark manifest | `benchmarks/` | create via `tools/benchmark.py` |
+| experiment config | `configs/experiments/<experiment>/<variant>.yaml` | `tools/configs.py list --check` |
+| generic maintenance utility (provided by template) | `tools/` | keep generic; do not dump project scripts |
 | test | `tests/test_*.py` | run `python -m unittest discover -s tests` |
 | claim | `claims/` | `ClaimStore` |
 | reusable cross-project code | DLEF core or `adapters/` | not in `myproject/` |
 | generated run output | `outputs/` | never edit by hand |
 
-**Rules:** no ad-hoc scripts in `commands/`; no flat `scripts/*.py` (except
-`_bootstrap.py`); no `scripts/misc/` or `scripts/tmp/`; no `utils.py` at the
-project root. If a script grows reusable logic, move the logic into
-`myproject/` and leave a thin CLI.
+**Rules:** no ad-hoc scripts in `commands/`; `scripts/` is intentionally
+unstructured and project-specific (no video/data assumptions); `tools/` holds
+only generic maintenance utilities. If a script grows reusable logic, move the
+logic into `myproject/` (or core/adapters) and leave a thin CLI. No `utils.py`
+at the project root.
 
 ---
 
@@ -126,9 +119,9 @@ python -m unittest discover -s tests -v
 python commands/train.py --config configs/base.yaml
 python commands/eval.py \
   --checkpoint outputs/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
-python scripts/analysis/run_info.py --run <run_id>
-python scripts/analysis/runs.py
-python scripts/ops/configs.py list
+python tools/run_info.py --run <run_id>
+python tools/runs.py
+python tools/configs.py list
 python commands/sweep.py --config configs/base.yaml
 ```
 
@@ -300,8 +293,8 @@ only. Report the comparison through `dlef compare` / `dlef report`.
   a parameter space; generated trial configs stay under
   `outputs/sweeps/<sweep_id>/configs/`, not in the repo.
 - Do not edit `base.yaml` for every experiment; copy/create a variant.
-- Discover configs with `python scripts/ops/configs.py list`; map runs to configs
-  with `python scripts/analysis/runs.py`.
+- Discover configs with `python tools/configs.py list`; map runs to configs
+  with `python tools/runs.py`.
 - Never put output paths in config; run directories are derived.
 - Dataset bytes live under `$DLEF_DATA_ROOT`; config selects logical names and
   versions, not absolute data paths.
@@ -309,7 +302,7 @@ only. Report the comparison through `dlef compare` / `dlef report`.
 - For a debug run, create a separate debug config (tiny data, 1–2 steps); do not
   add `if debug` branches in model/task code.
 - A run is inspected from its run directory: `manifest.json` +
-  `config.resolved.json` + eval records. `scripts/analysis/run_info.py --run <id>` prints
+  `config.resolved.json` + eval records. `tools/run_info.py --run <id>` prints
   the config-to-source map. The manifest records the original config source and
   code version, so a name cannot silently drift to different source.
 
@@ -439,7 +432,6 @@ Every project should have:
   benchmark id changes with membership/metric protocol;
 - `tests/test_config_contract.py`: every config selector resolves to a builder;
 - `tests/test_command_surface.py`: `commands/` stays train/eval/sweep only;
-- `tests/test_scripts_layout.py`: `scripts/` stays in purpose areas;
 - a golden test for each metric;
 - a checkpoint round-trip test if you touch checkpoints.
 
@@ -470,9 +462,9 @@ Do not edit the installed `dlef` package in place.
 - Do not put secrets in config/logs.
 - Do not commit dataset bytes or absolute data paths.
 - Do not add ad-hoc scripts to `commands/`; `commands/` is only train/eval/sweep.
-  Put data scripts under `scripts/data/{acquire,prepare,split}/`, read-only
-  analysis under `scripts/analysis/`, maintenance under `scripts/ops/`.
-  Promote reusable code to core/adapters instead of copying it into projects.
+- Project-specific automation goes under `scripts/` (intentionally unstructured).
+  `tools/` is only for the template's generic maintenance utilities.
+  Promote reusable logic to `myproject/` or core/adapters.
 - Do not add project-specific code to the installed core.
 
 ---
@@ -514,7 +506,7 @@ test that the same split name + seed yields the same membership.
 **New benchmark** → change the test membership, label version, eval transform
 or metric protocol, then create a new manifest:
 ```bash
-python scripts/ops/benchmark.py create \
+python tools/benchmark.py create \
   --config configs/base.yaml \
   --out benchmarks/my-benchmark-v2.json
 ```

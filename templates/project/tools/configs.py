@@ -10,11 +10,11 @@ import argparse
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts._bootstrap import ensure_core  # noqa: E402
+from tools._bootstrap import ensure_core  # noqa: E402
 
 ensure_core()
 

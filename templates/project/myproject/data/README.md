@@ -1,6 +1,6 @@
 # Data package
 
-Reusable data code lives here; CLI scripts under `scripts/data/` stay thin.
+Reusable data code lives here; project-specific scripts under `scripts/` stay thin.
 
 ```text
 datasets/    # runtime Dataset classes returned by build.py
@@ -15,7 +15,7 @@ benchmark.py # frozen test set + metric protocol
 build.py     # data.name / transform registry + make_loaders
 ```
 
-Example: a video-stream acquisition CLI belongs in
-`scripts/data/acquire/video_stream.py`; its reusable reader/decoder belongs in
+Example: a source-acquisition CLI belongs under `scripts/` (organize it however
+that project needs); its reusable reader/decoder belongs in
 `myproject/data/ingest/`. The CLI writes raw data under
 `$DLEF_DATA_ROOT/raw/...`; it does not write into `outputs/runs/`.

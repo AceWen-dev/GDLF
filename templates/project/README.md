@@ -32,16 +32,16 @@ myproject/runtime.py     # policy / runner / sweep result helper
 commands/train.py        # thin entry: train + eval
 commands/eval.py         # thin entry: separate eval run (val or sealed test)
 commands/sweep.py        # subprocess grid sweep
-scripts/ops/benchmark.py       # freeze / verify a benchmark manifest
-scripts/ops/configs.py         # list / validate experiment configs
-scripts/analysis/runs.py            # list runs with config source + latest metric
-scripts/analysis/run_info.py        # run card: config -> benchmark -> source files
+tools/benchmark.py       # freeze / verify a benchmark manifest
+tools/configs.py         # list / validate experiment configs
+tools/runs.py            # list runs with config source + latest metric
+tools/run_info.py        # run card: config -> benchmark -> source files
+scripts/                 # project-specific scripts (intentionally free-form)
 tests/test_smoke.py      # one tiny end-to-end test
 tests/test_components.py # component shape/golden tests
 tests/test_benchmark.py  # test-set / benchmark identity tests
 tests/test_config_contract.py # every config selector resolves to a builder
 tests/test_command_surface.py # commands/ stays train/eval/sweep only
-tests/test_scripts_layout.py # scripts/ stays in purpose areas
 benchmarks/              # one frozen JSON per benchmark (small, committed)
 claims/                  # one JSON per reported claim
 AGENTS.md                # project-local agent guide
@@ -144,11 +144,11 @@ benchmark = test membership + labels
 Freeze it once and commit the small manifest:
 
 ```bash
-python scripts/ops/benchmark.py create \
+python tools/benchmark.py create \
   --config configs/base.yaml \
   --out benchmarks/synthetic-test-v1.json
 
-python scripts/ops/benchmark.py verify \
+python tools/benchmark.py verify \
   --config configs/base.yaml \
   --benchmark benchmarks/synthetic-test-v1.json
 ```
@@ -198,9 +198,9 @@ core.
 python commands/train.py --config configs/base.yaml
 python commands/eval.py \
   --checkpoint outputs/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
-python scripts/analysis/run_info.py --run <run_id>
-python scripts/analysis/runs.py
-python scripts/ops/configs.py list
+python tools/run_info.py --run <run_id>
+python tools/runs.py
+python tools/configs.py list
 python commands/sweep.py --config configs/base.yaml
 python -m unittest discover -s tests -v
 python -m dlef.cli report --runs outputs/runs --claims claims --out report.md
@@ -217,16 +217,16 @@ using `--apply`.
 Keep the command surface small:
 
 ```text
-commands/          train.py / eval.py / sweep.py   # core experiment execution
-scripts/data/      acquire / prepare / split        # data pipeline entry points
-scripts/analysis/  queries, plots, run inspection   # read-only
-scripts/ops/       benchmark, config, export        # maintenance
+commands/   train.py / eval.py / sweep.py   # core experiment execution
+tools/      benchmark / configs / runs / run_info  # generic project maintenance
+scripts/    project-specific scripts        # intentionally unstructured
 ```
 
-`commands/` is not a script dump. A new utility goes to the matching
-`scripts/<area>/` directory first; if it is reusable across projects, promote
-its logic to DLEF core/adapters. This is enforced by
-`tests/test_command_surface.py` and `tests/test_scripts_layout.py`.
+`scripts/` is the escape hatch for project-specific automation: organize it
+however the current task needs. `tools/` is for the template's generic
+maintenance utilities; don't turn it into a project script dump. If a script's
+logic becomes reusable, move it to `myproject/` or DLEF core/adapters.
+`tests/test_command_surface.py` enforces the small `commands/` surface.
 
 ## Config organization
 
@@ -239,8 +239,8 @@ configs/
   sweeps/<sweep>.yaml          # optional parameter space
 ```
 
-See [`configs/README.md`](configs/README.md). Use `scripts/ops/configs.py list` to
-validate the catalog and `scripts/analysis/runs.py` to see which config produced each
+See [`configs/README.md`](configs/README.md). Use `tools/configs.py list` to
+validate the catalog and `tools/runs.py` to see which config produced each
 run. Seeds and sweep trials are runs, not extra config files.
 
 ## Inspect a run
@@ -248,7 +248,7 @@ run. Seeds and sweep trials are runs, not extra config files.
 The run directory is the entry point; the config is the first file to read:
 
 ```bash
-python scripts/analysis/run_info.py --run <run_id>
+python tools/run_info.py --run <run_id>
 # or: make inspect RUN=<run_id>
 ```
 
