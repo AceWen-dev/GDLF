@@ -11,11 +11,14 @@ from typing import Any
 from adapters.torch import TorchTask
 
 from .config import ProjectConfig
-from .losses import build_loss
-from .metrics import build_metrics
+
+# Keep imports and construction in training-flow order:
+# model -> loss -> optimizer -> scheduler -> metrics.
 from .models import build_model
+from .losses import build_loss
 from .optimizers import build_optimizer
 from .schedulers import build_scheduler
+from .metrics import build_metrics
 
 
 def build_task(config: ProjectConfig, device: Any = "cpu") -> TorchTask:

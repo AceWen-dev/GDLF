@@ -23,8 +23,8 @@ Do **not** modify `dlef/` for project-specific needs.
    - `myproject/data/` (`datasets/`, `transforms/`, `splits.py`, `loaders.py`)
    - `myproject/models/` + `models/build.py`
    - `myproject/losses/` + `losses/build.py`
+   - `myproject/optimizers/`、`myproject/schedulers/`
    - `myproject/metrics/` + `metrics/build.py`
-   - `myproject/optimizers/`、`myproject/schedulers/` as needed
 7. Keep `myproject/task.py` as the composition root; keep
    `myproject/runtime.py`, `myproject/config.py` and `commands/` as the wiring
    unless the experiment genuinely needs a new seam.
@@ -115,13 +115,13 @@ A project has this shape (from `templates/project/`):
   myproject/
     config.py              # typed dataclass schema
     data/
-      build.py             # data.name / transform registry + make_loaders
       datasets/            # one file per dataset + build.py registry
-      transforms/          # one file per transform
       splits.py            # split strategies (materialized indices)
+      transforms/          # one file per transform
       paths.py             # $DLEF_DATA_ROOT + external layout
-      loaders.py           # DataLoader assembly
       spec.py              # DataSpec + recipe digest
+      loaders.py           # DataLoader assembly
+      build.py             # data composition root: registry + make_loaders
     models/                # one file per architecture + build.py registry
     losses/                # one file per loss + build.py registry
     optimizers/            # one file per optimizer + build.py registry

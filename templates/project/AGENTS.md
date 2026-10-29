@@ -16,13 +16,13 @@ configs/                 # one YAML per experiment/variant
 myproject/
   config.py              # typed dataclass schema
   data/
-    build.py             # data.name / transform registry + make_loaders
     datasets/            # REPLACE: one file per dataset
-    transforms/          # one file per transform
     splits.py            # split strategies (materialized indices)
+    transforms/          # one file per transform
     paths.py             # $DLEF_DATA_ROOT + external layout
-    loaders.py           # DataLoader assembly
     spec.py              # DataSpec + recipe digest
+    loaders.py           # DataLoader assembly
+    build.py             # data composition root: registry + make_loaders
   models/
     build.py             # name -> builder registry
     mlp.py

@@ -12,13 +12,13 @@ asking a coding agent to edit.
 configs/base.yaml        # experiment config
 myproject/config.py      # typed config schema
 myproject/data/          # REPLACE/EXTEND: datasets, splits, transforms, loaders
-  build.py               # data.name / transform registry + make_loaders
   datasets/              # one file per dataset
-  transforms/            # one file per transform
   splits.py              # split strategies (materialized indices)
+  transforms/            # one file per transform
   paths.py               # $DLEF_DATA_ROOT + external dataset layout
-  loaders.py             # DataLoader assembly
   spec.py                # DataSpec + recipe digest
+  loaders.py             # DataLoader assembly
+  build.py               # data composition root: registry + make_loaders
 myproject/models/        # REPLACE/EXTEND: one file per architecture + build.py
 myproject/losses/        # REPLACE/EXTEND: one file per loss + build.py
 myproject/optimizers/    # one file per optimizer + build.py

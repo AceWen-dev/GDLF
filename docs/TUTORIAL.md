@@ -264,17 +264,18 @@ python -m dlef.cli gc \
 
 ```text
 myproject/data/          # 数据集 + split + transform + loader
-  build.py               # data.name / transform registry + make_loaders
   datasets/              # 每个数据集一个文件
-  transforms/            # 每个 transform 一个文件
   splits.py              # 物化的 role -> indices
-  loaders.py             # DataLoader 组装
+  transforms/            # 每个 transform 一个文件
+  paths.py               # $DLEF_DATA_ROOT + 外部目录布局
   spec.py                # DataBundle + DataSpec + recipe digest
+  loaders.py             # DataLoader 组装
+  build.py               # 数据侧 composition root
 myproject/models/        # 每个模型一个文件 + models/build.py 注册
 myproject/losses/        # 每个 loss 一个文件 + losses/build.py 注册
-myproject/metrics/       # 每个指标一个文件 + metrics/build.py 注册
 myproject/optimizers/    # 需要换优化器时
 myproject/schedulers/    # 需要换调度器时
+myproject/metrics/       # 每个指标一个文件 + metrics/build.py 注册
 ```
 
 `task.py` 是 trainable task 的 composition root；`data/build.py` 是数据侧的

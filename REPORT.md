@@ -207,18 +207,18 @@ python commands/train.py --config configs/base.yaml
 
 ```text
 myproject/data/          # 数据集 + split + transform + loader
-  build.py               # data.name / transform registry + make_loaders
   datasets/              # 每个数据集一个文件
-  transforms/            # 每个 transform 一个文件
   splits.py              # 物化的 role -> indices
+  transforms/            # 每个 transform 一个文件
   paths.py               # $DLEF_DATA_ROOT + 外部目录布局
-  loaders.py             # DataLoader 组装
   spec.py                # DataSpec + recipe digest
+  loaders.py             # DataLoader 组装
+  build.py               # 数据侧 composition root
 myproject/models/        # 每个模型一个文件 + models/build.py 注册
 myproject/losses/        # 每个 loss 一个文件 + losses/build.py 注册
-myproject/metrics/       # 每个指标一个文件 + metrics/build.py 注册
 myproject/optimizers/    # 需要换优化器时
 myproject/schedulers/    # 需要换调度器时
+myproject/metrics/       # 每个指标一个文件 + metrics/build.py 注册
 ```
 
 数据也是消融轴：`data.name` / `data.split` / `data.train_transform` /
