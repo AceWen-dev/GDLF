@@ -11,13 +11,13 @@ eval:
 
 inspect:
 	@test -n "$(RUN)" || (echo "usage: make inspect RUN=<run_id>"; exit 2)
-	$(PYTHON) tools/run_info.py --runs outputs/runs --run $(RUN)
+	$(PYTHON) scripts/analysis/run_info.py --runs outputs/runs --run $(RUN)
 
 runs:
-	$(PYTHON) tools/runs.py --runs outputs/runs
+	$(PYTHON) scripts/analysis/runs.py --runs outputs/runs
 
 configs:
-	$(PYTHON) tools/configs.py list
+	$(PYTHON) scripts/ops/configs.py list
 
 sweep:
 	$(PYTHON) commands/sweep.py --config configs/base.yaml

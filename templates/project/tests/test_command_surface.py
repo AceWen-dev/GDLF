@@ -17,7 +17,7 @@ class CommandSurfaceTests(unittest.TestCase):
         self.assertEqual(
             actual,
             CORE_COMMANDS,
-            "commands/ is for train/eval/sweep only; put tools under tools/",
+            "commands/ is for train/eval/sweep only; put scripts under scripts/<area>/",
         )
 
 
