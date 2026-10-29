@@ -128,14 +128,16 @@ core ← adapters ← examples / templates
 
 ### 5.1 配置
 
-- dataclass schema，支持嵌套（`data / model / optim / train`）。
+- dataclass schema，支持嵌套（`data / model / optim / benchmark / train`）。
+- **每个影响行为的选项都是 config 字段**；builder 接收 config，不在代码里隐藏开关。
 - unknown key 报错；类型不匹配报错；`validate()` 做范围/互斥检查。
 - 运行前 dump `config.resolved.json`，SHA-256 digest 进 manifest。
+- manifest 记录 `config_source` 和 `code_version`；`run_info.py` 从 config 反查源码。
 - JSON 永远可用；YAML 在安装 PyYAML 后可用。
 
 ### 5.2 Run / Artifact
 
-- `RunManifest`：run_id、project、experiment、config_digest、code_version、data_versions、env、seed、status、artifacts、parent_run_id、tags、error。
+- `RunManifest`：run_id、project、experiment、config_digest、config_source、code_version、data_versions、env、seed、status、artifacts、parent_run_id、tags、error。
 - `RunStore`：`runs/<project>/<experiment>/<run_id>/`。
 - `ArtifactStore`：内容寻址 `<sha[:2]>/<sha>/<name>`。
 - checkpoint 默认 JSON；torch adapter 用 `.pt`（`torch.save`）。
@@ -267,6 +269,16 @@ outputs/runs/<project>/<experiment>/<run_id>/
 python commands/eval.py \
   --checkpoint outputs/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
 ```
+
+查一个 run 的全部信息：
+
+```bash
+python commands/run_info.py --run <run_id>
+```
+
+它从 run 目录读取 `manifest.json` + `config.resolved.json` + eval records，打印
+数据/模型/loss/指标/benchmark 以及对应源码文件。`config.resolved.json` 是权威；
+原始 YAML 在用了 `--set` 或 sweep 后不是最终值。
 
 ### 6.3 实验中途换模型 / 损失函数
 

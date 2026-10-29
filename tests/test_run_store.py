@@ -18,8 +18,10 @@ class RunStoreTests(unittest.TestCase):
                 experiment="e",
                 config_digest="a" * 64,
                 seed=3,
+                config_source="configs/base.yaml",
             )
             self.assertEqual(run.manifest.status, "running")
+            self.assertEqual(run.manifest.config_source, "configs/base.yaml")
             self.assertTrue(run.manifest_path.is_file())
 
             run.log_metrics({"step": 1, "loss": 0.5})

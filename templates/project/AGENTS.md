@@ -50,11 +50,13 @@ commands/
   train.py               # thin entry: train + eval
   eval.py                # thin entry: separate eval run (val or sealed test)
   benchmark.py           # freeze / verify a benchmark manifest
+  run_info.py           # run card: config -> benchmark -> source files
   sweep.py               # subprocess grid/random sweep
 tests/
   test_smoke.py
   test_components.py
   test_benchmark.py
+  test_config_contract.py
 benchmarks/              # one frozen JSON per benchmark (small, committed)
 claims/                  # one JSON per reported claim
 outputs/                 # generated; never edit by hand
@@ -65,6 +67,7 @@ If you rename `myproject`, update:
 
 - `pyproject.toml` → `[tool.setuptools.packages.find] include`;
 - imports in `commands/*.py` and `tests/*.py`;
+- source-path prefixes in `commands/run_info.py`;
 - any project docs.
 
 ---
@@ -79,6 +82,7 @@ python -m unittest discover -s tests -v
 python commands/train.py --config configs/base.yaml
 python commands/eval.py \
   --checkpoint outputs/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
+python commands/run_info.py --run <run_id>
 python commands/sweep.py --config configs/base.yaml
 ```
 
@@ -87,6 +91,7 @@ Or:
 ```bash
 make train
 make eval CHECKPOINT=outputs/runs/.../checkpoints/last.pt
+make inspect RUN=<run_id>
 make sweep
 make test
 make report
@@ -232,6 +237,12 @@ only. Report the comparison through `dlef compare` / `dlef report`.
 ## 4. Config rules
 
 - `myproject/config.py` is the schema; `configs/*.yaml` are values.
+- **Every behavior-affecting choice is a typed config field.** Data
+  name/version/seed/split/transforms, model, loss, optimizer, scheduler,
+  metrics, benchmark and training policy all live in the config. No hidden
+  module-level constants or `if name == ...` switches.
+- Builders receive config objects; `task.py`, `data/build.py` and `commands/`
+  only wire. They do not read environment-specific overrides.
 - Use nested dataclasses (`data`, `model`, `optim`, ...) for real projects.
 - Unknown keys are errors by design.
 - Add validation in `validate()` (ranges, mutual exclusion).
@@ -242,6 +253,10 @@ only. Report the comparison through `dlef compare` / `dlef report`.
 - Secrets go through environment variables; never config or logs.
 - For a debug run, create a separate debug config (tiny data, 1–2 steps); do not
   add `if debug` branches in model/task code.
+- A run is inspected from its run directory: `manifest.json` +
+  `config.resolved.json` + eval records. `commands/run_info.py --run <id>` prints
+  the config-to-source map. The manifest records the original config source and
+  code version, so a name cannot silently drift to different source.
 
 ---
 
@@ -367,6 +382,7 @@ Every project should have:
 - a shape/contract test for data/model/loss;
 - `tests/test_benchmark.py`: test membership stable across train changes;
   benchmark id changes with membership/metric protocol;
+- `tests/test_config_contract.py`: every config selector resolves to a builder;
 - a golden test for each metric;
 - a checkpoint round-trip test if you touch checkpoints.
 

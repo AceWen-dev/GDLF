@@ -323,8 +323,11 @@ class Config:
 约束：
 
 - schema 是 dataclass tree；类型化。
+- **每个影响行为的选项都是 config 字段**：data recipe / split / transform / model / loss / optimizer / scheduler / metrics / benchmark / policy；不允许模块级隐藏开关或 `if name ==`。
+- builder 接收 config 对象；`task.py` / `data/build.py` / `commands/` 只做接线。
 - unknown key 报错；缺省值只在 schema 里定义。
-- 运行前 dump `config.resolved.yaml`；digest 进入 RunManifest。
+- 运行前 dump `config.resolved.json`；digest 进入 RunManifest。
+- RunManifest 记录 `config_source` 和 `code_version`；从 run 目录的 manifest + resolved config 可以回到源码。
 - secrets 只从 env 读；dump 时 redact。
 - 不允许 config 里写任意 Python 表达式或 import；`class_path` 是唯一受控逃生口。
 
@@ -347,6 +350,7 @@ class RunManifest:
     ended_at: str | None = None
     parent_run_id: str | None = None
     tags: Mapping[str, str] = field(default_factory=dict)
+    config_source: str = ""
 ```
 
 约束：

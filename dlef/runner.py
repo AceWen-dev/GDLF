@@ -84,6 +84,7 @@ class Runner:
                 seed=schema.seed,
                 data_versions=_data_versions(train_data, val_data),
                 tags={"framework": "dlef"},
+                config_source=config.source,
             )
             run.save_json("config.resolved.json", config.resolved)
 

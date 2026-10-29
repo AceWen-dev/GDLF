@@ -30,10 +30,12 @@ myproject/runtime.py     # policy / runner / sweep result helper
 commands/train.py        # thin entry: train + eval
 commands/eval.py         # thin entry: separate eval run (val or sealed test)
 commands/benchmark.py    # freeze / verify a benchmark manifest
+commands/run_info.py      # run card: config -> benchmark -> source files
 commands/sweep.py        # subprocess grid sweep
 tests/test_smoke.py      # one tiny end-to-end test
 tests/test_components.py # component shape/golden tests
 tests/test_benchmark.py  # test-set / benchmark identity tests
+tests/test_config_contract.py # every config selector resolves to a builder
 benchmarks/              # one frozen JSON per benchmark (small, committed)
 claims/                  # one JSON per reported claim
 AGENTS.md                # project-local agent guide
@@ -190,15 +192,39 @@ core.
 python commands/train.py --config configs/base.yaml
 python commands/eval.py \
   --checkpoint outputs/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
+python commands/run_info.py --run <run_id>
 python commands/sweep.py --config configs/base.yaml
 python -m unittest discover -s tests -v
 python -m dlef.cli report --runs outputs/runs --claims claims --out report.md
 ```
 
 Or `make train`, `make sweep`, `make report`, `make gc-dry`, `make test`,
-`make doctor`. `make eval CHECKPOINT=...` needs the checkpoint path explicitly.
+`make doctor`. `make eval CHECKPOINT=...` needs the checkpoint path explicitly;
+`make inspect RUN=<run_id>` prints the run card.
 `make gc-dry` is a dry-run; change `--metric-key` to your primary metric before
 using `--apply`.
+
+## Inspect a run
+
+The run directory is the entry point; the config is the first file to read:
+
+```bash
+python commands/run_info.py --run <run_id>
+# or: make inspect RUN=<run_id>
+```
+
+The run card prints:
+
+- `manifest.json`: status, code version, config digest, seed, data versions;
+- `config.resolved.json`: data recipe, model/loss/optimizer/scheduler/metrics,
+  benchmark config;
+- eval records: benchmark id, test set id, metrics, test access;
+- source files: `myproject/data/datasets/<name>.py`,
+  `myproject/models/<name>.py`, `myproject/losses/<name>.py`, etc.
+
+The config selects implementations; the `build.py` registries map names to
+files. The manifest records the exact code version and data versions, so a
+config name cannot silently drift to different source.
 
 ## Changing data / model / loss mid-experiment
 

@@ -84,6 +84,7 @@ class RunManifest:
     parent_run_id: str | None = None
     tags: Mapping[str, str] = field(default_factory=dict)
     error: str | None = None
+    config_source: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -284,6 +285,7 @@ class RunStore:
         data_versions: Mapping[str, str] | None = None,
         tags: Mapping[str, str] | None = None,
         parent_run_id: str | None = None,
+        config_source: str = "",
     ) -> Run:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         run_id = f"{timestamp}_{config_digest[:8]}_s{seed}_{uuid.uuid4().hex[:6]}"
@@ -299,6 +301,7 @@ class RunStore:
             data_versions=dict(data_versions or {}),
             tags=dict(tags or {}),
             parent_run_id=parent_run_id,
+            config_source=config_source,
         )
         run = Run(directory, manifest, self.artifact_store)
         run.write_manifest()

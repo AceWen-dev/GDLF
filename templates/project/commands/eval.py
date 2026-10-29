@@ -152,6 +152,7 @@ def main() -> int:
             "split": args.split,
             **({"benchmark_id": benchmark_id} if benchmark_id else {}),
         },
+        config_source=source,
     )
     run.save_json("config.resolved.json", config.resolved)
     try:

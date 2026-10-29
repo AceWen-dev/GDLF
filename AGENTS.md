@@ -70,6 +70,10 @@ Do **not** modify `dlef/` for project-specific needs.
 13. **A benchmark is frozen.** Test membership + labels + eval transform +
     metric protocol are one `benchmark_id`; changing any of them creates a new
     benchmark. Compare numbers only within the same `benchmark_id`.
+14. **Config is the single declaration of choices.** Every behavior-affecting
+    knob/selector is a typed config field; builders receive config instead of
+    branching on names. The run manifest records config digest, config source
+    and code version; `inspect` resolves config → source.
 
 ---
 
@@ -138,6 +142,7 @@ A project has this shape (from `templates/project/`):
     train.py               # thin entry: train + eval
     eval.py                # thin entry: separate eval run (val or sealed test)
     benchmark.py           # freeze / verify a benchmark manifest
+    run_info.py           # run card: config -> benchmark -> source files
     sweep.py               # subprocess grid/random sweep
   tests/
     test_smoke.py
@@ -251,9 +256,20 @@ Changing data/model/loss mid-experiment:
 ## 5. Config conventions
 
 - Config is a **typed dataclass tree** (`ConfigSchema` / `TrainConfig`).
+- **Every behavior-affecting choice is a config field**: data recipe, split,
+  transforms, model, loss, optimizer, scheduler, metrics, benchmark, policy.
+  Do not hide switches in module globals, environment variables or `if name ==`
+  branches. Environment variables are only for paths (`DLEF_DATA_ROOT`) and
+  secrets.
+- Builders receive config objects. `task.py` / `data/build.py` / `commands/`
+  only wire; they do not branch on implementation names.
 - Unknown keys are errors. Do not add ad-hoc dict keys.
 - Validation belongs in `validate()` / `__post_init__`.
-- Every run dumps `config.resolved.json`; its SHA-256 goes into the manifest.
+- Every run dumps `config.resolved.json`; its SHA-256 and original
+  `config_source` go into the manifest.
+- Inspect a run from its directory: `manifest.json` + `config.resolved.json` +
+  eval records. `commands/run_info.py --run <id>` prints the config-to-source
+  map.
 - Secrets go through environment variables, never config files.
 - Do not put paths to outputs in config; run directories are derived.
 - Do not use `if debug` branches inside model/task code; use a separate debug
@@ -409,6 +425,7 @@ Every project should have:
 - a shape/contract test for data/model/loss/metric;
 - a benchmark identity test: test membership stable across train changes,
   benchmark id changes with membership/metric protocol;
+- a config-contract test: every selector in the config resolves to a builder;
 - a golden metric test;
 - a checkpoint round-trip test if you touch checkpoints.
 

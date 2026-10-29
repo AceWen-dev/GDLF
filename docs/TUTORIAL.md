@@ -519,6 +519,44 @@ params={
 一个 trial = 一个新 run。旧 run 的 `DataSpec.version` 和 `config.resolved.json`
 保持不变，所以新增数据不会让旧结果失效。
 
+### 跑完一个 run 怎么查
+
+入口是 run 目录，不是原始 YAML：
+
+```text
+outputs/runs/<project>/<experiment>/<run_id>/
+  manifest.json            # config digest、config_source、code_version、data_versions
+  config.resolved.json     # 权威配置：包含 --set / sweep 后的最终值
+  evals/<eval_id>.json     # benchmark_id、test_set_id、metrics、test_access
+  checkpoints/last.pt
+```
+
+```bash
+python commands/run_info.py --run <run_id>
+# 或 make inspect RUN=<run_id>
+```
+
+它会打印：
+
+- run 状态、seed、代码版本、config digest、原始 config 路径；
+- 数据：`data.name` / `version` / `seed` / `split` / transforms，以及 manifest
+  里的 `data_versions`；
+- 模型、loss、optimizer、scheduler、metrics、benchmark 的最终配置；
+- 每条 eval 的 `benchmark_id` / `test_set_id` / metrics / test access；
+- 配置名对应的源码文件，例如 `myproject/models/<name>.py`。
+
+注意：**原始 `configs/*.yaml` 不是权威**。如果用了 `--set` 或 sweep，最终值在
+`config.resolved.json`；源码由 `build.py` 注册表 + manifest 里的
+`code_version` 决定。所以“config → 源码”的完整链路是：
+
+```text
+run dir
+  → manifest.json (config_source, code_version, data_versions)
+  → config.resolved.json (最终选择)
+  → myproject/{models,losses,optimizers,schedulers,metrics,data}/build.py
+  → <name>.py
+```
+
 ---
 
 ## 13. 每天的工作流
@@ -549,6 +587,9 @@ params={
 ```bash
 # 训练
 python commands/train.py --config configs/base.yaml
+
+# 查看 run 的 config / benchmark / 源码
+python commands/run_info.py --run <run_id>
 
 # 换模型/loss
 python commands/train.py --config configs/base.yaml \

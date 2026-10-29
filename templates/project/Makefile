@@ -1,6 +1,6 @@
 PYTHON ?= python
 
-.PHONY: train eval sweep report gc-dry test doctor
+.PHONY: train eval inspect sweep report gc-dry test doctor
 
 train:
 	$(PYTHON) commands/train.py --config configs/base.yaml
@@ -8,6 +8,10 @@ train:
 eval:
 	@test -n "$(CHECKPOINT)" || (echo "usage: make eval CHECKPOINT=outputs/runs/.../checkpoints/last.pt"; exit 2)
 	$(PYTHON) commands/eval.py --checkpoint $(CHECKPOINT)
+
+inspect:
+	@test -n "$(RUN)" || (echo "usage: make inspect RUN=<run_id>"; exit 2)
+	$(PYTHON) commands/run_info.py --runs outputs/runs --run $(RUN)
 
 sweep:
 	$(PYTHON) commands/sweep.py --config configs/base.yaml
