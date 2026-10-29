@@ -83,7 +83,7 @@ python -m unittest discover -s tests -v
 ## 5. 跑第一次训练
 
 ```bash
-python scripts/train.py --config configs/base.yaml
+python commands/train.py --config configs/base.yaml
 ```
 
 你会看到类似：
@@ -137,7 +137,7 @@ tail -5 "$RUN_DIR/metrics.jsonl"
 ## 7. 做一次独立评测
 
 ```bash
-python scripts/eval.py --checkpoint "$RUN_DIR/checkpoints/last.pt"
+python commands/eval.py --checkpoint "$RUN_DIR/checkpoints/last.pt"
 ```
 
 输出：
@@ -158,7 +158,7 @@ eval record: .../evals/...json
 ## 8. 跑一次 sweep（多个变体）
 
 ```bash
-python scripts/sweep.py --config configs/base.yaml
+python commands/sweep.py --config configs/base.yaml
 ```
 
 默认跑 4 个 trial（lr × grad accumulation），每个 trial 一个 subprocess。
@@ -331,7 +331,7 @@ unknown key 会报错；这是故意的。
 模板已经配置驱动：
 
 ```bash
-python scripts/train.py --config configs/base.yaml \
+python commands/train.py --config configs/base.yaml \
   --set model.name=linear \
   --set loss.name=huber \
   --set experiment=arch-linear-loss-huber
@@ -340,12 +340,12 @@ python scripts/train.py --config configs/base.yaml \
 评测只给 checkpoint：
 
 ```bash
-python scripts/eval.py --checkpoint .../last.pt
+python commands/eval.py --checkpoint .../last.pt
 ```
 
 它会自动读回训练配置。
 
-要比较多个组合，改 `scripts/sweep.py`：
+要比较多个组合，改 `commands/sweep.py`：
 
 ```python
 params={
@@ -385,17 +385,17 @@ params={
 
 ```bash
 # 训练
-python scripts/train.py --config configs/base.yaml
+python commands/train.py --config configs/base.yaml
 
 # 换模型/loss
-python scripts/train.py --config configs/base.yaml \
+python commands/train.py --config configs/base.yaml \
   --set model.name=linear --set loss.name=huber
 
 # 评测
-python scripts/eval.py --checkpoint outputs/runs/.../checkpoints/last.pt
+python commands/eval.py --checkpoint outputs/runs/.../checkpoints/last.pt
 
 # 扫参
-python scripts/sweep.py --config configs/base.yaml
+python commands/sweep.py --config configs/base.yaml
 
 # 报告
 python -m dlef.cli report --runs outputs/runs --claims claims --out report.md
@@ -408,7 +408,7 @@ python -m dlef.cli gc --runs outputs/runs --sweeps outputs/sweeps \
 python -m dlef.cli doctor
 
 # DDP
-torchrun --nproc_per_node=N scripts/train.py --config configs/base.yaml
+torchrun --nproc_per_node=N commands/train.py --config configs/base.yaml
 ```
 
 ---

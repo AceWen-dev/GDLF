@@ -17,9 +17,9 @@ myproject/loss.py       # REPLACE: loss + named terms
 myproject/metrics.py    # REPLACE: metrics
 myproject/task.py       # wiring: model / loss / optimizer / scheduler
 myproject/runtime.py    # policy / runner / sweep result helper
-scripts/train.py        # thin entry: train + eval
-scripts/eval.py         # thin entry: separate eval run
-scripts/sweep.py        # subprocess grid sweep
+commands/train.py        # thin entry: train + eval
+commands/eval.py         # thin entry: separate eval run
+commands/sweep.py        # subprocess grid sweep
 tests/test_smoke.py     # one tiny end-to-end test
 claims/                 # one JSON per reported claim
 AGENTS.md               # project-local agent guide
@@ -52,10 +52,10 @@ core.
 ## Run
 
 ```bash
-python scripts/train.py --config configs/base.yaml
-python scripts/eval.py \
+python commands/train.py --config configs/base.yaml
+python commands/eval.py \
   --checkpoint outputs/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
-python scripts/sweep.py --config configs/base.yaml
+python commands/sweep.py --config configs/base.yaml
 python -m unittest discover -s tests -v
 python -m dlef.cli report --runs outputs/runs --claims claims --out report.md
 ```
@@ -71,7 +71,7 @@ A running job cannot swap architecture/loss. Start a new run; old runs stay
 immutable. The template is config-driven:
 
 ```bash
-python scripts/train.py --config configs/base.yaml \
+python commands/train.py --config configs/base.yaml \
   --set model.name=linear \
   --set loss.name=huber \
   --set experiment=arch-linear-loss-huber
@@ -87,7 +87,7 @@ and loss match automatically; the eval run stays grouped under the training
 experiment. `--config` is only a fallback if the original run directory is gone.
 
 For a comparison, sweep `model.name`, `loss.name`, and `seed` in
-`scripts/sweep.py`; one trial = one new run. Commit code before official runs;
+`commands/sweep.py`; one trial = one new run. Commit code before official runs;
 dirty runs are exploratory.
 
 ## What you get
@@ -113,7 +113,7 @@ outputs/sweeps/<sweep_id>/
   trials/<trial_id>.result.json
 ```
 
-`scripts/train.py` writes a `TrialResult` when it runs under
+`commands/train.py` writes a `TrialResult` when it runs under
 `SubprocessSweep`; that is how the sweep gets `run_id` and metrics.
 
 ## Rules
@@ -126,10 +126,10 @@ outputs/sweeps/<sweep_id>/
 
 ## DDP
 
-`scripts/train.py` supports `torchrun`:
+`commands/train.py` supports `torchrun`:
 
 ```bash
-torchrun --nproc_per_node=N scripts/train.py --config configs/base.yaml
+torchrun --nproc_per_node=N commands/train.py --config configs/base.yaml
 ```
 
 Rank 0 writes the run; other ranks train without writing. DDP evaluation and

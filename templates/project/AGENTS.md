@@ -20,7 +20,7 @@ myproject/
   metrics.py             # REPLACE: metrics
   task.py                # wiring only
   runtime.py             # policy/runner/sweep result helper
-scripts/
+commands/
   train.py               # thin entry: train + eval
   eval.py                # thin entry: separate eval run
   sweep.py               # subprocess grid/random sweep
@@ -34,7 +34,7 @@ AGENTS.md                # this file
 If you rename `myproject`, update:
 
 - `pyproject.toml` → `[tool.setuptools.packages.find] include`;
-- imports in `scripts/*.py` and `tests/*.py`;
+- imports in `commands/*.py` and `tests/*.py`;
 - any project docs.
 
 ---
@@ -46,10 +46,10 @@ pip install -e /path/to/DLEF   # core
 pip install -e .               # project deps (torch, PyYAML)
 
 python -m unittest discover -s tests -v
-python scripts/train.py --config configs/base.yaml
-python scripts/eval.py \
+python commands/train.py --config configs/base.yaml
+python commands/eval.py \
   --checkpoint outputs/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
-python scripts/sweep.py --config configs/base.yaml
+python commands/sweep.py --config configs/base.yaml
 ```
 
 Or:
@@ -120,7 +120,7 @@ To add a variant:
 One-off variant:
 
 ```bash
-python scripts/train.py --config configs/base.yaml \
+python commands/train.py --config configs/base.yaml \
   --set model.name=linear \
   --set loss.name=huber \
   --set experiment=arch-linear-loss-huber
@@ -129,7 +129,7 @@ python scripts/train.py --config configs/base.yaml \
 For evaluation, just point at the checkpoint:
 
 ```bash
-python scripts/eval.py --checkpoint outputs/runs/.../checkpoints/last.pt
+python commands/eval.py --checkpoint outputs/runs/.../checkpoints/last.pt
 ```
 
 `eval.py` reads the training run's `config.resolved.json` via the checkpoint
@@ -138,7 +138,7 @@ grouped under the training experiment (`...-eval`). `--config` is only a
 fallback when the original run directory is unavailable. Do not hand-sync
 model/loss flags unless you are deliberately evaluating a different setup.
 
-For a comparison, sweep model/loss/seed. `scripts/sweep.py` already has a
+For a comparison, sweep model/loss/seed. `commands/sweep.py` already has a
 `set_dotted` helper; replace the params with:
 
 ```python
@@ -192,7 +192,7 @@ Recommended order:
 7. For a 3-seed result, add `seed` to the sweep params:
    ```python
    params={"optim.lr": Choice((...)), "seed": Choice((1, 2, 3))}
-   # scripts/sweep.py maps every param with set_dotted; one seed = one run.
+   # commands/sweep.py maps every param with set_dotted; one seed = one run.
    ```
 8. Create a claim for each reported number.
 9. Run `dlef gc` dry-run; tag runs that must survive (`reported`, `baseline`).
@@ -221,7 +221,7 @@ Rules:
   `.pt` files.
 - Resume must restore model, optimizer, scheduler, scaler, RNG, epoch/step,
   policy state. Loading only model weights is not a resume.
-- DDP training: `torchrun --nproc_per_node=N scripts/train.py ...`; rank 0 writes
+- DDP training: `torchrun --nproc_per_node=N commands/train.py ...`; rank 0 writes
   the run. Multi-rank eval/resume is not built into this template.
 
 ---
@@ -231,7 +231,7 @@ Rules:
 - Train/val evaluation is for model selection.
 - Final test evaluation is a separate run:
   ```bash
-  python scripts/eval.py --checkpoint ...
+  python commands/eval.py --checkpoint ...
   ```
   The eval reuses the training run config; `--config` is only a fallback.
 - Test access is counted under `outputs/test_access/`; report shows `WARN` when
@@ -343,7 +343,7 @@ task's metric dict.
 **New config field** → edit `config.py`, add validation, update YAML, run a
 config test.
 
-**New sweep parameter** → edit `scripts/sweep.py`:
+**New sweep parameter** → edit `commands/sweep.py`:
 1. add it to `SweepSpec.params`;
 2. map it into `trial_raw` in `command_fn`;
 3. ensure `train.py` sees it in the trial config.

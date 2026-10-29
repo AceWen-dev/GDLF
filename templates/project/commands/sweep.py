@@ -73,7 +73,7 @@ def main() -> int:
         return TrialCommand(
             argv=[
                 sys.executable,
-                str(ROOT / "scripts" / "train.py"),
+                str(ROOT / "commands" / "train.py"),
                 "--config",
                 str(config_path),
             ],

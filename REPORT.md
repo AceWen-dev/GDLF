@@ -200,7 +200,7 @@ cd ~/my-experiment
 git init
 pip install -e /path/to/DLEF
 pip install -e .
-python scripts/train.py --config configs/base.yaml
+python commands/train.py --config configs/base.yaml
 ```
 
 模板里需要替换的只有四个文件：
@@ -212,12 +212,12 @@ myproject/loss.py      # loss + named terms
 myproject/metrics.py   # 指标
 ```
 
-`config.py / task.py / runtime.py / scripts/` 是接线，通常不用改。
+`config.py / task.py / runtime.py / commands/` 是接线，通常不用改。
 
 ### 6.2 训练 + 评测
 
 ```bash
-python scripts/train.py --config configs/base.yaml
+python commands/train.py --config configs/base.yaml
 ```
 
 输出：
@@ -234,7 +234,7 @@ outputs/runs/<project>/<experiment>/<run_id>/
 独立评测：
 
 ```bash
-python scripts/eval.py \
+python commands/eval.py \
   --checkpoint outputs/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
 ```
 
@@ -245,7 +245,7 @@ python scripts/eval.py \
 模板是配置驱动的：
 
 ```bash
-python scripts/train.py --config configs/base.yaml \
+python commands/train.py --config configs/base.yaml \
   --set model.name=linear \
   --set loss.name=huber \
   --set experiment=arch-linear-loss-huber
@@ -265,7 +265,7 @@ python scripts/train.py --config configs/base.yaml \
 ### 6.4 扫参
 
 ```bash
-python scripts/sweep.py --config configs/base.yaml
+python commands/sweep.py --config configs/base.yaml
 ```
 
 每个 trial：
@@ -326,7 +326,7 @@ python examples/torch_regression/sweep.py
 ### 6.9 DDP
 
 ```bash
-torchrun --nproc_per_node=N scripts/train.py --config configs/base.yaml
+torchrun --nproc_per_node=N commands/train.py --config configs/base.yaml
 ```
 
 本地 CPU smoke：

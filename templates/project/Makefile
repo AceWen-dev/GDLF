@@ -3,14 +3,14 @@ PYTHON ?= python
 .PHONY: train eval sweep report gc-dry test doctor
 
 train:
-	$(PYTHON) scripts/train.py --config configs/base.yaml
+	$(PYTHON) commands/train.py --config configs/base.yaml
 
 eval:
 	@test -n "$(CHECKPOINT)" || (echo "usage: make eval CHECKPOINT=outputs/runs/.../checkpoints/last.pt"; exit 2)
-	$(PYTHON) scripts/eval.py --checkpoint $(CHECKPOINT)
+	$(PYTHON) commands/eval.py --checkpoint $(CHECKPOINT)
 
 sweep:
-	$(PYTHON) scripts/sweep.py --config configs/base.yaml
+	$(PYTHON) commands/sweep.py --config configs/base.yaml
 
 report:
 	$(PYTHON) -m dlef.cli report --runs outputs/runs --claims claims --out report.md

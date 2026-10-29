@@ -255,7 +255,7 @@ cd ~/my-experiment
 git init
 pip install -e /path/to/DLEF
 pip install -e .
-python scripts/train.py --config configs/base.yaml
+python commands/train.py --config configs/base.yaml
 ```
 
 See `templates/project/README.md` for the replace points and commands. The

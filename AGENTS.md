@@ -25,7 +25,7 @@ Do **not** modify `dlef/` for project-specific needs.
    - `myproject/loss.py`
    - `myproject/metrics.py`
 7. Keep `myproject/task.py`, `myproject/runtime.py`, `myproject/config.py` and
-   `scripts/` as the wiring unless the experiment genuinely needs a new seam.
+   `commands/` as the wiring unless the experiment genuinely needs a new seam.
 
 ### Mode B — change the framework itself
 
@@ -118,7 +118,7 @@ A project has this shape (from `templates/project/`):
     metrics.py             # metrics
     task.py                # wire model/loss/optimizer/scheduler/metrics
     runtime.py             # policy/runner/sweep result helper
-  scripts/
+  commands/
     train.py               # thin entry: train + eval
     eval.py                # thin entry: separate eval run
     sweep.py               # subprocess grid/random sweep
@@ -139,7 +139,7 @@ Placement rules:
 - **Wiring only** → `myproject/task.py`. It is the only place that knows the
   domain-specific combination.
 - **Config schema** → `myproject/config.py`; values → `configs/*.yaml`.
-- **Entry points** → `scripts/`; keep them thin.
+- **Entry points** → `commands/`; keep them thin.
 - **Project tests** → `tests/`.
 - **Claims** → `claims/<claim_id>.json` via `ClaimStore`.
 - **Generated artifacts** → `outputs/`; never edit by hand.
@@ -170,13 +170,13 @@ Rules:
   claim.
 - Tag runs that must survive cleanup: `baseline`, `reported`, `debug`.
 - A failed run/trial is still recorded (`failed` / `partial`); do not delete it.
-- To compare variants, use `scripts/sweep.py` (subprocess) or `LocalSweep`
+- To compare variants, use `commands/sweep.py` (subprocess) or `LocalSweep`
   (thread/in-process for lightweight cases); one trial = one run.
 - To report a number, create a `Claim` with the eval id(s), then run
   `dlef report`.
 - To clean up, run `dlef gc` (dry-run first); keep `reported` tagged runs.
 
-Multi-seed sweep example (edit the template’s `scripts/sweep.py`):
+Multi-seed sweep example (edit the template’s `commands/sweep.py`):
 
 ```python
 params={
@@ -194,19 +194,19 @@ Changing model/loss mid-experiment:
   `myproject/loss.py`; `task.py` stays unchanged.
 - One-off variant:
   ```bash
-  python scripts/train.py --config configs/base.yaml \
+  python commands/train.py --config configs/base.yaml \
     --set model.name=linear --set loss.name=huber \
     --set experiment=arch-linear-loss-huber
   ```
   For evaluation, point at the checkpoint; it reads the training run's resolved
   config, so architecture/loss match automatically:
   ```bash
-  python scripts/eval.py --checkpoint outputs/runs/.../checkpoints/last.pt
+  python commands/eval.py --checkpoint outputs/runs/.../checkpoints/last.pt
   ```
 - Add the builder branch, extend config validation, add a smoke/shape test, and
   commit the code before official runs.
 - For a comparison, sweep `model.name` / `loss.name` / `seed`; one trial = one
-  run. The template’s `scripts/sweep.py` has a `set_dotted` helper.
+  run. The template’s `commands/sweep.py` has a `set_dotted` helper.
 - Compare old vs new through `dlef compare` or `dlef report`; old runs remain
   valid because each has its own config digest and code version.
 
@@ -347,7 +347,7 @@ For project changes:
 
 ```bash
 python -m unittest discover -s tests -v
-python scripts/train.py --config configs/base.yaml
+python commands/train.py --config configs/base.yaml
 ```
 
 Every project should have:
@@ -382,9 +382,9 @@ A project task is done when:
 2. `DataSpec` exists; one batch is validated; split provenance is recorded.
 3. Model/loss/metric contracts are implemented; loss terms are named.
 4. `tests/` smoke test passes on tiny data.
-5. `scripts/train.py` produces a run with manifest, resolved config, metrics,
+5. `commands/train.py` produces a run with manifest, resolved config, metrics,
    checkpoint.
-6. `scripts/eval.py` produces an eval record bound to a checkpoint digest.
+6. `commands/eval.py` produces an eval record bound to a checkpoint digest.
 7. Sweep (if used) produces one run per trial and a sweep record.
 8. A claim (if reported) resolves to eval → checkpoint → run.
 9. `dlef gc` dry-run shows only intended deletions.
