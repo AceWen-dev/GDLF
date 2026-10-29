@@ -84,7 +84,9 @@ class Dataset(Protocol):
 
 - `Dataset` 是 **batch iterable**；batching / shuffling / padding / collation 都是 adapter 的责任。这样 streaming 数据、非张量数据也能接入。
 - 数据只读；预处理产物写到新的 versioned artifact，不原地改。
+- 数据集字节放在项目外（`DLEF_DATA_ROOT`）；项目只保存代码和小 manifest，不保存图片/表格副本。
 - split 必须物化；不允许在 `__iter__` 里随机划分。
+- split 是同一份 curated 数据的 membership 视图（sample id / 相对路径），不复制 train/val/test 数据目录。
 - `DataSpec.version` 标识一次 data recipe（dataset + split + transform）；run manifest 记录 `role -> version`，旧 run 不随新数据变化。
 - train / eval transform 必须是两个独立声明。
 - 第一个 batch 必须通过 `DataSpec.schema` 校验（keys / dtype / shape）。

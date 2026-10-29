@@ -20,6 +20,7 @@ myproject/
     datasets/            # REPLACE: one file per dataset
     transforms/          # one file per transform
     splits.py            # split strategies (materialized indices)
+    paths.py             # $DLEF_DATA_ROOT + external layout
     loaders.py           # DataLoader assembly
     spec.py              # DataSpec + recipe digest
   models/
@@ -102,6 +103,9 @@ Replace or extend these component packages:
      call `random_split`.
    - Each dataset builder returns a `DataBundle(dataset, DataSpec)`.
    - `DataSpec` carries name, version, schema, splits, transform and provenance.
+   - Dataset bytes live outside the repo under `$DLEF_DATA_ROOT`; resolve them
+     through `data/paths.py` (`curated_dir(name, version)`). `data.version` is
+     the dataset content version; never commit images/tables or absolute paths.
    - Batch is a `Mapping[str, Any]`; collate/batching belongs in `data/loaders.py`.
    - Data is an ablation axis: `data.name`, `data.split`,
      `data.train_transform`, `data.eval_transform` are config-selected.
@@ -147,6 +151,7 @@ edit a completed run.**
 The template is config-driven:
 
 - `data.name` selects the dataset builder in `myproject/data/build.py`;
+- `data.version` selects the curated dataset version under `$DLEF_DATA_ROOT`;
 - `data.split` selects the splitter in `myproject/data/splits.py`;
 - `data.train_transform` / `data.eval_transform` select transforms in
   `myproject/data/transforms/`;
@@ -173,6 +178,7 @@ One-off variant:
 ```bash
 python commands/train.py --config configs/base.yaml \
   --set data.name=regression \
+  --set data.version=synthetic \
   --set data.split=holdout \
   --set model.name=linear \
   --set loss.name=huber \
@@ -218,6 +224,8 @@ only. Report the comparison through `dlef compare` / `dlef report`.
 - Add validation in `validate()` (ranges, mutual exclusion).
 - One config file per experiment/variant. Do not edit `base.yaml` for every run.
 - Never put output paths in config; run directories are derived.
+- Dataset bytes live under `$DLEF_DATA_ROOT`; config selects logical names and
+  versions, not absolute data paths.
 - Secrets go through environment variables; never config or logs.
 - For a debug run, create a separate debug config (tiny data, 1–2 steps); do not
   add `if debug` branches in model/task code.
@@ -362,6 +370,7 @@ Do not edit the installed `dlef` package in place.
 - Do not tune on test; do not report a single lucky seed.
 - Do not make a tracker the only record.
 - Do not put secrets in config/logs.
+- Do not commit dataset bytes or absolute data paths.
 - Do not add project-specific code to the installed core.
 
 ---
@@ -385,8 +394,9 @@ Do not edit the installed `dlef` package in place.
 
 **New dataset** → add `data/datasets/<name>.py` returning
 `DataBundle(dataset=..., spec=DataSpec(...))`; register it in `data/build.py`;
-allow the name in `DataConfig`; validate one batch; add a smoke test. Update
-`configs/*.yaml`.
+allow the name in `DataConfig`; validate one batch; add a smoke test. Resolve
+bytes with `data/paths.py` (`$DLEF_DATA_ROOT`), never with a path in config.
+Update `configs/*.yaml`.
 
 **New transform** → add `data/transforms/<name>.py` returning a named
 `Transform`; register it in `data/build.py`; allow the name in `DataConfig`;

@@ -33,6 +33,7 @@ def make_spec(
 ) -> DataSpec:
     recipe = {
         "dataset": config.name,
+        "dataset_version": config.version,
         "split": config.split,
         "role": role,
         "seed": seed,

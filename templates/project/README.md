@@ -16,6 +16,7 @@ myproject/data/          # REPLACE/EXTEND: datasets, splits, transforms, loaders
   datasets/              # one file per dataset
   transforms/            # one file per transform
   splits.py              # split strategies (materialized indices)
+  paths.py               # $DLEF_DATA_ROOT + external dataset layout
   loaders.py             # DataLoader assembly
   spec.py                # DataSpec + recipe digest
 myproject/models/        # REPLACE/EXTEND: one file per architecture + build.py
@@ -89,6 +90,35 @@ Then allow `"resnet"` in `ModelConfig.validate` and set `model.name: resnet`
 in the config. The run's `config.resolved.json` records exactly which name was
 used; `models/build.py` gets you to the file.
 
+## External data
+
+Do not put dataset bytes in this repository. Set `DLEF_DATA_ROOT` to a
+directory outside the repo:
+
+```bash
+export DLEF_DATA_ROOT=/path/to/datasets
+```
+
+Standard layout:
+
+```text
+$DLEF_DATA_ROOT/
+  raw/<source>/...
+  curated/<dataset>/<version>/...
+  splits/<dataset>/<version>/<split>.json
+```
+
+`myproject/data/paths.py` resolves these paths. A real dataset builder uses
+`curated_dir(config.name, config.version)` and
+`split_manifest_path(config.name, config.version, split)`. The project keeps
+code and small manifests; the images/tables themselves stay outside git. A
+split manifest stores membership (sample ids or relative paths), not a copied
+`train/` `val/` `test/` tree — one curated copy serves every split.
+
+The project `.gitignore` blocks `/data/`, `/datasets/` and `/raw/` at the
+project root, so accidental copies do not get committed. `myproject/data/`
+(code) is not ignored.
+
 ## Install
 
 The core is a separate package. Install it first; the project can live anywhere
@@ -134,6 +164,7 @@ stay immutable. The template is config-driven:
 ```bash
 python commands/train.py --config configs/base.yaml \
   --set data.name=regression \
+  --set data.version=synthetic \
   --set data.split=holdout \
   --set model.name=linear \
   --set loss.name=huber \

@@ -17,6 +17,15 @@
 ## Config
 一次 Run 的完整输入声明。Config 是类型化的、经过校验的、可完全解析的；YAML、CLI、环境变量只是它的输入格式。
 
+## Data Recipe
+一次 Run 固定的数据组合：dataset version + split + transform。任一项变化都是新 recipe、新 Run；旧 Run 不被覆盖。
+
+## Dataset Version
+经过清洗、标签修正、去重后的不可变数据内容。实体数据存放在项目外，项目只保留代码和小型 manifest；版本之间只追加，不原地改写。
+
+## Split
+同一份 Dataset Version 上的 membership 视图（sample id 或相对路径），不是数据副本。Split 必须物化并被记录，训练时不得重新随机划分。
+
 ## Eval Spec
 定义一次 Evaluation 的输入：checkpoint 选择规则、数据 split、预处理、指标及其聚合/置信区间方法。
 

@@ -211,6 +211,7 @@ myproject/data/          # 数据集 + split + transform + loader
   datasets/              # 每个数据集一个文件
   transforms/            # 每个 transform 一个文件
   splits.py              # 物化的 role -> indices
+  paths.py               # $DLEF_DATA_ROOT + 外部目录布局
   loaders.py             # DataLoader 组装
   spec.py                # DataSpec + recipe digest
 myproject/models/        # 每个模型一个文件 + models/build.py 注册
@@ -223,6 +224,18 @@ myproject/schedulers/    # 需要换调度器时
 数据也是消融轴：`data.name` / `data.split` / `data.train_transform` /
 `data.eval_transform` 都可以进 sweep；一个新数据集、新 split 或新 transform
 就是一个新 run。
+
+实体数据（图片/表格等）不进项目目录，放到项目外的 `$DLEF_DATA_ROOT`：
+
+```text
+$DLEF_DATA_ROOT/
+  raw/<source>/...
+  curated/<dataset>/<version>/...
+  splits/<dataset>/<version>/<split>.json
+```
+
+`myproject/data/paths.py` 负责解析；split 文件只存 membership，不复制
+train/val/test 图片。项目里只保留代码和小 manifest。
 
 `config.py / task.py / runtime.py / commands/` 是接线；`task.py` 是 composition
 root，只负责把组件拼成 `TorchTask`。
@@ -260,6 +273,7 @@ python commands/eval.py \
 ```bash
 python commands/train.py --config configs/base.yaml \
   --set data.name=regression \
+  --set data.version=synthetic \
   --set data.split=holdout \
   --set model.name=linear \
   --set loss.name=huber \
@@ -571,7 +585,7 @@ DLEF/
 1. 复制 `templates/project/`，`git init`。
 2. 安装 core 和项目依赖。
 3. 写 `configs/base.yaml`：project / experiment / seed / epochs / 数据 / 模型 / 优化器。
-4. 替换 `data/` 下的数据集/transform/split，并按需扩展 `models/`、`losses/`、`metrics/`、`optimizers/`、`schedulers/`。
+4. 设置 `DLEF_DATA_ROOT`，替换 `data/` 下的数据集/transform/split，并按需扩展 `models/`、`losses/`、`metrics/`、`optimizers/`、`schedulers/`。
 5. 跑 smoke test：
    ```bash
    python -m unittest discover -s tests -v

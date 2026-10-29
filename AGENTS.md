@@ -119,6 +119,7 @@ A project has this shape (from `templates/project/`):
       datasets/            # one file per dataset + build.py registry
       transforms/          # one file per transform
       splits.py            # split strategies (materialized indices)
+      paths.py             # $DLEF_DATA_ROOT + external layout
       loaders.py           # DataLoader assembly
       spec.py              # DataSpec + recipe digest
     models/                # one file per architecture + build.py registry
@@ -221,8 +222,8 @@ Changing data/model/loss mid-experiment:
 - One-off variant:
   ```bash
   python commands/train.py --config configs/base.yaml \
-    --set data.name=regression --set data.split=holdout \
-    --set model.name=linear --set loss.name=huber \
+    --set data.name=regression --set data.version=synthetic \
+    --set data.split=holdout --set model.name=linear --set loss.name=huber \
     --set experiment=data-linear-loss-huber
   ```
   For evaluation, point at the checkpoint; it reads the training run's resolved
@@ -259,6 +260,11 @@ Changing data/model/loss mid-experiment:
   stats, provenance.
 - Dataset / split / transform implementations live in `myproject/data/`;
   `data/build.py` selects them by config, `task.py` does not load data.
+- Dataset **bytes** live outside the repo under `DLEF_DATA_ROOT`; the project
+  holds code and small manifests only. Do not commit images/tables or absolute
+  data paths.
+- A split is a membership view over one curated copy (sample ids or relative
+  paths), not a second `train/` `val/` `test/` copy of the data.
 - A run pins a **data recipe** (dataset + split + transform). New data, a new
   split or a new transform is a new version and a new run; never overwrite an
   old version.
@@ -403,6 +409,8 @@ Every project should have:
 - Do not tune on test; do not report a single lucky seed as the result.
 - Do not make W&B/MLflow/TensorBoard the only record.
 - Do not store secrets in config or logs.
+- Do not commit dataset bytes or absolute data paths; use `DLEF_DATA_ROOT`.
+- Do not duplicate dataset bytes per split; store one curated copy + membership.
 - Do not change a contract without updating tests and the design doc.
 
 ---

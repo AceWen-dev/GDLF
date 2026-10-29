@@ -8,6 +8,7 @@ from dlef.config import ConfigError, ConfigSchema, TrainConfig
 @dataclass
 class DataConfig(ConfigSchema):
     name: str = "regression"
+    version: str = "synthetic"
     split: str = "holdout"
     n_train: int = 512
     n_val: int = 128
@@ -19,6 +20,8 @@ class DataConfig(ConfigSchema):
     def validate(self) -> None:
         if self.name not in {"regression"}:
             raise ConfigError(f"unknown data.name: {self.name!r}")
+        if not self.version.strip():
+            raise ConfigError("data.version must not be empty")
         if self.split not in {"holdout"}:
             raise ConfigError(f"unknown data.split: {self.split!r}")
         if self.train_transform not in {"identity"}:

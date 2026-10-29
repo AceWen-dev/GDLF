@@ -280,6 +280,33 @@ myproject/schedulers/    # 需要换调度器时
 `task.py` 是 trainable task 的 composition root；`data/build.py` 是数据侧的
 composition root；`commands/train.py` 把两者接到同一个 run。
 
+### 外部数据根目录
+
+实体数据（图片、音频、表格）不进 repo，放到项目外的目录：
+
+```bash
+export DLEF_DATA_ROOT=/path/to/datasets
+```
+
+标准布局：
+
+```text
+$DLEF_DATA_ROOT/
+  raw/<source>/...
+  curated/<dataset>/<version>/...
+  splits/<dataset>/<version>/<split>.json
+```
+
+`myproject/data/paths.py` 负责解析这些路径；真实 dataset builder 用
+`curated_dir(config.name, config.version)` 和
+`split_manifest_path(config.name, config.version, split)`。项目里只放代码和
+小 manifest。split 文件只存 membership（sample id 或相对路径），不复制
+`train/` / `val/` / `test/` 三份图片。这样一份 curated 数据可以服务多个
+split，也不会把项目目录撑乱。
+
+项目的 `.gitignore` 会忽略根目录下的 `/data/`、`/datasets/`、`/raw/`，
+但不会忽略 `myproject/data/` 代码包。
+
 ### data/
 
 一个数据集一个文件，返回 `DataBundle(dataset, DataSpec)`：
@@ -393,8 +420,8 @@ def build_my_metric() -> Metric:
 ### config.py + configs/base.yaml
 
 把新组件名字加进对应 Config 的 `validate()`，再更新 YAML。
-`data.name` / `data.split` / `data.*_transform` 和 `model.name` / `loss.name`
-都是同一类选择器。unknown key 会报错；这是故意的。
+`data.name` / `data.version` / `data.split` / `data.*_transform` 和
+`model.name` / `loss.name` 都是同一类选择器。unknown key 会报错；这是故意的。
 
 ### task.py
 

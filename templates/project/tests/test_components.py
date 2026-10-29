@@ -46,6 +46,14 @@ class ComponentTests(unittest.TestCase):
         other_seed = build_dataset(config, "train", 8, "identity")
         self.assertNotEqual(train.spec.version, other_seed.spec.version)
 
+        other_version = build_dataset(
+            DataConfig(n_train=8, n_val=4, version="v2"),
+            "train",
+            7,
+            "identity",
+        )
+        self.assertNotEqual(train.spec.version, other_version.spec.version)
+
         train_loader, _ = make_loaders(config, seed=7)
         batch = next(iter(train_loader))
         self.assertEqual(tuple(batch["x"].shape), (2, 1))

@@ -6,8 +6,11 @@ experiment: baseline
 log_every: 10
 checkpoint_every: 0
 
+# Dataset bytes live outside this repo under $DLEF_DATA_ROOT.
+# Config selects logical names/versions, never absolute paths.
 data:
   name: regression
+  version: synthetic
   split: holdout
   n_train: 512
   n_val: 128
