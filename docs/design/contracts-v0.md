@@ -85,6 +85,7 @@ class Dataset(Protocol):
 - `Dataset` 是 **batch iterable**；batching / shuffling / padding / collation 都是 adapter 的责任。这样 streaming 数据、非张量数据也能接入。
 - 数据只读；预处理产物写到新的 versioned artifact，不原地改。
 - split 必须物化；不允许在 `__iter__` 里随机划分。
+- `DataSpec.version` 标识一次 data recipe（dataset + split + transform）；run manifest 记录 `role -> version`，旧 run 不随新数据变化。
 - train / eval transform 必须是两个独立声明。
 - 第一个 batch 必须通过 `DataSpec.schema` 校验（keys / dtype / shape）。
 - core 不关心 batch 的语义；只关心它是 typed mapping。

@@ -7,12 +7,28 @@ from dlef.config import ConfigError, ConfigSchema, TrainConfig
 
 @dataclass
 class DataConfig(ConfigSchema):
+    name: str = "regression"
+    split: str = "holdout"
     n_train: int = 512
     n_val: int = 128
     noise: float = 0.1
     batch_size: int = 32
+    train_transform: str = "identity"
+    eval_transform: str = "identity"
 
     def validate(self) -> None:
+        if self.name not in {"regression"}:
+            raise ConfigError(f"unknown data.name: {self.name!r}")
+        if self.split not in {"holdout"}:
+            raise ConfigError(f"unknown data.split: {self.split!r}")
+        if self.train_transform not in {"identity"}:
+            raise ConfigError(
+                f"unknown data.train_transform: {self.train_transform!r}"
+            )
+        if self.eval_transform not in {"identity"}:
+            raise ConfigError(
+                f"unknown data.eval_transform: {self.eval_transform!r}"
+            )
         if self.n_train <= 0 or self.n_val <= 0:
             raise ConfigError("n_train/n_val must be > 0")
         if self.batch_size <= 0:

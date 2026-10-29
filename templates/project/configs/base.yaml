@@ -7,10 +7,14 @@ log_every: 10
 checkpoint_every: 0
 
 data:
+  name: regression
+  split: holdout
   n_train: 512
   n_val: 128
   noise: 0.1
   batch_size: 32
+  train_transform: identity
+  eval_transform: identity
 
 model:
   name: mlp

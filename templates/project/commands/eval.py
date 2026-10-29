@@ -21,7 +21,7 @@ from adapters.torch import TorchCheckpointCodec  # noqa: E402
 from dlef.config import load_config, resolve_config  # noqa: E402
 from dlef.eval import EvalSpec  # noqa: E402
 from myproject.config import ProjectConfig  # noqa: E402
-from myproject.data import make_loaders  # noqa: E402
+from myproject.data import make_loader  # noqa: E402
 from myproject.runtime import build_policy, build_runner, parse_overrides  # noqa: E402
 from myproject.task import build_task  # noqa: E402
 
@@ -91,7 +91,7 @@ def main() -> int:
     device = policy.device
 
     runner = build_runner(ROOT / "outputs", policy)
-    _, val_loader = make_loaders(config.schema.data, config.schema.seed)
+    val_loader = make_loader(config.schema.data, "val", config.schema.seed)
     task = build_task(config.schema, device=device)
     optimizer = task.configure_optimizer(task.get_model())
     policy.on_fit_start(task, optimizer, config.schema)

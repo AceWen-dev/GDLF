@@ -20,7 +20,7 @@ Do **not** modify `dlef/` for project-specific needs.
 4. Install core: `pip install -e /path/to/DLEF`.
 5. Install project: `pip install -e .`.
 6. Replace/extend the component packages:
-   - `myproject/data.py`
+   - `myproject/data/` (`datasets/`, `transforms/`, `splits.py`, `loaders.py`)
    - `myproject/models/` + `models/build.py`
    - `myproject/losses/` + `losses/build.py`
    - `myproject/metrics/` + `metrics/build.py`
@@ -114,7 +114,13 @@ A project has this shape (from `templates/project/`):
     base.yaml              # one config per baseline / experiment variant
   myproject/
     config.py              # typed dataclass schema
-    data.py                # dataset + loaders + DataSpec
+    data/
+      build.py             # data.name / transform registry + make_loaders
+      datasets/            # one file per dataset + build.py registry
+      transforms/          # one file per transform
+      splits.py            # split strategies (materialized indices)
+      loaders.py           # DataLoader assembly
+      spec.py              # DataSpec + recipe digest
     models/                # one file per architecture + build.py registry
     losses/                # one file per loss + build.py registry
     optimizers/            # one file per optimizer + build.py registry
@@ -136,8 +142,10 @@ A project has this shape (from `templates/project/`):
 
 Placement rules:
 
-- **Dataset / transforms / collate** → `myproject/data.py` (or a `myproject/data/`
-  package if it grows). Always produce a `DataSpec`.
+- **Dataset / transforms / split / collate** → `myproject/data/` package:
+  `datasets/<name>.py`, `transforms/<name>.py`, `splits.py`, `loaders.py`.
+  Always produce a `DataSpec`; materialize splits, never `random_split` at
+  runtime.
 - **Architecture** → `myproject/models/<name>.py`; register in
   `models/build.py`.
 - **Loss / named terms** → `myproject/losses/<name>.py`; register in
@@ -197,18 +205,25 @@ params={
 # one trial = one run; the template's sweep maps dotted keys into trial configs.
 ```
 
-Changing model/loss mid-experiment:
+Changing data/model/loss mid-experiment:
 
-- A new architecture or loss is a **new run**, never an edit to an old run.
-- Core never knows architectures/losses. The project template is config-driven:
-  `model.name` selects `myproject/models/build.py`; `loss.name` selects
-  `myproject/losses/build.py`; optimizer/scheduler/metrics have their own
-  registries; `task.py` stays unchanged.
+- A new dataset, split, transform, architecture or loss is a **new run**, never
+  an edit to an old run.
+- Core never knows datasets/architectures/losses. The project template is
+  config-driven: `data.name` / `data.split` / `data.*_transform` select
+  `myproject/data/build.py` + `data/splits.py`; `model.name` selects
+  `myproject/models/build.py`; `loss.name` selects `myproject/losses/build.py`;
+  optimizer/scheduler/metrics have their own registries; `task.py` stays
+  unchanged.
+- Materialize splits; never call `random_split` at runtime. A new data version
+  or split version produces a new `DataSpec.version`, recorded in the run
+  manifest; old runs keep their original version.
 - One-off variant:
   ```bash
   python commands/train.py --config configs/base.yaml \
+    --set data.name=regression --set data.split=holdout \
     --set model.name=linear --set loss.name=huber \
-    --set experiment=arch-linear-loss-huber
+    --set experiment=data-linear-loss-huber
   ```
   For evaluation, point at the checkpoint; it reads the training run's resolved
   config, so architecture/loss match automatically:
@@ -242,11 +257,17 @@ Changing model/loss mid-experiment:
 
 - Every dataset exposes a `DataSpec`: name, version, schema, splits, transform,
   stats, provenance.
+- Dataset / split / transform implementations live in `myproject/data/`;
+  `data/build.py` selects them by config, `task.py` does not load data.
+- A run pins a **data recipe** (dataset + split + transform). New data, a new
+  split or a new transform is a new version and a new run; never overwrite an
+  old version.
 - `Dataset` is an **iterable of batches** (`Mapping[str, Any]`); batching,
   shuffling, padding and collation belong to the data adapter.
 - Data is read-only. Preprocessing writes a new versioned artifact, not an
   in-place mutation.
 - Split must be materialized; never do random splitting inside `__getitem__`.
+  Loaders read a recorded membership (`role -> indices`), not a fresh seed.
 - Train and eval transforms are separate declarations.
 - Validate one batch before training (keys, dtypes, shapes).
 - Check leakage before a new split: case/group overlap, duplicates, temporal

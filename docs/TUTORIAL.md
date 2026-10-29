@@ -263,7 +263,13 @@ python -m dlef.cli gc \
 改数据 + 组件包：
 
 ```text
-myproject/data.py
+myproject/data/          # 数据集 + split + transform + loader
+  build.py               # data.name / transform registry + make_loaders
+  datasets/              # 每个数据集一个文件
+  transforms/            # 每个 transform 一个文件
+  splits.py              # 物化的 role -> indices
+  loaders.py             # DataLoader 组装
+  spec.py                # DataBundle + DataSpec + recipe digest
 myproject/models/        # 每个模型一个文件 + models/build.py 注册
 myproject/losses/        # 每个 loss 一个文件 + losses/build.py 注册
 myproject/metrics/       # 每个指标一个文件 + metrics/build.py 注册
@@ -271,11 +277,59 @@ myproject/optimizers/    # 需要换优化器时
 myproject/schedulers/    # 需要换调度器时
 ```
 
-`task.py` 是 composition root，通常不用改。
+`task.py` 是 trainable task 的 composition root；`data/build.py` 是数据侧的
+composition root；`commands/train.py` 把两者接到同一个 run。
 
-### data.py
+### data/
 
-保持这个接口：
+一个数据集一个文件，返回 `DataBundle(dataset, DataSpec)`：
+
+```python
+# data/datasets/my_dataset.py
+def build_my_dataset(config, role, seed, transform):
+    ...
+    return DataBundle(
+        dataset=...,
+        spec=DataSpec(
+            name="my-dataset",
+            version="sha256:...",
+            schema={...},
+            splits=...,
+            transform=transform.name,
+        ),
+    )
+```
+
+在 `data/build.py` 注册：
+
+```python
+from .datasets.my_dataset import build_my_dataset
+
+DATASETS = {
+    "regression": build_regression,
+    "my_dataset": build_my_dataset,
+}
+```
+
+split 在 `data/splits.py` 物化，loader 只读 `role -> indices`，不在训练时
+`random_split`：
+
+```python
+SPLITTERS = {"holdout": holdout, "my_split": my_split}
+```
+
+transform 一个文件，train/eval 分开选：
+
+```python
+# data/transforms/my_transform.py
+def build_my_transform() -> Transform:
+    return Transform(name="my_transform", fn=lambda sample: ...)
+```
+
+注册到 `TRANSFORMS`，然后在 YAML 里写 `data.train_transform` /
+`data.eval_transform`。
+
+对外保持这个接口：
 
 ```python
 def make_loaders(config, seed, *, distributed=False):
@@ -283,8 +337,8 @@ def make_loaders(config, seed, *, distributed=False):
     return train_loader, val_loader
 ```
 
-每个 loader 是 **batch iterable**，batch 是 `Mapping[str, Any]`。
-给每个数据集一个 `DataSpec`（name / version / schema / splits / transform）。
+每个 loader 是 **batch iterable**，batch 是 `Mapping[str, Any]`；每个 loader
+带一个 `DataSpec`，其 `version` 会写进 run manifest。
 
 ### models/
 
@@ -339,7 +393,8 @@ def build_my_metric() -> Metric:
 ### config.py + configs/base.yaml
 
 把新组件名字加进对应 Config 的 `validate()`，再更新 YAML。
-unknown key 会报错；这是故意的。
+`data.name` / `data.split` / `data.*_transform` 和 `model.name` / `loss.name`
+都是同一类选择器。unknown key 会报错；这是故意的。
 
 ### task.py
 
@@ -348,24 +403,28 @@ unknown key 会报错；这是故意的。
 ```python
 model = build_model(config.model, device)
 loss = build_loss(config.loss)
-metrics = build_metrics(config.metrics)
+
 optimizer_fn = lambda model: build_optimizer(config.optim, model)
 scheduler_fn = lambda opt: build_scheduler(config.scheduler, opt, epochs=config.epochs)
+
+metrics = build_metrics(config.metrics)
 ```
 
 ---
 
-## 12. 换模型/换 loss 怎么办
+## 12. 换数据/模型/loss 怎么办
 
-**新模型/loss = 新 run，不改旧 run。**
+**新数据集、新 split、新 transform、新模型、新 loss = 新 run，不改旧 run。**
 
 模板已经配置驱动：
 
 ```bash
 python commands/train.py --config configs/base.yaml \
+  --set data.name=regression \
+  --set data.split=holdout \
   --set model.name=linear \
   --set loss.name=huber \
-  --set experiment=arch-linear-loss-huber
+  --set experiment=data-linear-loss-huber
 ```
 
 评测只给 checkpoint：
@@ -380,13 +439,16 @@ python commands/eval.py --checkpoint .../last.pt
 
 ```python
 params={
+    "data.name": Choice(("regression",)),
+    "data.split": Choice(("holdout",)),
     "model.name": Choice(("mlp", "linear")),
     "loss.name": Choice(("mse", "huber")),
     "seed": Choice((1, 2, 3)),
 }
 ```
 
-一个 trial = 一个新 run。
+一个 trial = 一个新 run。旧 run 的 `DataSpec.version` 和 `config.resolved.json`
+保持不变，所以新增数据不会让旧结果失效。
 
 ---
 
@@ -463,8 +525,9 @@ eval 会自动读训练 run 的 config；如果原 run 目录被删，才用
 先 `dlef gc` dry-run，确认后再 `--apply`；不要手动 rm。
 
 **test 怎么评**
-模板 demo 只有 train/val；真实项目在 `data.py` 里加 test loader，
-在 `eval.py` 里用 `split="test"`。test 访问会被计数。
+模板 demo 只有 train/val；真实项目在 `data/splits.py` 里加 test membership，
+然后用 `make_loader(config, "test", seed)` 取 test loader，在 `eval.py` 里用
+`split="test"`。test 访问会被计数。
 
 **examples 可以删吗**
 `examples/` 不是 core，但测试会 import 它；删了 `make test` 会挂。

@@ -206,13 +206,23 @@ python commands/train.py --config configs/base.yaml
 模板里需要替换/扩展的是数据 + 组件包：
 
 ```text
-myproject/data.py        # 数据集 + loaders
+myproject/data/          # 数据集 + split + transform + loader
+  build.py               # data.name / transform registry + make_loaders
+  datasets/              # 每个数据集一个文件
+  transforms/            # 每个 transform 一个文件
+  splits.py              # 物化的 role -> indices
+  loaders.py             # DataLoader 组装
+  spec.py                # DataSpec + recipe digest
 myproject/models/        # 每个模型一个文件 + models/build.py 注册
 myproject/losses/        # 每个 loss 一个文件 + losses/build.py 注册
 myproject/metrics/       # 每个指标一个文件 + metrics/build.py 注册
 myproject/optimizers/    # 需要换优化器时
 myproject/schedulers/    # 需要换调度器时
 ```
+
+数据也是消融轴：`data.name` / `data.split` / `data.train_transform` /
+`data.eval_transform` 都可以进 sweep；一个新数据集、新 split 或新 transform
+就是一个新 run。
 
 `config.py / task.py / runtime.py / commands/` 是接线；`task.py` 是 composition
 root，只负责把组件拼成 `TorchTask`。
@@ -249,11 +259,15 @@ python commands/eval.py \
 
 ```bash
 python commands/train.py --config configs/base.yaml \
+  --set data.name=regression \
+  --set data.split=holdout \
   --set model.name=linear \
   --set loss.name=huber \
-  --set experiment=arch-linear-loss-huber
+  --set experiment=data-linear-loss-huber
 ```
 
+- `data.name` / `data.split` / `data.*_transform` 选择 `data/build.py` 和
+  `data/splits.py`；
 - `model.name` 选择 `models/build.py` 里的 builder；
 - `loss.name` 选择 `losses/build.py` 里的 builder；
 - `optim.name` / `scheduler.name` / `metrics[]` 分别从各自 registry 选择；
@@ -262,8 +276,9 @@ python commands/train.py --config configs/base.yaml \
   `config.resolved.json`，自动复用同一份结构/超参，所以不需要手动重复
   `--set`；只有原 run 目录丢了才用 `--config` 兜底。
 
-比较多个架构/loss 时，用 sweep 把 `model.name`、`loss.name`、`seed` 作为参数；
-一个 trial = 一个新 run。旧 run 保留，`dlef compare` / `dlef report` 负责比较。
+比较多个数据/架构/loss 时，用 sweep 把 `data.name`、`data.split`、
+`data.*_transform`、`model.name`、`loss.name`、`seed` 作为参数；一个 trial =
+一个新 run。旧 run 保留，`dlef compare` / `dlef report` 负责比较。
 换代码后先 commit 再跑正式实验；dirty run 只能算探索。
 
 ### 6.4 扫参
@@ -546,7 +561,7 @@ DLEF/
 - **kill-resume 测试**：checkpoint round-trip 有测试；完整 kill-resume 还没自动化。
 - **模板占位符**：数据/模型/loss/metric 是合成回归，需要替换。
 - **数据审计**：没有内建 leakage/duplicate 检查；DataSpec 只提供字段。
-- **多 seed**：支持多个 run，但模板 sweep 目前只变 lr/accum；要 3-seed 就把 `seed` 加进 `SweepSpec.params`。
+- **多 seed**：支持多个 run；模板 sweep 只给了一个 lr/accum 示例，数据/模型/loss/seed 都可加进 `SweepSpec.params`。
 - **模型 zoo / 训练引擎**：不提供；这是 adapter 的事。
 
 ---
@@ -556,7 +571,7 @@ DLEF/
 1. 复制 `templates/project/`，`git init`。
 2. 安装 core 和项目依赖。
 3. 写 `configs/base.yaml`：project / experiment / seed / epochs / 数据 / 模型 / 优化器。
-4. 替换 `data.py`，并按需扩展 `models/`、`losses/`、`metrics/`、`optimizers/`、`schedulers/`。
+4. 替换 `data/` 下的数据集/transform/split，并按需扩展 `models/`、`losses/`、`metrics/`、`optimizers/`、`schedulers/`。
 5. 跑 smoke test：
    ```bash
    python -m unittest discover -s tests -v

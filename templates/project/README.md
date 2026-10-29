@@ -11,7 +11,13 @@ asking a coding agent to edit.
 ```text
 configs/base.yaml        # experiment config
 myproject/config.py      # typed config schema
-myproject/data.py        # REPLACE: dataset + loaders
+myproject/data/          # REPLACE/EXTEND: datasets, splits, transforms, loaders
+  build.py               # data.name / transform registry + make_loaders
+  datasets/              # one file per dataset
+  transforms/            # one file per transform
+  splits.py              # split strategies (materialized indices)
+  loaders.py             # DataLoader assembly
+  spec.py                # DataSpec + recipe digest
 myproject/models/        # REPLACE/EXTEND: one file per architecture + build.py
 myproject/losses/        # REPLACE/EXTEND: one file per loss + build.py
 myproject/optimizers/    # one file per optimizer + build.py
@@ -37,13 +43,35 @@ Each component is one file plus a small registry:
 
 | Registry | Selects by | Implementation |
 |---|---|---|
+| `data/build.py` | `data.name` | `data/datasets/<name>.py` |
+| `data/build.py` | `data.train_transform` / `data.eval_transform` | `data/transforms/<name>.py` |
+| `data/splits.py` | `data.split` | `data/splits.py` |
 | `models/build.py` | `model.name` | `models/<name>.py` |
 | `losses/build.py` | `loss.name` | `losses/<name>.py` |
 | `optimizers/build.py` | `optim.name` | `optimizers/<name>.py` |
 | `schedulers/build.py` | `scheduler.name` | `schedulers/<name>.py` |
 | `metrics/build.py` | `metrics[]` | `metrics/<name>.py` |
 
-`task.py` only composes; it never contains model/loss code.
+`data/build.py` is the data composition root; `task.py` composes the trainable
+task. `commands/train.py` wires both into a run, so data, model, loss and
+metrics are all selectable from the same config.
+
+To add a dataset:
+
+```python
+# myproject/data/datasets/my_dataset.py
+def build_my_dataset(config, role, seed, transform):
+    ...
+    return DataBundle(dataset=..., spec=DataSpec(...))
+
+# myproject/data/build.py
+from .datasets.my_dataset import build_my_dataset
+DATASETS = {"regression": build_regression, "my_dataset": build_my_dataset}
+```
+
+Then allow `"my_dataset"` in `DataConfig.validate` and set
+`data.name: my_dataset`. Splits are materialized in `data/splits.py`; the
+runtime loader never calls `random_split`.
 
 To add a model:
 
@@ -98,31 +126,39 @@ Or `make train`, `make sweep`, `make report`, `make gc-dry`, `make test`,
 `make gc-dry` is a dry-run; change `--metric-key` to your primary metric before
 using `--apply`.
 
-## Changing model / loss mid-experiment
+## Changing data / model / loss mid-experiment
 
-A running job cannot swap architecture/loss. Start a new run; old runs stay
-immutable. The template is config-driven:
+A running job cannot swap data, architecture or loss. Start a new run; old runs
+stay immutable. The template is config-driven:
 
 ```bash
 python commands/train.py --config configs/base.yaml \
+  --set data.name=regression \
+  --set data.split=holdout \
   --set model.name=linear \
   --set loss.name=huber \
-  --set experiment=arch-linear-loss-huber
+  --set experiment=data-linear-huber
 ```
 
-`model.name` and `loss.name` select the builders in `models/build.py` /
-`losses/build.py`; `task.py` stays unchanged. Add a new component file, register
-it in the corresponding `build.py`, extend the config validation, add a shape/
-golden test, and commit the code.
+`data.name` / `data.split` / `data.*_transform`, `model.name` and `loss.name`
+select builders in `data/build.py`, `data/splits.py`, `models/build.py` and
+`losses/build.py`. Add a new component file, register it in the corresponding
+registry, extend the config validation, add a shape/golden test, and commit the
+code.
+
+For data, the key rule is: **new data or a new split is a new run, not an edit
+to a previous run.** The loader reads a materialized membership and records the
+resulting `DataSpec.version` in the run manifest, so old runs remain
+reproducible even after the dataset grows.
 
 For evaluation, just point at the checkpoint. `eval.py` reads the training
 run's `config.resolved.json` via the checkpoint manifest, so the architecture
 and loss match automatically; the eval run stays grouped under the training
 experiment. `--config` is only a fallback if the original run directory is gone.
 
-For a comparison, sweep `model.name`, `loss.name`, and `seed` in
-`commands/sweep.py`; one trial = one new run. Commit code before official runs;
-dirty runs are exploratory.
+For a comparison, sweep `data.name`, `data.split`, `data.*_transform`,
+`model.name`, `loss.name`, and `seed` in `commands/sweep.py`; one trial = one
+new run. Commit code before official runs; dirty runs are exploratory.
 
 ## What you get
 

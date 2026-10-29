@@ -15,7 +15,13 @@ composition root.
 configs/                 # one YAML per experiment/variant
 myproject/
   config.py              # typed dataclass schema
-  data.py                # REPLACE: dataset + loaders + DataSpec
+  data/
+    build.py             # data.name / transform registry + make_loaders
+    datasets/            # REPLACE: one file per dataset
+    transforms/          # one file per transform
+    splits.py            # split strategies (materialized indices)
+    loaders.py           # DataLoader assembly
+    spec.py              # DataSpec + recipe digest
   models/
     build.py             # name -> builder registry
     mlp.py
@@ -89,10 +95,16 @@ make doctor
 
 Replace or extend these component packages:
 
-1. `myproject/data.py`
-   - Keep a `DataSpec` (name, version, schema, splits, transform).
-   - Return two batch iterables: train and val.
-   - Batch is a `Mapping[str, Any]`; collate/batching belongs here.
+1. `myproject/data/`
+   - One dataset per file in `data/datasets/`; register it in `data/build.py`.
+   - One transform per file in `data/transforms/`; register it in `data/build.py`.
+   - `data/splits.py` materializes membership (`role -> indices`); loaders never
+     call `random_split`.
+   - Each dataset builder returns a `DataBundle(dataset, DataSpec)`.
+   - `DataSpec` carries name, version, schema, splits, transform and provenance.
+   - Batch is a `Mapping[str, Any]`; collate/batching belongs in `data/loaders.py`.
+   - Data is an ablation axis: `data.name`, `data.split`,
+     `data.train_transform`, `data.eval_transform` are config-selected.
 
 2. `myproject/models/`
    - One file per architecture.
@@ -115,31 +127,43 @@ Replace or extend these component packages:
    - Return `Metric` objects (`TorchMetric` is the convenience adapter).
    - Add a golden test for each metric.
 
-Keep `myproject/task.py` as the **composition root**. It only calls
+Keep `myproject/task.py` as the **task composition root**. It only calls
 `build_model`, `build_loss`, `build_optimizer`, `build_scheduler`,
 `build_metrics`; it should not contain implementations or data loading.
+`myproject/data/build.py` is the **data composition root**; `commands/` wires
+the data loaders and the task into one run. Both are config-selected and part of
+the ablation surface.
 
 Put reusable, cross-project torch code in the DLEF repo's `adapters/torch/`,
 not in `myproject/`; put project-specific research code in `myproject/`.
 
 ---
 
-## 3.1 Changing model / loss mid-experiment
+## 3.1 Changing data / model / loss mid-experiment
 
-A running job cannot swap architecture or loss. **Start a new run; never edit a
-completed run.**
+A running job cannot swap data, architecture or loss. **Start a new run; never
+edit a completed run.**
 
 The template is config-driven:
 
+- `data.name` selects the dataset builder in `myproject/data/build.py`;
+- `data.split` selects the splitter in `myproject/data/splits.py`;
+- `data.train_transform` / `data.eval_transform` select transforms in
+  `myproject/data/transforms/`;
 - `model.name` selects the builder in `myproject/models/build.py`;
 - `loss.name` selects the builder in `myproject/losses/build.py`;
 - `optim.name` / `scheduler.name` / `metrics[]` select from their registries;
 - `myproject/task.py` stays unchanged.
 
+Data rule: **new data or a new split is a new run.** The loader records the
+materialized `DataSpec.version` in the run manifest; never re-split at runtime
+and never overwrite a previous split or dataset version. Old runs stay valid.
+
 To add a variant:
 
-1. add `myproject/models/<name>.py` (or `losses/<name>.py` etc.) with its builder;
-2. register it in the matching `build.py`;
+1. add `data/datasets/<name>.py` (or `models/<name>.py`, `losses/<name>.py`,
+   etc.) with its builder;
+2. register it in the matching registry (`data/build.py`, `models/build.py`, ...);
 3. allow the name in the matching `Config` validation in `config.py`;
 4. add a shape/golden test;
 5. commit the code.
@@ -148,9 +172,11 @@ One-off variant:
 
 ```bash
 python commands/train.py --config configs/base.yaml \
+  --set data.name=regression \
+  --set data.split=holdout \
   --set model.name=linear \
   --set loss.name=huber \
-  --set experiment=arch-linear-loss-huber
+  --set experiment=data-linear-loss-huber
 ```
 
 For evaluation, just point at the checkpoint:
@@ -165,11 +191,13 @@ grouped under the training experiment (`...-eval`). `--config` is only a
 fallback when the original run directory is unavailable. Do not hand-sync
 model/loss flags unless you are deliberately evaluating a different setup.
 
-For a comparison, sweep model/loss/seed. `commands/sweep.py` already has a
+For a comparison, sweep data/model/loss/seed. `commands/sweep.py` already has a
 `set_dotted` helper; replace the params with:
 
 ```python
 params={
+    "data.name": Choice(("regression",)),
+    "data.split": Choice(("holdout",)),
     "model.name": Choice(("mlp", "linear")),
     "loss.name": Choice(("mse", "huber")),
     "seed": Choice((1, 2, 3)),
@@ -211,7 +239,7 @@ claim        one reported number/table/figure
 Recommended order:
 
 1. Write the baseline config.
-2. Replace data/model/loss/metrics.
+2. Replace `data/` + model/loss/metrics.
 3. Run the smoke test.
 4. Run baseline; inspect `manifest.json` + `config.resolved.json` + checkpoint.
 5. Evaluate on val; keep test for the final claim.
@@ -355,8 +383,19 @@ Do not edit the installed `dlef` package in place.
 
 ## 12. Quick recipes
 
-**New dataset** → edit `data.py`, add `DataSpec`, validate one batch, add a smoke
-test. Update `configs/*.yaml` if the shape/size changes.
+**New dataset** → add `data/datasets/<name>.py` returning
+`DataBundle(dataset=..., spec=DataSpec(...))`; register it in `data/build.py`;
+allow the name in `DataConfig`; validate one batch; add a smoke test. Update
+`configs/*.yaml`.
+
+**New transform** → add `data/transforms/<name>.py` returning a named
+`Transform`; register it in `data/build.py`; allow the name in `DataConfig`;
+keep train and eval transforms separate; add a test.
+
+**New split strategy** → add a function in `data/splits.py` returning
+`role -> list[int]`; register it in `SPLITTERS`; allow the name in
+`DataConfig.split`; record the membership digest in `DataSpec.splits`; add a
+test that the same split name + seed yields the same membership.
 
 **New model** → add `models/<name>.py`; register it in `models/build.py`; allow
 the name in `ModelConfig`; add a forward-shape test; set `model.name`.
