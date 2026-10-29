@@ -210,6 +210,16 @@ class Run:
         )
         return candidates[-1] if candidates else self.directory / "checkpoints" / "last.json"
 
+    @property
+    def log_path(self) -> Path:
+        return self.directory / "logs" / "train.log"
+
+    def log(self, message: str) -> None:
+        """Append a timestamped line to this run's training log."""
+        self.log_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.log_path.open("a", encoding="utf-8") as handle:
+            handle.write(f"{utc_now()} {message}\n")
+
     def write_manifest(self) -> None:
         self.directory.mkdir(parents=True, exist_ok=True)
         self.manifest_path.write_text(

@@ -24,6 +24,10 @@ class RunStoreTests(unittest.TestCase):
             self.assertEqual(run.manifest.config_source, "configs/base.yaml")
             self.assertTrue(run.manifest_path.is_file())
 
+            run.log("hello from the run")
+            self.assertTrue(run.log_path.is_file())
+            self.assertIn("hello from the run", run.log_path.read_text(encoding="utf-8"))
+
             run.log_metrics({"step": 1, "loss": 0.5})
             run.log_metrics({"step": 2, "loss": 0.4})
             lines = run.metrics_path.read_text(encoding="utf-8").strip().splitlines()

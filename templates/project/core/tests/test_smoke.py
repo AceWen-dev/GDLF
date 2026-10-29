@@ -51,6 +51,8 @@ class SmokeTests(unittest.TestCase):
             self.assertEqual(run.manifest.status, "completed")
             self.assertTrue(run.config_path.is_file())
             self.assertTrue(run.checkpoint_path.is_file())
+            self.assertTrue(run.log_path.is_file())
+            self.assertIn("status=completed", run.log_path.read_text(encoding="utf-8"))
 
             record = runner.evaluate(
                 task,

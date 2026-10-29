@@ -327,6 +327,7 @@ output/runs/<project>/<experiment>/<run_id>/
   manifest.json
   config.resolved.json
   metrics.jsonl
+  logs/train.log
   checkpoints/last.pt
   evals/<eval_id>.json
 ```

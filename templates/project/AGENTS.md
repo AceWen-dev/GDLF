@@ -76,7 +76,7 @@ scripts/                 # project-specific scripts, intentionally unstructured
   README.md
 
 output/                   # layer 3: generated results
-  runs/
+  runs/                   # includes logs/train.log per run
   artifacts/
   sweeps/
   test_access/

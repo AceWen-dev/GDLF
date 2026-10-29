@@ -118,7 +118,8 @@ find "$RUN_DIR" -maxdepth 2 -type f | sort
 ```text
 manifest.json          # 身份证：代码版本、config 指纹、数据版本、seed、状态
 config.resolved.json   # 这次实验完整的配置
-metrics.jsonl          # 训练/验证过程
+metrics.jsonl          # 训练/验证过程（机器可读）
+logs/train.log         # 训练文本日志（epoch/step/eval/checkpoint）
 checkpoints/last.pt    # 模型
 evals/xxx.json         # 评测成绩单
 ```

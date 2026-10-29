@@ -13,6 +13,7 @@ The default policy reproduces plain single-process training.
 from __future__ import annotations
 
 import random
+import traceback
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -87,6 +88,11 @@ class Runner:
                 config_source=config.source,
             )
             run.save_json("config.resolved.json", config.resolved)
+            run.log(
+                f"start project={schema.project} experiment={schema.experiment} "
+                f"seed={schema.seed} config_digest={config.digest} "
+                f"code_version={run.manifest.code_version}"
+            )
 
         model = task.get_model()
         optimizer = task.configure_optimizer(model)
@@ -107,6 +113,8 @@ class Runner:
             for epoch in range(1, schema.epochs + 1):
                 last_epoch = epoch
                 ctx.epoch = epoch
+                if run is not None:
+                    run.log(f"epoch {epoch}/{schema.epochs} start")
                 set_epoch = getattr(train_data, "set_epoch", None)
                 if callable(set_epoch):
                     set_epoch(epoch)
@@ -141,6 +149,14 @@ class Runner:
                         }
                         record.update({key: to_float(value) for key, value in step.terms.items()})
                         run.log_metrics(record)
+                        terms = " ".join(
+                            f"{key}={to_float(value):.6g}"
+                            for key, value in step.terms.items()
+                        )
+                        run.log(
+                            f"step {global_step} loss={record['loss']} "
+                            f"{terms}".rstrip()
+                        )
 
                     self._call(callbacks, "on_step_end", ctx, step)
 
@@ -172,6 +188,13 @@ class Runner:
                 epoch_record.update(val_metrics)
                 if run is not None:
                     run.log_metrics(epoch_record)
+                    val_text = " ".join(
+                        f"{key}={value:.6g}" for key, value in val_metrics.items()
+                    )
+                    run.log(
+                        f"epoch {epoch} train_loss={epoch_record['train_loss']} "
+                        f"{val_text}".rstrip()
+                    )
 
                 if (
                     schema.checkpoint_every
@@ -193,11 +216,14 @@ class Runner:
             policy.on_fit_end(task, optimizer)
             self._call(callbacks, "on_run_end", ctx)
             if run is not None:
+                run.log("status=completed")
                 run.finalize("completed")
             return run
         except BaseException as exc:  # noqa: BLE001 - finalize on any failure
             self._call(callbacks, "on_exception", ctx, exc)
             if run is not None:
+                run.log(f"status=failed error={exc!r}")
+                run.log("traceback:\n" + traceback.format_exc().rstrip())
                 run.finalize("failed", error=repr(exc))
             raise
 
@@ -210,6 +236,10 @@ class Runner:
     ) -> EvalRecord:
         validate_task(task)
         metrics = dict(task.configure_metrics())
+        run.log(
+            f"eval start split={spec.split} benchmark={spec.benchmark_id or '-'} "
+            f"test_set={spec.test_set_id or '-'}"
+        )
         values = self._validate(task, dataset, metrics, self.training_policy)
 
         eval_id = f"{run.run_id}-{spec.split}-{_short_id()}"
@@ -234,6 +264,11 @@ class Runner:
         )
         path = run.save_json(f"evals/{record.eval_id}.json", record.to_dict())
         run.save_artifact(path, f"eval:{record.eval_id}")
+        metric_text = " ".join(f"{key}={value:.6g}" for key, value in values.items())
+        run.log(
+            f"eval done eval_id={record.eval_id} metrics={metric_text} "
+            f"test_access={test_access}"
+        )
         return record
 
     def load_checkpoint(
@@ -311,6 +346,7 @@ class Runner:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.checkpoint_codec.dump(path, checkpoint)
         run.save_artifact(path, f"checkpoint:{name}")
+        run.log(f"checkpoint {name} path={path.name}")
         return path
 
     @staticmethod

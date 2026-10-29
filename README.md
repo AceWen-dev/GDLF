@@ -94,6 +94,8 @@ examples/toy/output/
 - The core is domain-agnostic: a batch is an opaque mapping.
 - Config is typed, strict, resolved, hashed, and dumped into the run directory.
 - The manifest is written before the first step; status is explicit.
+- Each run keeps `metrics.jsonl` plus a human-readable `logs/train.log`; sweep
+  child stdout/stderr is captured in the sweep trial log.
 - Loss terms are named and logged.
 - Eval is a separate record linked to a checkpoint digest.
 - `compare` reads eval records, not hand-copied numbers.

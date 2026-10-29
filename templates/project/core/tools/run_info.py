@@ -149,6 +149,10 @@ def main() -> int:
         print(f"  checkpoint: {checkpoint}")
     else:
         print("  checkpoint: (none)")
+    if run.log_path.is_file():
+        print(f"  training_log: {run.log_path}")
+    else:
+        print("  training_log: (none)")
     print(f"  evals_dir: {run.directory / 'evals'}")
     return 0
 

@@ -141,6 +141,7 @@ core ← adapters ← examples / templates
 - `RunStore`：`runs/<project>/<experiment>/<run_id>/`。
 - `ArtifactStore`：内容寻址 `<sha[:2]>/<sha>/<name>`。
 - checkpoint 默认 JSON；torch adapter 用 `.pt`（`torch.save`）。
+- run 目录同时有 `metrics.jsonl`（机器可读）和 `logs/train.log`（epoch/step/eval/checkpoint 文本日志）。
 - manifest 在第一个 step 之前写；失败/中断也保留。
 
 ### 5.3 Eval / benchmark
@@ -275,6 +276,7 @@ output/runs/<project>/<experiment>/<run_id>/
   manifest.json
   config.resolved.json
   metrics.jsonl
+  logs/train.log
   checkpoints/last.pt
   evals/<eval_id>.json
 ```
