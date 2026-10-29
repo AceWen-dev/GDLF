@@ -17,6 +17,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from _bootstrap import ensure_core  # noqa: E402
+
+ensure_core()
+
 from dlef.eval import EvalRecord  # noqa: E402
 from dlef.run import Run, RunStore  # noqa: E402
 

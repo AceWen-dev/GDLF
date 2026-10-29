@@ -15,6 +15,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from _bootstrap import ensure_core  # noqa: E402
+
+ensure_core()
+
 from dlef.benchmark import BenchmarkSpec  # noqa: E402
 from dlef.config import load_config  # noqa: E402
 from myproject.config import ProjectConfig  # noqa: E402
