@@ -18,6 +18,7 @@ myproject/data/          # REPLACE/EXTEND: datasets, splits, transforms, loaders
   paths.py               # $DLEF_DATA_ROOT + external dataset layout
   spec.py                # DataSpec + recipe digest
   loaders.py             # DataLoader assembly
+  benchmark.py           # frozen test set + metric protocol -> benchmark id
   build.py               # data composition root: registry + make_loaders
 myproject/models/        # REPLACE/EXTEND: one file per architecture + build.py
 myproject/losses/        # REPLACE/EXTEND: one file per loss + build.py
@@ -27,10 +28,13 @@ myproject/metrics/       # one file per metric + build.py
 myproject/task.py        # composition root: build model/loss/optimizer/scheduler/metrics
 myproject/runtime.py     # policy / runner / sweep result helper
 commands/train.py        # thin entry: train + eval
-commands/eval.py         # thin entry: separate eval run
+commands/eval.py         # thin entry: separate eval run (val or sealed test)
+commands/benchmark.py    # freeze / verify a benchmark manifest
 commands/sweep.py        # subprocess grid sweep
 tests/test_smoke.py      # one tiny end-to-end test
 tests/test_components.py # component shape/golden tests
+tests/test_benchmark.py  # test-set / benchmark identity tests
+benchmarks/              # one frozen JSON per benchmark (small, committed)
 claims/                  # one JSON per reported claim
 AGENTS.md                # project-local agent guide
 ```
@@ -61,7 +65,7 @@ To add a dataset:
 
 ```python
 # myproject/data/datasets/my_dataset.py
-def build_my_dataset(config, role, seed, transform):
+def build_my_dataset(config, role, transform):
     ...
     return DataBundle(dataset=..., spec=DataSpec(...))
 
@@ -118,6 +122,46 @@ split manifest stores membership (sample ids or relative paths), not a copied
 The project `.gitignore` blocks `/data/`, `/datasets/` and `/raw/` at the
 project root, so accidental copies do not get committed. `myproject/data/`
 (code) is not ignored.
+
+## Frozen benchmark / test set
+
+A benchmark is the unit of comparison:
+
+```text
+benchmark = test membership + labels
+          + eval transform
+          + metric implementation/version + aggregation + thresholds
+```
+
+Freeze it once and commit the small manifest:
+
+```bash
+python commands/benchmark.py create \
+  --config configs/base.yaml \
+  --out benchmarks/synthetic-test-v1.json
+
+python commands/benchmark.py verify \
+  --config configs/base.yaml \
+  --benchmark benchmarks/synthetic-test-v1.json
+```
+
+Test evaluation must go through the frozen manifest:
+
+```bash
+python commands/eval.py \
+  --checkpoint outputs/runs/.../checkpoints/last.pt \
+  --split test \
+  --benchmark benchmarks/synthetic-test-v1.json
+```
+
+If the test membership, labels, eval transform or metric protocol changes, the
+benchmark id changes. Create a new benchmark file; do not edit or overwrite the
+old one. Old runs keep their original benchmark id, and `dlef compare` warns
+when records come from different benchmarks.
+
+The template config has `data.seed` (dataset content) separate from the
+top-level `seed` (run seed), so changing the training seed does not move the
+test set.
 
 ## Install
 

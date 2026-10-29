@@ -13,7 +13,7 @@
 - 支持 **grid / random sweep**，有 thread 和 subprocess 两种后端；一个 trial = 一个 run。
 - 支持 **AMP、梯度累积、梯度裁剪、可选 DDP**。
 - 支持 **retention / gc**：默认 dry-run，引用检查、血缘保护、artifact TTL。
-- 支持 **Claim / Markdown report**：报告里的数字可以反向解析到 eval record；test split 访问会计数，重复访问标 `WARN`。
+- 支持 **Claim / Markdown report**：报告里的数字可以反向解析到 eval record；test split 按 `test_set_id` 计数，重复访问标 `WARN`；跨 benchmark 标为不可比。
 - 项目模板 `templates/project/` 可以直接复制，**依赖 core 包，不复制 core**。
 - 测试：主套件 **48 个**（无 torch 环境 4 个 skip；torch 环境全过）；模板 smoke **1 个**。
 - 真实跑通：CUDA AMP、2 进程 CPU DDP、subprocess sweep、模板 train/eval/sweep。
@@ -51,7 +51,7 @@ Config ──► Run ──► Eval ──► Claim
 |---|---|---|
 | **Config** | 一次 run 的完整输入声明 | 类型化、unknown key 报错、运行前 dump + hash |
 | **Run** | 一份 resolved config × 一个 seed 的一次执行 | manifest 先写；完成后不可变；失败也保留 |
-| **Eval** | 一个 checkpoint × 一份 eval spec × 一个 split | 独立 run；有自己的 manifest；test access 计数 |
+| **Eval** | 一个 checkpoint × 一份 eval spec × 一个 benchmark | 独立 run；有自己的 manifest；test access 计数；benchmark id 可比性 |
 | **Claim** | 报告/论文里的一个数字、表或图 | 必须引用 eval；report 反向解析到 run |
 | **Artifact** | checkpoint、预测、指标表、图 | 内容寻址；被 kept run 引用则保护 |
 
@@ -94,6 +94,7 @@ core (dlef/)
   checkpoint.py   # CheckpointCodec: JSON default
   run.py          # manifest / run store / artifact store
   eval.py         # EvalSpec / EvalRecord
+  benchmark.py    # test set + metric protocol -> benchmark id
   claim.py        # Claim / ClaimStore / TestAccessLog
   sweep.py        # SweepSpec / trials / thread + subprocess queues
   retention.py    # plan / apply / reference checks
@@ -140,12 +141,14 @@ core ← adapters ← examples / templates
 - checkpoint 默认 JSON；torch adapter 用 `.pt`（`torch.save`）。
 - manifest 在第一个 step 之前写；失败/中断也保留。
 
-### 5.3 Eval
+### 5.3 Eval / benchmark
 
-- `EvalSpec`：checkpoint、split、metrics、aggregation、ci_method、test_access_policy。
-- `EvalRecord`：eval_id、split、checkpoint_digest、data_version、eval_spec_digest、metrics、predictions、test_access。
-- eval 是独立 run；`compare` 从 eval records 生成对比表。
-- test split 每次 eval 都写入 `TestAccessLog`；report 里访问次数 > 1 标 `WARN`。
+- `EvalSpec`：checkpoint、split、metrics、aggregation、ci_method、test_access_policy、benchmark_id、test_set_id。
+- `EvalRecord`：eval_id、split、checkpoint_digest、data_version、eval_spec_digest、metrics、predictions、test_access、benchmark_id、test_set_id。
+- `BenchmarkSpec`：test set（dataset + version + membership + label version）+ eval transform + metric versions + aggregation + thresholds + evaluator version。
+- `test_set_id` 用于防泄漏和 test access；`benchmark_id` 用于可比性；只有同一个 `benchmark_id` 的 eval 才能直接比较。
+- eval 是独立 run；`compare` 从 eval records 生成对比表，跨 benchmark 会提示不可比。
+- test split 每次 eval 都按 `test_set_id` 写入 `TestAccessLog`；report 里访问次数 > 1 标 `WARN`。
 
 ### 5.4 Sweep
 
@@ -174,10 +177,10 @@ core ← adapters ← examples / templates
 
 ### 5.7 Claim / report
 
-- `Claim`：claim_id、text、eval_ids、metric、value、unit、notes、tags。
+- `Claim`：claim_id、text、eval_ids、metric、value、unit、notes、tags、benchmark_id。
 - `ClaimStore`：一个 claim 一个 JSON。
 - `dlef report`：claim + eval records → Markdown。
-- 缺失 eval 会显示 `MISSING`；test access > 1 显示 `WARN`。
+- 缺失 eval 会显示 `MISSING`；test access > 1 显示 `WARN`；claim 与 eval 的 benchmark 不一致显示 `MISMATCH`。
 
 ### 5.8 CLI
 
@@ -213,6 +216,7 @@ myproject/data/          # 数据集 + split + transform + loader
   paths.py               # $DLEF_DATA_ROOT + 外部目录布局
   spec.py                # DataSpec + recipe digest
   loaders.py             # DataLoader 组装
+  benchmark.py           # 冻结 test set + metric protocol
   build.py               # 数据侧 composition root
 myproject/models/        # 每个模型一个文件 + models/build.py 注册
 myproject/losses/        # 每个 loss 一个文件 + losses/build.py 注册
@@ -280,8 +284,8 @@ python commands/train.py --config configs/base.yaml \
   --set experiment=data-linear-loss-huber
 ```
 
-- `data.name` / `data.split` / `data.*_transform` 选择 `data/build.py` 和
-  `data/splits.py`；
+- `data.name` / `data.version` / `data.split` / `data.*_transform` 选择
+  `data/build.py` 和 `data/splits.py`；
 - `model.name` 选择 `models/build.py` 里的 builder；
 - `loss.name` 选择 `losses/build.py` 里的 builder；
 - `optim.name` / `scheduler.name` / `metrics[]` 分别从各自 registry 选择；
@@ -289,6 +293,8 @@ python commands/train.py --config configs/base.yaml \
 - `eval.py` 会通过 checkpoint manifest 找到训练 run 的
   `config.resolved.json`，自动复用同一份结构/超参，所以不需要手动重复
   `--set`；只有原 run 目录丢了才用 `--config` 兜底。
+- 最终 test eval 必须带冻结 benchmark：
+  `python commands/eval.py --checkpoint ... --split test --benchmark benchmarks/<id>.json`。
 
 比较多个数据/架构/loss 时，用 sweep 把 `data.name`、`data.split`、
 `data.*_transform`、`model.name`、`loss.name`、`seed` 作为参数；一个 trial =
@@ -458,8 +464,8 @@ dry-run: would delete 6 run(s), 12 artifact(s)
 ### 7.7 Claim report
 
 ```text
-| claim | text | metric | value | split | eval | run | test_access |
-| c1 | Baseline comparison | mae | ... | test | ... | ... | WARN 2 |
+| claim | text | metric | value | split | benchmark | eval | run | test_access |
+| c1 | Baseline comparison | mae | ... | test | 647b946221bf | ... | ... | WARN 2 |
 ```
 
 ---
@@ -503,8 +509,8 @@ RunStore 是事实来源；W&B / MLflow / TensorBoard 将来只是可选索引�
 
 - 独立 manifest；
 - checkpoint digest；
-- data version；
-- eval spec digest；
+- data version + test set id；
+- benchmark id + eval spec digest；
 - test access 计数。
 
 ### 8.6 模板依赖 core，不复制 core
@@ -516,7 +522,7 @@ RunStore 是事实来源；W&B / MLflow / TensorBoard 将来只是可选索引�
 - 修 bug / 加能力通过升级 core 传播；
 - 每个项目仍可在 adapter 层自由分叉。
 
-ADR：`docs/adr/0002-template-imports-core.md`。
+ADR：`docs/adr/0002-template-imports-core.md`、`docs/adr/0003-benchmark-identity.md`。
 
 ### 8.7 失败也保留
 
@@ -571,7 +577,8 @@ DLEF/
 - **Tracker**：没有 W&B / MLflow / TensorBoard adapter；RunStore 是唯一的真相。
 - **远程执行**：只有本地 thread / subprocess；没有 Slurm / K8s launcher。
 - **DDP 完整性**：训练已跑通；多 rank eval、分布式 checkpoint resume 没做。
-- **Claim 强制**：test access > 1 只标 `WARN`，不阻塞；没有 claim/report UI。
+- **Claim 强制**：test access > 1、跨 benchmark 只标 `WARN`，不阻塞；没有 claim/report UI。
+- **Benchmark 自动检查**：模板会校验 benchmark 的 id；duplicate/group/time/label 泄漏检查仍需项目自己实现。
 - **kill-resume 测试**：checkpoint round-trip 有测试；完整 kill-resume 还没自动化。
 - **模板占位符**：数据/模型/loss/metric 是合成回归，需要替换。
 - **数据审计**：没有内建 leakage/duplicate 检查；DataSpec 只提供字段。
@@ -586,16 +593,20 @@ DLEF/
 2. 安装 core 和项目依赖。
 3. 写 `configs/base.yaml`：project / experiment / seed / epochs / 数据 / 模型 / 优化器。
 4. 设置 `DLEF_DATA_ROOT`，替换 `data/` 下的数据集/transform/split，并按需扩展 `models/`、`losses/`、`metrics/`、`optimizers/`、`schedulers/`。
-5. 跑 smoke test：
+5. 冻结 benchmark 并提交 manifest：
+   ```bash
+   python commands/benchmark.py create --config configs/base.yaml --out benchmarks/<name>.json
+   ```
+6. 跑 smoke test：
    ```bash
    python -m unittest discover -s tests -v
    ```
-6. 跑 baseline；确认 manifest / config / checkpoint 都对。
-7. 需要多 seed 时，把 `seed` 加进 sweep 的 params；一个 seed 一个 run。
-8. val 上选模；test 只在一个 claim 里用一次。
-9. 写 claim；`dlef report` 生成报告。
-10. 给要保留的 run 打 `reported` tag；用 `dlef gc` 清理其余。
-11. 归档：把 manifest、config、报告、关键 checkpoint 放到长期存储。
+7. 跑 baseline；确认 manifest / config / checkpoint 都对。
+8. 需要多 seed 时，把 `seed` 加进 sweep 的 params；一个 seed 一个 run。
+9. val 上选模；test 只用冻结 benchmark 评一次。
+10. 写 claim（带 benchmark_id）；`dlef report` 生成报告。
+11. 给要保留的 run 打 `reported` tag；用 `dlef gc` 清理其余。
+12. 归档：把 manifest、config、benchmark、报告、关键 checkpoint 放到长期存储。
 
 ---
 
@@ -607,7 +618,8 @@ DLEF/
 | **Manifest** | Run 的身份证：代码、config、数据、环境、seed、状态、产物 |
 | **Config** | 一次 run 的完整输入声明；resolved + hash |
 | **Artifact** | checkpoint、预测、指标表、图；内容寻址 |
-| **Eval** | 独立评测 run：checkpoint × eval spec × split |
+| **Eval** | 独立评测 run：checkpoint × eval spec × benchmark |
+| **Benchmark** | 测试集 + 标签 + eval transform + 指标协议；可比较性的单位 |
 | **Claim** | 报告里的一个数字/表/图，链接到 eval |
 | **Sweep** | 一组 trial；一个 trial = 一个 run |
 | **Trial** | sweep 里的一个 run |

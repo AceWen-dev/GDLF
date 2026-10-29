@@ -22,14 +22,14 @@
 | 8 | Task / Runner | runtime | 是 | Runner 循环、`StepOutput`、resume | Task 的 step | step 纯函数；不写磁盘 |
 | 9 | Config | service | 是 | schema、resolver、digest | 配置值 | 严格、已解析、有 hash |
 | 10 | Run / Artifact | service | 是 | `RunManifest` / `RunStore` / `ArtifactStore` | 无 | manifest 先写；不可变；内容寻址 |
-| 11 | Eval | service | 是 | `EvalSpec` / `EvalRecord` / 聚合 | 指标选择 | 独立 run；test access 计数 |
+| 11 | Eval | service | 是 | `EvalSpec` / `EvalRecord` / benchmark id / 聚合 | 指标选择 | 独立 run；test access 计数 |
 | 12 | CLI / Launcher | service | 是 | commands、launcher 协议 | 项目入口配置 | 薄入口；一条命令一个工作流 |
 | 13 | Registry | service | 是 | register / create / resolve | 实现注册 | 不重名；显式 `class_path` 逃生口 |
 | 14 | Sweep | service | 是 | `SweepSpec` / `TrialSpec` / queue / record | `trial_fn` | 一个 trial = 一个 run；失败隔离 |
 | 15 | Retention | service | 是 | plan / apply / reference checks | 无 | 默认 dry-run；引用/血缘/sweep 保护 |
 | 16 | TrainingPolicy | runtime | 可选（默认 NoOp） | hook 生命周期 | AMP / accum / clip / DDP | backward/step 必须走 policy |
 | 17 | Claim | service | 是 | Claim / ClaimStore / report | 无 | claim → eval → run；test access 可见 |
-| 18 | TestAccess | service | 是 | append-only log + count | 无 | 每个 data version 的 test 访问计数 |
+| 18 | TestAccess | service | 是 | append-only log + count | 无 | 每个 test set 的 test 访问计数 |
 
 **runtime contract**：每次实验都会实例化的对象。
 **service**：框架提供的运行时设施，不是用户实现的算法组件。
@@ -91,6 +91,24 @@ class Dataset(Protocol):
 - train / eval transform 必须是两个独立声明。
 - 第一个 batch 必须通过 `DataSpec.schema` 校验（keys / dtype / shape）。
 - core 不关心 batch 的语义；只关心它是 typed mapping。
+
+### 3.1.1 Benchmark
+
+`BenchmarkSpec`（`dlef/benchmark.py`）把测试集和评价协议绑成一个不可变 id：
+
+```text
+test_set_id   = dataset + split membership digest
+benchmark_id  = test_set_id + label version + eval transform + metric versions
+              + aggregation + thresholds + evaluator version
+```
+
+约束：
+
+- `test_set_id` 用于防泄漏和 test access 计数；只改标签版本、eval transform 或指标不应重置访问计数。
+- `benchmark_id` 用于比较；只有相同 `benchmark_id` 的 EvalRecord 才能直接放在一张表里。
+- 改测试集、标签、eval transform、指标实现/聚合/阈值、评测代码版本 → 新 benchmark。
+- benchmark manifest 是小型 JSON，应随项目提交；测试数据实体仍在 `DLEF_DATA_ROOT`。
+- 构建 membership、查重、group/time/label 泄漏检查属于数据层；core 只拥有 id 和审计字段。
 
 ### 3.2 Model
 
@@ -359,6 +377,8 @@ class EvalSpec:
     aggregation: str
     ci_method: str | None = None
     test_access_policy: str = "once_per_claim"
+    benchmark_id: str = ""
+    test_set_id: str = ""
 
 @dataclass(frozen=True)
 class EvalRecord:
@@ -371,15 +391,19 @@ class EvalRecord:
     predictions: str | None = None
     created_at: str = ""
     test_access: int = 0
+    benchmark_id: str = ""
+    test_set_id: str = ""
 ```
 
 约束：
 
 - eval 是独立 run；有自己的 manifest。
 - metrics 按 split 命名；train/val/test 不混。
-- test access 计数；同一 claim 重复访问要显式记录。
+- test access 按 `test_set_id` 计数；同一 claim 重复访问要显式记录。
+- 测试集 + 标签 + eval transform + metric 实现/聚合 = 一个 benchmark；
+  `benchmark_id` 不同的 EvalRecord 不可直接比较。
 - 多 seed 聚合、CI 是 eval 层的能力，不是 metric 实现的责任。
-- 每个 claim 必须引用 eval id。
+- 每个 claim 必须引用 eval id，并应记录 benchmark id。
 
 ### 4.4 CLI / Launcher
 
@@ -514,19 +538,21 @@ class Claim:
     value: float | None = None
     unit: str = ""
     notes: str = ""
+    benchmark_id: str = ""
 ```
 
 约束：
 
 - Claim 必须至少引用一个 eval id；report 生成时通过 `RunStore.find_eval` 解析。
-- `TestAccessLog` 是 append-only；`Runner.evaluate` 对 `split == "test"` 记录计数，写入 `EvalRecord.test_access`。
+- Claim 应记录 `benchmark_id`；如果 claim 和 eval 的 benchmark 不同，report 标 `MISMATCH`。
+- `TestAccessLog` 是 append-only；`Runner.evaluate` 对 `split == "test"` 按 `test_set_id` 记录计数，写入 `EvalRecord.test_access`。
 - 报告里 `test_access > 1` 标记 `WARN`；v0 只警告，不阻塞。
 - Claim/report 是本地 JSON / Markdown；没有 Web UI。
 - `ClaimStore` 一个 claim 一个 JSON 文件；`dlef report` 生成 Markdown。
 
 ---
 
-## 5. 12 条不变量
+## 5. 13 条不变量
 
 1. **Run identity**：一个 run = 一份 resolved config × 一个 seed；seed 是维度，不是循环。
 2. **Config**：第一个 step 前完全解析、dump、hash；unknown key 报错。
@@ -540,6 +566,7 @@ class Claim:
 10. **Tracker**：只是索引；RunStore 是 canonical。
 11. **Core purity**：core 无领域词；领域代码只在 adapter。
 12. **First-class**：每个 contract 都有 schema、registry name、contract test。
+13. **Benchmark**：test membership + labels + eval transform + metric protocol 冻结；只有相同 `benchmark_id` 才可直接比较。
 
 ---
 
@@ -555,6 +582,7 @@ core/
   run/            # manifest, run store, artifact store
   claim/          # claims + test-access log
   retention/      # plan / apply / reference checks
+  benchmark/      # test set + metric protocol -> benchmark id
   eval/           # eval spec, eval record, aggregation
   registry/       # register / create / resolve
   cli/            # train, eval, sweep, compare, report, doctor
@@ -601,7 +629,7 @@ templates/
 6. **Retention**：`RetentionPolicy` + `RetentionService.plan/apply`；默认 dry-run；引用检查、血缘闭包、sweep 保护。
 7. **TrainingPolicy**：backward/step 走 policy seam；torch adapter 提供 AMP + accumulation + clipping + optional DDP；默认 NoOp 保持单进程行为。
 8. **Delivery**：项目模板 `templates/project/` 依赖版本化 core，不 vendor core（ADR 0002）。
-9. **Claim / TestAccess**：Claim 对象 + Markdown report；test-split access 按 data version 计数，report 标记 WARN。
+9. **Claim / TestAccess**：Claim 对象 + Markdown report；test-split access 按 `test_set_id` 计数，report 标记 WARN；跨 benchmark 显示不可比。
 
 **待定：**
 

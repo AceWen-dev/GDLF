@@ -22,6 +22,7 @@ myproject/
     paths.py             # $DLEF_DATA_ROOT + external layout
     spec.py              # DataSpec + recipe digest
     loaders.py           # DataLoader assembly
+    benchmark.py         # frozen test set + metric protocol -> benchmark id
     build.py             # data composition root: registry + make_loaders
   models/
     build.py             # name -> builder registry
@@ -47,11 +48,14 @@ myproject/
   runtime.py             # policy/runner/sweep result helper
 commands/
   train.py               # thin entry: train + eval
-  eval.py                # thin entry: separate eval run
+  eval.py                # thin entry: separate eval run (val or sealed test)
+  benchmark.py           # freeze / verify a benchmark manifest
   sweep.py               # subprocess grid/random sweep
 tests/
   test_smoke.py
   test_components.py
+  test_benchmark.py
+benchmarks/              # one frozen JSON per benchmark (small, committed)
 claims/                  # one JSON per reported claim
 outputs/                 # generated; never edit by hand
 AGENTS.md                # this file
@@ -101,13 +105,17 @@ Replace or extend these component packages:
    - One transform per file in `data/transforms/`; register it in `data/build.py`.
    - `data/splits.py` materializes membership (`role -> indices`); loaders never
      call `random_split`.
-   - Each dataset builder returns a `DataBundle(dataset, DataSpec)`.
+   - Each dataset builder returns a `DataBundle(dataset=..., spec=DataSpec(...))`.
    - `DataSpec` carries name, version, schema, splits, transform and provenance.
    - Dataset bytes live outside the repo under `$DLEF_DATA_ROOT`; resolve them
      through `data/paths.py` (`curated_dir(name, version)`). `data.version` is
      the dataset content version; never commit images/tables or absolute paths.
+   - `data.seed` controls dataset content; the top-level `seed` controls the run.
+     Do not use the run seed for the test membership.
+   - `data/benchmark.py` freezes `test membership + labels + eval transform +
+     metric protocol` into a benchmark id; the config pins benchmark versions.
    - Batch is a `Mapping[str, Any]`; collate/batching belongs in `data/loaders.py`.
-   - Data is an ablation axis: `data.name`, `data.split`,
+   - Data is an ablation axis: `data.name`, `data.version`, `data.split`,
      `data.train_transform`, `data.eval_transform` are config-selected.
 
 2. `myproject/models/`
@@ -163,6 +171,11 @@ The template is config-driven:
 Data rule: **new data or a new split is a new run.** The loader records the
 materialized `DataSpec.version` in the run manifest; never re-split at runtime
 and never overwrite a previous split or dataset version. Old runs stay valid.
+
+Benchmark rule: **the test set + eval transform + metric protocol are frozen
+together.** If any of them changes, create a new benchmark manifest/version;
+never edit an old one in place. Results are comparable only within the same
+`benchmark_id`; `dlef compare` / `report` warn across benchmarks.
 
 To add a variant:
 
@@ -292,14 +305,20 @@ Rules:
 ## 7. Eval / claim rules
 
 - Train/val evaluation is for model selection.
-- Final test evaluation is a separate run:
+- Final test evaluation is a separate run. It must use a frozen benchmark:
   ```bash
-  python commands/eval.py --checkpoint ...
+  python commands/eval.py \
+    --checkpoint ... \
+    --split test \
+    --benchmark benchmarks/synthetic-test-v1.json
   ```
-  The eval reuses the training run config; `--config` is only a fallback.
-- Test access is counted under `outputs/test_access/`; report shows `WARN` when
-  the same data version is accessed more than once.
-- A `Claim` must reference at least one eval id:
+  `eval.py` verifies the current test membership/metric protocol against the
+  manifest and refuses to run on a mismatch. `--config` is only a fallback when
+  the original run directory is gone.
+- Test access is counted under `outputs/test_access/` by `test_set_id`; report
+  shows `WARN` when the same test set is accessed more than once.
+- A `Claim` must reference at least one eval id and should pin the benchmark
+  id it belongs to:
   ```python
   from dlef.claim import Claim, ClaimStore
   ClaimStore("claims").add(
@@ -308,6 +327,7 @@ Rules:
           text="...",
           eval_ids=("eval-id",),
           metric="mae",
+          benchmark_id="sha256:...",
       )
   )
   ```
@@ -345,6 +365,8 @@ Every project should have:
 
 - `tests/test_smoke.py`: 1–2 steps on tiny data, asserts a manifest/checkpoint;
 - a shape/contract test for data/model/loss;
+- `tests/test_benchmark.py`: test membership stable across train changes;
+  benchmark id changes with membership/metric protocol;
 - a golden test for each metric;
 - a checkpoint round-trip test if you touch checkpoints.
 
@@ -368,6 +390,9 @@ Do not edit the installed `dlef` package in place.
 - Do not edit completed manifests/metrics/eval records.
 - Do not delete runs/artifacts manually.
 - Do not tune on test; do not report a single lucky seed.
+- Do not edit a frozen benchmark manifest; create a new benchmark version.
+- Do not run `--split test` without `--benchmark`.
+- Do not compare numbers from different `benchmark_id`s as if they were one result.
 - Do not make a tracker the only record.
 - Do not put secrets in config/logs.
 - Do not commit dataset bytes or absolute data paths.
@@ -378,13 +403,15 @@ Do not edit the installed `dlef` package in place.
 ## 11. Definition of done
 
 1. Config validates; unknown keys fail.
-2. `DataSpec` exists; one batch validated; split provenance recorded.
+2. `DataSpec` exists; train/val/test membership materialized; one batch validated.
 3. Model/loss/metrics implement the contracts; loss terms named.
-4. Smoke test passes.
+4. Smoke test + benchmark identity test pass.
 5. Train produces manifest + resolved config + metrics + checkpoint.
-6. Eval produces a separate eval record bound to the checkpoint digest.
+6. Test eval uses a frozen benchmark and produces an eval record bound to the
+   checkpoint digest + benchmark id.
 7. Sweep (if used) produces one run per trial and a sweep record.
-8. Claim (if reported) resolves to eval → checkpoint → run.
+8. Claim (if reported) resolves to eval → checkpoint → run and names its
+   benchmark.
 9. `gc` dry-run shows only intended deletions.
 10. No project-specific changes in the installed core.
 
@@ -406,6 +433,16 @@ keep train and eval transforms separate; add a test.
 `role -> list[int]`; register it in `SPLITTERS`; allow the name in
 `DataConfig.split`; record the membership digest in `DataSpec.splits`; add a
 test that the same split name + seed yields the same membership.
+
+**New benchmark** → change the test membership, label version, eval transform
+or metric protocol, then create a new manifest:
+```bash
+python commands/benchmark.py create \
+  --config configs/base.yaml \
+  --out benchmarks/my-benchmark-v2.json
+```
+Never edit the old manifest. Test eval must pass `--benchmark`; `compare` /
+`report` show the benchmark id.
 
 **New model** → add `models/<name>.py`; register it in `models/build.py`; allow
 the name in `ModelConfig`; add a forward-shape test; set `model.name`.

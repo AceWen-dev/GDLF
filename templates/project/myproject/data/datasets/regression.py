@@ -5,7 +5,7 @@ from torch.utils.data import Dataset
 
 from ...config import DataConfig
 from ..spec import DataBundle, make_spec
-from ..splits import make_split, membership_ids
+from ..splits import make_split, membership_ids, role_seed
 from ..transforms.base import Transform
 
 
@@ -33,28 +33,33 @@ class RegressionDataset(Dataset):
 def build_regression(
     config: DataConfig,
     role: str,
-    seed: int,
     transform: Transform,
 ) -> DataBundle:
-    indices = make_split(config.split, config.n_train, config.n_val, seed)
+    indices = make_split(
+        config.split,
+        config.n_train,
+        config.n_val,
+        config.n_test,
+        config.seed,
+    )
     if role not in indices:
         raise ValueError(
             f"unknown data role: {role!r}; available: {sorted(indices)}"
         )
     selected = indices[role]
 
-    total = config.n_train + config.n_val
-    generator = torch.Generator().manual_seed(seed)
-    x = torch.randn(total, 1, generator=generator)
-    y = 2.0 * x + 1.0 + config.noise * torch.randn(total, 1, generator=generator)
+    generator = torch.Generator().manual_seed(role_seed(config.seed, role))
+    x = torch.randn(len(selected), 1, generator=generator)
+    y = 2.0 * x + 1.0 + config.noise * torch.randn(
+        len(selected), 1, generator=generator
+    )
 
-    dataset = RegressionDataset(x[selected], y[selected], transform)
+    dataset = RegressionDataset(x, y, transform)
     spec = make_spec(
         config,
         role,
-        seed,
         transform.name,
         len(selected),
-        membership_ids(config.split, indices),
+        membership_ids(config.split, indices, config.seed, config.version),
     )
     return DataBundle(dataset=dataset, spec=spec)

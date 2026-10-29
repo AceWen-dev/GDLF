@@ -26,7 +26,6 @@ class DataBundle:
 def make_spec(
     config: DataConfig,
     role: str,
-    seed: int,
     transform_name: str,
     n: int,
     splits: Mapping[str, str],
@@ -36,7 +35,7 @@ def make_spec(
         "dataset_version": config.version,
         "split": config.split,
         "role": role,
-        "seed": seed,
+        "data_seed": config.seed,
         "n": n,
         "noise": config.noise,
         "transform": transform_name,
@@ -50,5 +49,5 @@ def make_spec(
         splits=dict(splits),
         transform=transform_name,
         stats={"n": n},
-        provenance={"recipe": recipe, "role": role},
+        provenance={"recipe": recipe, "role": role, "data_seed": config.seed},
     )

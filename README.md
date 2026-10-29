@@ -34,6 +34,7 @@ dlef/
   registry.py      # name/class_path -> implementation
   run.py           # manifest, run store, content-addressed artifacts
   eval.py          # EvalSpec / EvalRecord
+  benchmark.py     # test set + metric protocol -> benchmark id
   claim.py         # Claim / ClaimStore / TestAccessLog
   runner.py        # minimal train/eval loop
   policy.py        # TrainingPolicy: AMP / accumulation / clipping / DDP seam
@@ -107,8 +108,10 @@ examples/toy/outputs/
   with a binary checkpoint codec; the core never imports torch.
 - The training policy seam supports AMP, gradient accumulation, clipping and
   optional DDP without teaching the core about torch.
-- Test-split evaluations are counted per data version; claims link reported
-  numbers to eval records and surface test reuse as `WARN`.
+- Test-split evaluations are counted per test set; claims link reported numbers
+  to eval records and surface test reuse as `WARN`.
+- A benchmark pins test membership + labels + eval transform + metric protocol;
+  different `benchmark_id`s are reported as not directly comparable.
 
 It does **not** prove a good model, a real dataset pipeline, or distributed
 training. Those are adapter concerns.
@@ -275,6 +278,7 @@ ClaimStore("claims").add(
         text="Our method improves the main metric",
         eval_ids=("eval-id-from-a-run",),
         metric="mae",
+        benchmark_id="sha256:...",
     )
 )
 ```
@@ -283,9 +287,11 @@ ClaimStore("claims").add(
 python -m dlef.cli report --runs runs --claims claims --out report.md
 ```
 
-Test-split access is logged under `runs/../test_access/` and shown as
-`test_access` in the report; access count > 1 is marked `WARN`. The report is
-file-based Markdown; there is no web UI.
+Test-set access is logged under `runs/../test_access/`, keyed by `test_set_id`,
+and shown as `test_access` in the report; access count > 1 is marked `WARN`.
+Claims and comparison rows also carry the `benchmark_id`; rows from different
+benchmarks are marked as not directly comparable. The report is file-based
+Markdown; there is no web UI.
 
 ## What is intentionally missing
 
@@ -302,3 +308,4 @@ file-based Markdown; there is no web UI.
 - `docs/design/contracts-v0.md` — contract map, invariants, boundaries.
 - `docs/adr/0001-thin-experiment-os.md` — why a thin, domain-agnostic core.
 - `docs/adr/0002-template-imports-core.md` — template imports the versioned core; no vendoring.
+- `docs/adr/0003-benchmark-identity.md` — frozen benchmark: test set + metric protocol.

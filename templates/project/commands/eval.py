@@ -18,10 +18,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from adapters.torch import TorchCheckpointCodec  # noqa: E402
+from dlef.benchmark import BenchmarkSpec  # noqa: E402
 from dlef.config import load_config, resolve_config  # noqa: E402
 from dlef.eval import EvalSpec  # noqa: E402
 from myproject.config import ProjectConfig  # noqa: E402
-from myproject.data import make_loader  # noqa: E402
+from myproject.data import build_benchmark, make_loader  # noqa: E402
 from myproject.runtime import build_policy, build_runner, parse_overrides  # noqa: E402
 from myproject.task import build_task  # noqa: E402
 
@@ -30,6 +31,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--config", default=None, help="fallback config if run dir is missing")
+    parser.add_argument(
+        "--split",
+        choices=("val", "test"),
+        default="val",
+        help="evaluate on val (model selection) or test (requires --benchmark)",
+    )
+    parser.add_argument(
+        "--benchmark",
+        default=None,
+        help="frozen benchmark JSON; required with --split test",
+    )
     parser.add_argument(
         "--set",
         dest="overrides",
@@ -90,8 +102,40 @@ def main() -> int:
     policy.setup()
     device = policy.device
 
+    benchmark_id = ""
+    test_set_id = ""
+    benchmark_name = ""
+    if args.split == "test":
+        if not args.benchmark:
+            print("--benchmark is required with --split test", file=sys.stderr)
+            return 2
+        benchmark_path = Path(args.benchmark)
+        if not benchmark_path.is_file():
+            print(f"benchmark not found: {benchmark_path}", file=sys.stderr)
+            return 2
+        eval_loader = make_loader(config.schema.data, "test", config.schema.seed)
+        current = build_benchmark(config.schema, eval_loader.spec)
+        try:
+            stored = BenchmarkSpec.load(benchmark_path)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            print(f"invalid benchmark manifest: {exc}", file=sys.stderr)
+            return 2
+        if stored.benchmark_id != current.benchmark_id:
+            print(
+                "benchmark mismatch: the test set or evaluation protocol changed\n"
+                f"stored:  {stored.benchmark_id}\n"
+                f"current: {current.benchmark_id}\n"
+                "create a new benchmark instead of reusing this one",
+                file=sys.stderr,
+            )
+            return 2
+        benchmark_id = stored.benchmark_id
+        test_set_id = stored.test_set_id
+        benchmark_name = stored.name
+    else:
+        eval_loader = make_loader(config.schema.data, "val", config.schema.seed)
+
     runner = build_runner(ROOT / "outputs", policy)
-    val_loader = make_loader(config.schema.data, "val", config.schema.seed)
     task = build_task(config.schema, device=device)
     optimizer = task.configure_optimizer(task.get_model())
     policy.on_fit_start(task, optimizer, config.schema)
@@ -102,15 +146,24 @@ def main() -> int:
         experiment=f"{train_experiment}-eval",
         config_digest=config.digest,
         seed=config.schema.seed,
-        data_versions={"val": val_loader.spec.version},
-        tags={"kind": "eval"},
+        data_versions={args.split: eval_loader.spec.version},
+        tags={
+            "kind": "eval",
+            "split": args.split,
+            **({"benchmark_id": benchmark_id} if benchmark_id else {}),
+        },
     )
     run.save_json("config.resolved.json", config.resolved)
     try:
         record = runner.evaluate(
             task,
-            val_loader,
-            EvalSpec(checkpoint=str(checkpoint), split="val"),
+            eval_loader,
+            EvalSpec(
+                checkpoint=str(checkpoint),
+                split=args.split,
+                benchmark_id=benchmark_id,
+                test_set_id=test_set_id,
+            ),
             run,
         )
         run.finalize("completed")
@@ -119,6 +172,8 @@ def main() -> int:
         raise
 
     print(f"config: {source}")
+    if benchmark_name:
+        print(f"benchmark: {benchmark_name} ({benchmark_id})")
     print(f"eval run: {run.run_id}")
     print(f"metrics: {record.metrics}")
     print(f"eval record: {run.dir / 'evals' / (record.eval_id + '.json')}")

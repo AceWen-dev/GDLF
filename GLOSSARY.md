@@ -17,6 +17,9 @@
 ## Config
 一次 Run 的完整输入声明。Config 是类型化的、经过校验的、可完全解析的；YAML、CLI、环境变量只是它的输入格式。
 
+## Benchmark
+可比较性的单位：一份冻结的 Test Set + 标签版本 + eval transform + 指标实现/聚合/阈值 + 评测代码版本。任一项变化都产生新的 Benchmark；不同 Benchmark 的分数不合并排名。
+
 ## Data Recipe
 一次 Run 固定的数据组合：dataset version + split + transform。任一项变化都是新 recipe、新 Run；旧 Run 不被覆盖。
 
@@ -25,6 +28,9 @@
 
 ## Split
 同一份 Dataset Version 上的 membership 视图（sample id 或相对路径），不是数据副本。Split 必须物化并被记录，训练时不得重新随机划分。
+
+## Test Set
+Benchmark 中冻结的测试 membership（样本 id / 相对路径）。它不随 run seed 变化；每次访问按 Test Set id 计数，重复访问必须在报告中显式可见。标签版本属于 Benchmark 协议。
 
 ## Eval Spec
 定义一次 Evaluation 的输入：checkpoint 选择规则、数据 split、预处理、指标及其聚合/置信区间方法。

@@ -213,8 +213,9 @@ class Runner:
 
         eval_id = f"{run.run_id}-{spec.split}-{_short_id()}"
         data_version = _data_version(dataset)
+        test_set_id = spec.test_set_id or data_version
         test_access = (
-            self.test_access_log.record(data_version, eval_id, spec.split)
+            self.test_access_log.record(test_set_id, eval_id, spec.split)
             if spec.split == "test"
             else 0
         )
@@ -227,6 +228,8 @@ class Runner:
             metrics=values,
             created_at=utc_now(),
             test_access=test_access,
+            benchmark_id=spec.benchmark_id,
+            test_set_id=test_set_id,
         )
         path = run.save_json(f"evals/{record.eval_id}.json", record.to_dict())
         run.save_artifact(path, f"eval:{record.eval_id}")

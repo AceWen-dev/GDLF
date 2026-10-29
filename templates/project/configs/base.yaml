@@ -11,13 +11,24 @@ checkpoint_every: 0
 data:
   name: regression
   version: synthetic
+  seed: 7
   split: holdout
   n_train: 512
   n_val: 128
+  n_test: 128
   noise: 0.1
   batch_size: 32
   train_transform: identity
   eval_transform: identity
+
+benchmark:
+  name: synthetic-test-v1
+  label_version: v1
+  evaluator_version: "1"
+  aggregation: mean
+  metric_versions:
+    mae: v1
+  thresholds: {}
 
 model:
   name: mlp

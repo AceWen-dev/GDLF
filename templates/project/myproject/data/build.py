@@ -17,7 +17,7 @@ from .spec import DataBundle
 from .transforms.base import Transform
 from .transforms.identity import build_identity
 
-DatasetBuilder = Callable[[DataConfig, str, int, Transform], DataBundle]
+DatasetBuilder = Callable[[DataConfig, str, Transform], DataBundle]
 TransformBuilder = Callable[[], Transform]
 
 DATASETS: dict[str, DatasetBuilder] = {
@@ -42,7 +42,6 @@ def build_transform(name: str) -> Transform:
 def build_dataset(
     config: DataConfig,
     role: str,
-    seed: int,
     transform_name: str,
 ) -> DataBundle:
     try:
@@ -53,7 +52,7 @@ def build_dataset(
         ) from exc
 
     transform = build_transform(transform_name)
-    return builder(config, role, seed, transform)
+    return builder(config, role, transform)
 
 
 def make_loader(
@@ -72,7 +71,7 @@ def make_loader(
     if shuffle is None:
         shuffle = role == "train"
 
-    bundle = build_dataset(config, role, seed, transform_name)
+    bundle = build_dataset(config, role, transform_name)
     return build_loader(
         bundle,
         config.batch_size,

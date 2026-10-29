@@ -270,6 +270,7 @@ myproject/data/          # 数据集 + split + transform + loader
   paths.py               # $DLEF_DATA_ROOT + 外部目录布局
   spec.py                # DataBundle + DataSpec + recipe digest
   loaders.py             # DataLoader 组装
+  benchmark.py           # 冻结 test set + metric protocol -> benchmark id
   build.py               # 数据侧 composition root
 myproject/models/        # 每个模型一个文件 + models/build.py 注册
 myproject/losses/        # 每个 loss 一个文件 + losses/build.py 注册
@@ -305,16 +306,19 @@ $DLEF_DATA_ROOT/
 `train/` / `val/` / `test/` 三份图片。这样一份 curated 数据可以服务多个
 split，也不会把项目目录撑乱。
 
+`data.seed` 控制数据内容，顶层 `seed` 控制 run；改训练 seed 不应改变
+test membership。
+
 项目的 `.gitignore` 会忽略根目录下的 `/data/`、`/datasets/`、`/raw/`，
 但不会忽略 `myproject/data/` 代码包。
 
 ### data/
 
-一个数据集一个文件，返回 `DataBundle(dataset, DataSpec)`：
+一个数据集一个文件，返回 `DataBundle(dataset=..., spec=DataSpec(...))`：
 
 ```python
 # data/datasets/my_dataset.py
-def build_my_dataset(config, role, seed, transform):
+def build_my_dataset(config, role, transform):
     ...
     return DataBundle(
         dataset=...,
@@ -367,6 +371,34 @@ def make_loaders(config, seed, *, distributed=False):
 
 每个 loader 是 **batch iterable**，batch 是 `Mapping[str, Any]`；每个 loader
 带一个 `DataSpec`，其 `version` 会写进 run manifest。
+
+### benchmark 固定测试集
+
+benchmark = 测试集 membership + 标签版本 + eval transform + 指标实现/聚合/
+阈值。把这份 manifest 冻结并提交：
+
+```bash
+python commands/benchmark.py create \
+  --config configs/base.yaml \
+  --out benchmarks/synthetic-test-v1.json
+
+python commands/benchmark.py verify \
+  --config configs/base.yaml \
+  --benchmark benchmarks/synthetic-test-v1.json
+```
+
+test 评测必须带 benchmark：
+
+```bash
+python commands/eval.py \
+  --checkpoint outputs/runs/.../checkpoints/last.pt \
+  --split test \
+  --benchmark benchmarks/synthetic-test-v1.json
+```
+
+- `test_set_id` 用于 test access 计数，改 eval transform 不会重置；
+- `benchmark_id` 用于比较，改测试集/指标/eval transform 都会产生新 id；
+- 旧 benchmark 不覆盖；要改 test 就新建 `v2`，报告里两个 benchmark 不合并排名。
 
 ### models/
 
@@ -455,13 +487,22 @@ python commands/train.py --config configs/base.yaml \
   --set experiment=data-linear-loss-huber
 ```
 
-评测只给 checkpoint：
+val 评测只给 checkpoint：
 
 ```bash
 python commands/eval.py --checkpoint .../last.pt
 ```
 
 它会自动读回训练配置。
+
+最终 test 评测必须走冻结 benchmark：
+
+```bash
+python commands/eval.py \
+  --checkpoint .../last.pt \
+  --split test \
+  --benchmark benchmarks/synthetic-test-v1.json
+```
 
 要比较多个组合，改 `commands/sweep.py`：
 
@@ -494,11 +535,12 @@ params={
   → 给要保留的 run 打 tag / 用 gc 清理
 ```
 
-三条硬规则：
+四条硬规则：
 
 1. 一个 run = 一份 config × 一个 seed。
-2. test 只用于 claim，不用于调参。
+2. test 只用于 claim，不用于调参；test eval 必须走冻结 benchmark。
 3. 旧 run 不改；新想法开新 run。
+4. 旧 benchmark 不改；改测试集/指标/eval transform 就新建 benchmark，旧结果继续标旧 id。
 
 ---
 
@@ -512,8 +554,19 @@ python commands/train.py --config configs/base.yaml
 python commands/train.py --config configs/base.yaml \
   --set model.name=linear --set loss.name=huber
 
-# 评测
+# val 评测
 python commands/eval.py --checkpoint outputs/runs/.../checkpoints/last.pt
+
+# 冻结 benchmark
+python commands/benchmark.py create \
+  --config configs/base.yaml \
+  --out benchmarks/synthetic-test-v1.json
+
+# 最终 test 评测（必须带 benchmark）
+python commands/eval.py \
+  --checkpoint outputs/runs/.../checkpoints/last.pt \
+  --split test \
+  --benchmark benchmarks/synthetic-test-v1.json
 
 # 扫参
 python commands/sweep.py --config configs/base.yaml

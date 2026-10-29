@@ -1,8 +1,8 @@
 """Claims and test-access accounting.
 
 A Claim is a reported number/table/figure linked to one or more EvalRecords.
-The test-access log records every test-split evaluation per data version, so
-the report can flag reuse instead of silently treating test numbers as fresh.
+The test-access log records every test-split evaluation per test set, so the
+report can flag reuse instead of silently treating test numbers as fresh.
 """
 
 from __future__ import annotations
@@ -32,6 +32,7 @@ class Claim:
     notes: str = ""
     tags: Mapping[str, str] = field(default_factory=dict)
     created_at: str = field(default_factory=utc_now)
+    benchmark_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -50,6 +51,7 @@ class Claim:
             notes=str(payload.get("notes", "")),
             tags=dict(payload.get("tags", {})),
             created_at=str(payload.get("created_at", "")),
+            benchmark_id=str(payload.get("benchmark_id", "")),
         )
 
 
@@ -94,19 +96,23 @@ class ClaimStore:
 
 
 class TestAccessLog:
-    """Append-only test-split access log, grouped by data version."""
+    """Append-only test-split access log, grouped by test-set id.
+
+    Old logs keyed only by ``data_version`` remain readable: the payload lookup
+    falls back to the legacy field.
+    """
 
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
 
-    def _path(self, data_version: str) -> Path:
-        digest = hashlib.sha256(data_version.encode("utf-8")).hexdigest()[:16]
+    def _path(self, test_set_id: str) -> Path:
+        digest = hashlib.sha256(test_set_id.encode("utf-8")).hexdigest()[:16]
         return self.root / f"{digest}.jsonl"
 
-    def count(self, data_version: str, split: str = "test") -> int:
-        path = self._path(data_version)
+    def count(self, test_set_id: str, split: str = "test") -> int:
+        path = self._path(test_set_id)
         if not path.is_file():
             return 0
         total = 0
@@ -115,21 +121,24 @@ class TestAccessLog:
                 payload = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if payload.get("data_version") == data_version and payload.get("split") == split:
+            recorded_id = payload.get("test_set_id", payload.get("data_version"))
+            if recorded_id == test_set_id and payload.get("split") == split:
                 total += 1
         return total
 
-    def record(self, data_version: str, eval_id: str, split: str = "test") -> int:
+    def record(self, test_set_id: str, eval_id: str, split: str = "test") -> int:
         with self._lock:
-            count = self.count(data_version, split) + 1
+            count = self.count(test_set_id, split) + 1
             payload = {
-                "data_version": data_version,
+                "test_set_id": test_set_id,
+                # Legacy alias for readers that predate benchmark ids.
+                "data_version": test_set_id,
                 "eval_id": eval_id,
                 "split": split,
                 "n": count,
                 "at": utc_now(),
             }
-            with self._path(data_version).open("a", encoding="utf-8") as handle:
+            with self._path(test_set_id).open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
             return count
 

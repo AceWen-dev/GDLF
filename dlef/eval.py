@@ -16,6 +16,8 @@ class EvalSpec:
     aggregation: str = "mean"
     ci_method: str | None = None
     test_access_policy: str = "once_per_claim"
+    benchmark_id: str = ""
+    test_set_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,8 @@ class EvalRecord:
     predictions: str | None = None
     created_at: str = ""
     test_access: int = 0
+    benchmark_id: str = ""
+    test_set_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

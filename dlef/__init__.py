@@ -25,6 +25,7 @@ from .contracts import (
     to_float,
     validate_task,
 )
+from .benchmark import BenchmarkSpec, canonical_digest, make_test_set_id
 from .checkpoint import CheckpointCodec, JsonCheckpointCodec
 from .claim import Claim, ClaimError, ClaimStore, TestAccessLog
 from .config import Config, ConfigError, ConfigSchema, TrainConfig, load_config, resolve_config
@@ -85,6 +86,9 @@ __all__ = [
     "validate_task",
     "CheckpointCodec",
     "JsonCheckpointCodec",
+    "BenchmarkSpec",
+    "canonical_digest",
+    "make_test_set_id",
     "Claim",
     "ClaimError",
     "ClaimStore",

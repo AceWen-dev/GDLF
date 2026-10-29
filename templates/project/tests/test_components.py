@@ -29,30 +29,49 @@ except ImportError:
 @unittest.skipUnless(TORCH_AVAILABLE, "torch is not installed")
 class ComponentTests(unittest.TestCase):
     def test_data(self) -> None:
-        config = DataConfig(n_train=8, n_val=4, batch_size=2)
-        train = build_dataset(config, "train", 7, "identity")
-        val = build_dataset(config, "val", 7, "identity")
+        config = DataConfig(n_train=8, n_val=4, n_test=2, batch_size=2)
+        train = build_dataset(config, "train", "identity")
+        val = build_dataset(config, "val", "identity")
+        test = build_dataset(config, "test", "identity")
 
         self.assertEqual(len(train.dataset), 8)
         self.assertEqual(len(val.dataset), 4)
+        self.assertEqual(len(test.dataset), 2)
         self.assertEqual(train.spec.splits, val.spec.splits)
+        self.assertEqual(train.spec.splits, test.spec.splits)
         self.assertNotEqual(train.spec.version, val.spec.version)
         self.assertEqual(train.spec.transform, "identity")
 
-        again = build_dataset(config, "train", 7, "identity")
+        again = build_dataset(config, "train", "identity")
         self.assertEqual(train.spec.version, again.spec.version)
         self.assertTrue(torch.equal(train.dataset.x, again.dataset.x))
 
-        other_seed = build_dataset(config, "train", 8, "identity")
+        other_seed = build_dataset(DataConfig(
+            n_train=8, n_val=4, n_test=2, seed=8
+        ), "train", "identity")
         self.assertNotEqual(train.spec.version, other_seed.spec.version)
 
         other_version = build_dataset(
-            DataConfig(n_train=8, n_val=4, version="v2"),
+            DataConfig(n_train=8, n_val=4, n_test=2, version="v2"),
             "train",
-            7,
             "identity",
         )
         self.assertNotEqual(train.spec.version, other_version.spec.version)
+
+        # The test membership must not drift when the training pool grows.
+        bigger_train = build_dataset(
+            DataConfig(n_train=16, n_val=4, n_test=2),
+            "test",
+            "identity",
+        )
+        self.assertEqual(test.spec.splits["test"], bigger_train.spec.splits["test"])
+
+        more_test = build_dataset(
+            DataConfig(n_train=8, n_val=4, n_test=3),
+            "test",
+            "identity",
+        )
+        self.assertNotEqual(test.spec.splits["test"], more_test.spec.splits["test"])
 
         train_loader, _ = make_loaders(config, seed=7)
         batch = next(iter(train_loader))
@@ -99,11 +118,11 @@ class ComponentTests(unittest.TestCase):
 
     def test_unknown_names_raise(self) -> None:
         with self.assertRaises(ValueError):
-            build_dataset(DataConfig(name="nope"), "train", 7, "identity")
+            build_dataset(DataConfig(name="nope"), "train", "identity")
         with self.assertRaises(ValueError):
-            build_dataset(DataConfig(split="nope"), "train", 7, "identity")
+            build_dataset(DataConfig(split="nope"), "train", "identity")
         with self.assertRaises(ValueError):
-            build_dataset(DataConfig(), "test", 7, "identity")
+            build_dataset(DataConfig(), "nope", "identity")
         with self.assertRaises(ValueError):
             build_transform("nope")
         with self.assertRaises(ValueError):

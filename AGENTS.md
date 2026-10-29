@@ -20,7 +20,8 @@ Do **not** modify `dlef/` for project-specific needs.
 4. Install core: `pip install -e /path/to/DLEF`.
 5. Install project: `pip install -e .`.
 6. Replace/extend the component packages:
-   - `myproject/data/` (`datasets/`, `transforms/`, `splits.py`, `loaders.py`)
+   - `myproject/data/` (`datasets/`, `transforms/`, `splits.py`, `loaders.py`,
+     `benchmark.py`)
    - `myproject/models/` + `models/build.py`
    - `myproject/losses/` + `losses/build.py`
    - `myproject/optimizers/`、`myproject/schedulers/`
@@ -66,6 +67,9 @@ Do **not** modify `dlef/` for project-specific needs.
     by `EvalSpec`/`EvalRecord`.
 12. **Project code never goes into `dlef/`.** If it is reusable across projects,
     it belongs in `adapters/`; otherwise it stays in the project.
+13. **A benchmark is frozen.** Test membership + labels + eval transform +
+    metric protocol are one `benchmark_id`; changing any of them creates a new
+    benchmark. Compare numbers only within the same `benchmark_id`.
 
 ---
 
@@ -121,6 +125,7 @@ A project has this shape (from `templates/project/`):
       paths.py             # $DLEF_DATA_ROOT + external layout
       spec.py              # DataSpec + recipe digest
       loaders.py           # DataLoader assembly
+      benchmark.py         # frozen test set + metric protocol -> benchmark id
       build.py             # data composition root: registry + make_loaders
     models/                # one file per architecture + build.py registry
     losses/                # one file per loss + build.py registry
@@ -131,11 +136,14 @@ A project has this shape (from `templates/project/`):
     runtime.py             # policy/runner/sweep result helper
   commands/
     train.py               # thin entry: train + eval
-    eval.py                # thin entry: separate eval run
+    eval.py                # thin entry: separate eval run (val or sealed test)
+    benchmark.py           # freeze / verify a benchmark manifest
     sweep.py               # subprocess grid/random sweep
   tests/
     test_smoke.py
     test_components.py
+    test_benchmark.py
+  benchmarks/              # one frozen JSON per benchmark (small, committed)
   claims/                  # one JSON per reported claim (created by ClaimStore)
   outputs/                 # generated: runs / artifacts / sweeps / test_access
   AGENTS.md                # project-local guide (from the template)
@@ -274,6 +282,9 @@ Changing data/model/loss mid-experiment:
   in-place mutation.
 - Split must be materialized; never do random splitting inside `__getitem__`.
   Loaders read a recorded membership (`role -> indices`), not a fresh seed.
+- Test membership is frozen per benchmark and must not depend on the run seed.
+  A new test set, label version, eval transform or metric protocol means a new
+  benchmark version, not an edit to the old one.
 - Train and eval transforms are separate declarations.
 - Validate one batch before training (keys, dtypes, shapes).
 - Check leakage before a new split: case/group overlap, duplicates, temporal
@@ -325,12 +336,15 @@ Metric:
 
 ## 9. Eval / claim conventions
 
-- Training eval is for model selection. Final evaluation is a separate run.
+- Training eval is for model selection. Final evaluation is a separate run and
+  must use a frozen benchmark.
 - `EvalRecord` carries split, checkpoint digest, data version, eval spec digest,
-  metrics, test access.
-- Test split access is counted per data version in
-  `outputs/test_access/`; report shows `WARN` when count > 1.
-- A `Claim` must reference at least one eval id.
+  metrics, test access, `benchmark_id` and `test_set_id`.
+- Test split access is counted per `test_set_id` in `outputs/test_access/`;
+  report shows `WARN` when count > 1. Changing the eval transform must not reset
+  the count.
+- A `Claim` must reference at least one eval id and should pin its
+  `benchmark_id`. Compare only records with the same `benchmark_id`.
 - Report generation:
 
 ```bash
@@ -393,6 +407,8 @@ Every project should have:
 
 - a smoke test that runs 1–2 steps on tiny data;
 - a shape/contract test for data/model/loss/metric;
+- a benchmark identity test: test membership stable across train changes,
+  benchmark id changes with membership/metric protocol;
 - a golden metric test;
 - a checkpoint round-trip test if you touch checkpoints.
 
@@ -411,6 +427,8 @@ Every project should have:
 - Do not store secrets in config or logs.
 - Do not commit dataset bytes or absolute data paths; use `DLEF_DATA_ROOT`.
 - Do not duplicate dataset bytes per split; store one curated copy + membership.
+- Do not edit a frozen benchmark or run test eval without one.
+- Do not compare numbers across different `benchmark_id`s.
 - Do not change a contract without updating tests and the design doc.
 
 ---
@@ -442,6 +460,7 @@ A project task is done when:
 - `docs/design/contracts-v0.md` — contract map and invariants.
 - `docs/adr/0001-thin-experiment-os.md` — why thin, domain-agnostic core.
 - `docs/adr/0002-template-imports-core.md` — why the template does not vendor core.
+- `docs/adr/0003-benchmark-identity.md` — why test set + metric protocol are a frozen benchmark.
 - `examples/torch_regression/` — a complete torch + sweep example.
 
 If a requirement is genuinely ambiguous, ask the human once, then follow the
