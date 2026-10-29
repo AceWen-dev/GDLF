@@ -215,10 +215,13 @@ class Run:
         return self.directory / "logs" / "train.log"
 
     def log(self, message: str) -> None:
-        """Append a timestamped line to this run's training log."""
+        """Append readable, timestamped lines to this run's training log."""
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%m/%d %H:%M:%S")
+        lines = str(message).splitlines() or [""]
         with self.log_path.open("a", encoding="utf-8") as handle:
-            handle.write(f"{utc_now()} {message}\n")
+            for line in lines:
+                handle.write(f"{timestamp} - dlef - INFO - {line}\n")
 
     def write_manifest(self) -> None:
         self.directory.mkdir(parents=True, exist_ok=True)

@@ -294,6 +294,9 @@ only. Report the comparison through `dlef compare` / `dlef report`.
 ## 4. Config rules
 
 - `core/config.py` is the schema; `input/configs/*.yaml` are values.
+- Training loop knobs (`seed`, `epochs`, `max_steps`, `log_every`,
+  `checkpoint_every`) are top-level; loader knobs (`batch_size`, `n_train`, ...)
+  are under `data`.
 - **Every behavior-affecting choice is a typed config field.** Data
   name/version/seed/split/transforms, model, loss, optimizer, scheduler,
   metrics, benchmark and training policy all live in the config. No hidden

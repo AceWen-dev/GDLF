@@ -261,6 +261,22 @@ See [`input/configs/README.md`](input/configs/README.md). Use `core/tools/config
 validate the catalog and `core/tools/runs.py` to see which config produced each
 run. Seeds and sweep trials are runs, not extra config files.
 
+Training knobs are in two places:
+
+```yaml
+seed: 7
+epochs: 10
+max_steps: null
+log_every: 10
+checkpoint_every: 0
+
+data:
+  batch_size: 32
+```
+
+The resolved run config is `output/runs/.../config.resolved.json`; the training
+log header prints the same summary.
+
 ## Inspect a run
 
 The run directory is the entry point; the config is the first file to read:

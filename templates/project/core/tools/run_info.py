@@ -107,6 +107,14 @@ def main() -> int:
     _print_source("benchmark_source", "core/data/benchmark.py")
     print()
 
+    print("training:")
+    for key in ("seed", "epochs", "max_steps", "log_every", "checkpoint_every"):
+        print(f"  {key}: {config.get(key, '')}")
+    print(f"  batch_size: {data.get('batch_size', '')}")
+    for key in ("amp", "grad_accum_steps", "grad_clip"):
+        print(f"  {key}: {config.get(key, '')}")
+    print()
+
     print("components:")
     print(f"  model: {model.get('name', '')} {model}")
     _print_source(

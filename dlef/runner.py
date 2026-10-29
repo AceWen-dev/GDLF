@@ -12,6 +12,7 @@ The default policy reproduces plain single-process training.
 
 from __future__ import annotations
 
+import json
 import random
 import traceback
 from pathlib import Path
@@ -88,11 +89,36 @@ class Runner:
                 config_source=config.source,
             )
             run.save_json("config.resolved.json", config.resolved)
+            run.log("=" * 78)
+            run.log(f"Run: {run.run_id}")
+            run.log(f"Project/experiment: {schema.project} / {schema.experiment}")
+            run.log(f"Seed: {schema.seed}  Config: {config.digest}")
             run.log(
-                f"start project={schema.project} experiment={schema.experiment} "
-                f"seed={schema.seed} config_digest={config.digest} "
-                f"code_version={run.manifest.code_version}"
+                f"Config source: {config.source or '-'}  "
+                f"Code: {run.manifest.code_version}"
             )
+            run.log(
+                f"Training: epochs={getattr(schema, 'epochs', '?')} "
+                f"max_steps={getattr(schema, 'max_steps', '?')} "
+                f"log_every={getattr(schema, 'log_every', '?')} "
+                f"checkpoint_every={getattr(schema, 'checkpoint_every', '?')}"
+            )
+            for key in ("data", "model", "loss", "optim", "scheduler", "benchmark"):
+                value = config.resolved.get(key)
+                if value is not None:
+                    run.log(
+                        f"{key.capitalize()}: "
+                        + json.dumps(
+                            value,
+                            sort_keys=True,
+                            ensure_ascii=False,
+                            default=str,
+                        )
+                    )
+            if "metrics" in config.resolved:
+                run.log(f"Metrics: {config.resolved['metrics']}")
+            run.log(f"Config file: {run.config_path}")
+            run.log("=" * 78)
 
         model = task.get_model()
         optimizer = task.configure_optimizer(model)
@@ -114,7 +140,7 @@ class Runner:
                 last_epoch = epoch
                 ctx.epoch = epoch
                 if run is not None:
-                    run.log(f"epoch {epoch}/{schema.epochs} start")
+                    run.log(f"Epoch(train) [{epoch}/{schema.epochs}] start")
                 set_epoch = getattr(train_data, "set_epoch", None)
                 if callable(set_epoch):
                     set_epoch(epoch)
@@ -122,7 +148,10 @@ class Runner:
 
                 train_losses: list[float] = []
                 reached_limit = False
+                total_batches = _length(train_data)
+                batch_index = 0
                 for batch in train_data:
+                    batch_index += 1
                     global_step += 1
                     ctx.step = global_step
                     with policy.forward_context():
@@ -140,7 +169,16 @@ class Runner:
                             ):
                                 scheduler.step()
 
-                    if schema.log_every and global_step % schema.log_every == 0 and run is not None:
+                    should_log_step = (
+                        global_step % schema.log_every == 0
+                        if schema.log_every
+                        else False
+                    )
+                    if (
+                        schema.log_every
+                        and (should_log_step or batch_index == total_batches)
+                        and run is not None
+                    ):
                         record = {
                             "phase": "train",
                             "epoch": epoch,
@@ -153,9 +191,16 @@ class Runner:
                             f"{key}={to_float(value):.6g}"
                             for key, value in step.terms.items()
                         )
+                        progress = (
+                            f"{batch_index}/{total_batches}"
+                            if total_batches is not None
+                            else str(batch_index)
+                        )
+                        lr = _current_lr(optimizer)
+                        lr_text = f" lr={lr:.4e}" if lr is not None else ""
                         run.log(
-                            f"step {global_step} loss={record['loss']} "
-                            f"{terms}".rstrip()
+                            f"Epoch(train) [{epoch}/{schema.epochs}][{progress}]"
+                            f"{lr_text} loss={record['loss']} {terms}".rstrip()
                         )
 
                     self._call(callbacks, "on_step_end", ctx, step)
@@ -188,13 +233,15 @@ class Runner:
                 epoch_record.update(val_metrics)
                 if run is not None:
                     run.log_metrics(epoch_record)
-                    val_text = " ".join(
-                        f"{key}={value:.6g}" for key, value in val_metrics.items()
-                    )
                     run.log(
-                        f"epoch {epoch} train_loss={epoch_record['train_loss']} "
-                        f"{val_text}".rstrip()
+                        f"Epoch(train) [{epoch}/{schema.epochs}] "
+                        f"train_loss={epoch_record['train_loss']}"
                     )
+                    if val_metrics:
+                        val_text = " ".join(
+                            f"{key}={value:.6g}" for key, value in val_metrics.items()
+                        )
+                        run.log(f"Epoch(val) [{epoch}/{schema.epochs}] {val_text}")
 
                 if (
                     schema.checkpoint_every
@@ -216,13 +263,13 @@ class Runner:
             policy.on_fit_end(task, optimizer)
             self._call(callbacks, "on_run_end", ctx)
             if run is not None:
-                run.log("status=completed")
+                run.log("Status: completed")
                 run.finalize("completed")
             return run
         except BaseException as exc:  # noqa: BLE001 - finalize on any failure
             self._call(callbacks, "on_exception", ctx, exc)
             if run is not None:
-                run.log(f"status=failed error={exc!r}")
+                run.log(f"Status: failed error={exc!r}")
                 run.log("traceback:\n" + traceback.format_exc().rstrip())
                 run.finalize("failed", error=repr(exc))
             raise
@@ -237,7 +284,7 @@ class Runner:
         validate_task(task)
         metrics = dict(task.configure_metrics())
         run.log(
-            f"eval start split={spec.split} benchmark={spec.benchmark_id or '-'} "
+            f"Eval [{spec.split}] start benchmark={spec.benchmark_id or '-'} "
             f"test_set={spec.test_set_id or '-'}"
         )
         values = self._validate(task, dataset, metrics, self.training_policy)
@@ -266,8 +313,8 @@ class Runner:
         run.save_artifact(path, f"eval:{record.eval_id}")
         metric_text = " ".join(f"{key}={value:.6g}" for key, value in values.items())
         run.log(
-            f"eval done eval_id={record.eval_id} metrics={metric_text} "
-            f"test_access={test_access}"
+            f"Eval [{spec.split}] done eval_id={record.eval_id} "
+            f"metrics={metric_text} test_access={test_access}"
         )
         return record
 
@@ -346,7 +393,7 @@ class Runner:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.checkpoint_codec.dump(path, checkpoint)
         run.save_artifact(path, f"checkpoint:{name}")
-        run.log(f"checkpoint {name} path={path.name}")
+        run.log(f"Checkpoint: {name} -> {path.name}")
         return path
 
     @staticmethod
@@ -388,6 +435,21 @@ def _data_versions(train_data: Any, val_data: Any | None) -> dict[str, str]:
     if val_data is not None:
         versions["val"] = _data_version(val_data)
     return versions
+
+
+def _length(value: Any) -> int | None:
+    try:
+        return len(value)
+    except TypeError:
+        return None
+
+
+def _current_lr(optimizer: Any) -> float | None:
+    inner = getattr(optimizer, "optimizer", optimizer)
+    groups = getattr(inner, "param_groups", None)
+    if groups:
+        return float(groups[0].get("lr", 0.0))
+    return None
 
 
 def _mean(values: list[float]) -> float | None:
