@@ -19,13 +19,15 @@ Do **not** modify `dlef/` for project-specific needs.
 3. Read `templates/project/AGENTS.md` — it is the project-local guide.
 4. Install core: `pip install -e /path/to/DLEF`.
 5. Install project: `pip install -e .`.
-6. Replace the four placeholder modules:
+6. Replace/extend the component packages:
    - `myproject/data.py`
-   - `myproject/model.py`
-   - `myproject/loss.py`
-   - `myproject/metrics.py`
-7. Keep `myproject/task.py`, `myproject/runtime.py`, `myproject/config.py` and
-   `commands/` as the wiring unless the experiment genuinely needs a new seam.
+   - `myproject/models/` + `models/build.py`
+   - `myproject/losses/` + `losses/build.py`
+   - `myproject/metrics/` + `metrics/build.py`
+   - `myproject/optimizers/`、`myproject/schedulers/` as needed
+7. Keep `myproject/task.py` as the composition root; keep
+   `myproject/runtime.py`, `myproject/config.py` and `commands/` as the wiring
+   unless the experiment genuinely needs a new seam.
 
 ### Mode B — change the framework itself
 
@@ -113,10 +115,12 @@ A project has this shape (from `templates/project/`):
   myproject/
     config.py              # typed dataclass schema
     data.py                # dataset + loaders + DataSpec
-    model.py               # architecture
-    loss.py                # loss + named terms
-    metrics.py             # metrics
-    task.py                # wire model/loss/optimizer/scheduler/metrics
+    models/                # one file per architecture + build.py registry
+    losses/                # one file per loss + build.py registry
+    optimizers/            # one file per optimizer + build.py registry
+    schedulers/            # one file per scheduler + build.py registry
+    metrics/               # one file per metric + build.py registry
+    task.py                # composition root only
     runtime.py             # policy/runner/sweep result helper
   commands/
     train.py               # thin entry: train + eval
@@ -124,6 +128,7 @@ A project has this shape (from `templates/project/`):
     sweep.py               # subprocess grid/random sweep
   tests/
     test_smoke.py
+    test_components.py
   claims/                  # one JSON per reported claim (created by ClaimStore)
   outputs/                 # generated: runs / artifacts / sweeps / test_access
   AGENTS.md                # project-local guide (from the template)
@@ -133,11 +138,17 @@ Placement rules:
 
 - **Dataset / transforms / collate** → `myproject/data.py` (or a `myproject/data/`
   package if it grows). Always produce a `DataSpec`.
-- **Architecture** → `myproject/model.py` (or `myproject/models/`).
-- **Loss / named terms** → `myproject/loss.py` (or `myproject/losses/`).
-- **Metrics** → `myproject/metrics.py` (or `myproject/metrics/`).
-- **Wiring only** → `myproject/task.py`. It is the only place that knows the
-  domain-specific combination.
+- **Architecture** → `myproject/models/<name>.py`; register in
+  `models/build.py`.
+- **Loss / named terms** → `myproject/losses/<name>.py`; register in
+  `losses/build.py`.
+- **Optimizer / scheduler** → `myproject/optimizers/<name>.py` /
+  `myproject/schedulers/<name>.py`; register in their `build.py`.
+- **Metrics** → `myproject/metrics/<name>.py`; register in
+  `metrics/build.py`.
+- **Wiring only** → `myproject/task.py`. It is the composition root; it should
+  only call `build_model` / `build_loss` / `build_optimizer` /
+  `build_scheduler` / `build_metrics`.
 - **Config schema** → `myproject/config.py`; values → `configs/*.yaml`.
 - **Entry points** → `commands/`; keep them thin.
 - **Project tests** → `tests/`.
@@ -190,8 +201,9 @@ Changing model/loss mid-experiment:
 
 - A new architecture or loss is a **new run**, never an edit to an old run.
 - Core never knows architectures/losses. The project template is config-driven:
-  `model.name` selects `myproject/model.py`; `loss.name` selects
-  `myproject/loss.py`; `task.py` stays unchanged.
+  `model.name` selects `myproject/models/build.py`; `loss.name` selects
+  `myproject/losses/build.py`; optimizer/scheduler/metrics have their own
+  registries; `task.py` stays unchanged.
 - One-off variant:
   ```bash
   python commands/train.py --config configs/base.yaml \
@@ -203,8 +215,8 @@ Changing model/loss mid-experiment:
   ```bash
   python commands/eval.py --checkpoint outputs/runs/.../checkpoints/last.pt
   ```
-- Add the builder branch, extend config validation, add a smoke/shape test, and
-  commit the code before official runs.
+- Add the component file, register it in the matching `build.py`, extend config
+  validation, add a smoke/shape test, and commit the code before official runs.
 - For a comparison, sweep `model.name` / `loss.name` / `seed`; one trial = one
   run. The template’s `commands/sweep.py` has a `set_dotted` helper.
 - Compare old vs new through `dlef compare` or `dlef report`; old runs remain

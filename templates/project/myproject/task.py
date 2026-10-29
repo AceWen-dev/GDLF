@@ -1,38 +1,33 @@
-"""Wire model / loss / optimizer / scheduler / metrics into a TorchTask."""
+"""Composition root: wire components selected by config.
+
+Keep this file thin. Model/loss/optimizer/scheduler/metric implementations live
+in their own packages; this file only composes them into a TorchTask.
+"""
 
 from __future__ import annotations
 
-import torch
+from typing import Any
 
-from adapters.torch import TorchOptimizer, TorchScheduler, TorchTask
+from adapters.torch import TorchTask
 
 from .config import ProjectConfig
-from .loss import build_loss
+from .losses import build_loss
 from .metrics import build_metrics
-from .model import build_model
+from .models import build_model
+from .optimizers import build_optimizer
+from .schedulers import build_scheduler
 
 
-def build_task(config: ProjectConfig, device: str | torch.device = "cpu") -> TorchTask:
+def build_task(config: ProjectConfig, device: Any = "cpu") -> TorchTask:
     model = build_model(config.model, device=device)
-    loss = build_loss(config)
-    metrics = build_metrics(config)
+    loss = build_loss(config.loss)
+    metrics = build_metrics(config.metrics)
 
     def optimizer_fn(model):
-        return TorchOptimizer(
-            torch.optim.Adam(
-                model.parameters(),
-                lr=config.optim.lr,
-                weight_decay=config.optim.weight_decay,
-            )
-        )
+        return build_optimizer(config.optim, model)
 
     def scheduler_fn(optimizer):
-        return TorchScheduler(
-            torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer.optimizer, T_max=config.epochs
-            ),
-            step_unit="epoch",
-        )
+        return build_scheduler(config.scheduler, optimizer, epochs=config.epochs)
 
     return TorchTask(
         model=model,

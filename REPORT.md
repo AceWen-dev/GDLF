@@ -203,16 +203,19 @@ pip install -e .
 python commands/train.py --config configs/base.yaml
 ```
 
-模板里需要替换的只有四个文件：
+模板里需要替换/扩展的是数据 + 组件包：
 
 ```text
-myproject/data.py      # 数据集 + loaders
-myproject/model.py     # 网络结构
-myproject/loss.py      # loss + named terms
-myproject/metrics.py   # 指标
+myproject/data.py        # 数据集 + loaders
+myproject/models/        # 每个模型一个文件 + models/build.py 注册
+myproject/losses/        # 每个 loss 一个文件 + losses/build.py 注册
+myproject/metrics/       # 每个指标一个文件 + metrics/build.py 注册
+myproject/optimizers/    # 需要换优化器时
+myproject/schedulers/    # 需要换调度器时
 ```
 
-`config.py / task.py / runtime.py / commands/` 是接线，通常不用改。
+`config.py / task.py / runtime.py / commands/` 是接线；`task.py` 是 composition
+root，只负责把组件拼成 `TorchTask`。
 
 ### 6.2 训练 + 评测
 
@@ -251,8 +254,9 @@ python commands/train.py --config configs/base.yaml \
   --set experiment=arch-linear-loss-huber
 ```
 
-- `model.name` 选择 `model.py` 里的 builder；
-- `loss.name` 选择 `loss.py` 里的 builder；
+- `model.name` 选择 `models/build.py` 里的 builder；
+- `loss.name` 选择 `losses/build.py` 里的 builder；
+- `optim.name` / `scheduler.name` / `metrics[]` 分别从各自 registry 选择；
 - `task.py` 不变；
 - `eval.py` 会通过 checkpoint manifest 找到训练 run 的
   `config.resolved.json`，自动复用同一份结构/超参，所以不需要手动重复
@@ -552,7 +556,7 @@ DLEF/
 1. 复制 `templates/project/`，`git init`。
 2. 安装 core 和项目依赖。
 3. 写 `configs/base.yaml`：project / experiment / seed / epochs / 数据 / 模型 / 优化器。
-4. 替换 `data.py / model.py / loss.py / metrics.py`。
+4. 替换 `data.py`，并按需扩展 `models/`、`losses/`、`metrics/`、`optimizers/`、`schedulers/`。
 5. 跑 smoke test：
    ```bash
    python -m unittest discover -s tests -v

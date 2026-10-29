@@ -16,7 +16,7 @@
 
 模板只包含项目特定内容：
 
-- `myproject/config.py`、`data.py`、`model.py`、`loss.py`、`metrics.py`、`task.py`；
+- `myproject/config.py`、`data.py`、`models/`、`losses/`、`optimizers/`、`schedulers/`、`metrics/`、`task.py`；
 - `commands/train.py`、`eval.py`、`sweep.py`；
 - `configs/base.yaml`、`tests/test_smoke.py`。
 

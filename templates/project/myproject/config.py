@@ -47,14 +47,35 @@ class LossConfig(ConfigSchema):
 
 @dataclass
 class OptimConfig(ConfigSchema):
+    name: str = "adamw"
     lr: float = 1e-2
     weight_decay: float = 0.0
+    momentum: float = 0.0
 
     def validate(self) -> None:
+        if self.name not in {"adamw", "adam", "sgd"}:
+            raise ConfigError(f"unknown optim.name: {self.name!r}")
         if self.lr <= 0:
             raise ConfigError("lr must be > 0")
         if self.weight_decay < 0:
             raise ConfigError("weight_decay must be >= 0")
+        if self.momentum < 0:
+            raise ConfigError("momentum must be >= 0")
+
+
+@dataclass
+class SchedulerConfig(ConfigSchema):
+    name: str = "cosine"
+    t_max: int | None = None
+    eta_min: float = 0.0
+
+    def validate(self) -> None:
+        if self.name not in {"cosine", "constant"}:
+            raise ConfigError(f"unknown scheduler.name: {self.name!r}")
+        if self.t_max is not None and self.t_max < 1:
+            raise ConfigError("scheduler.t_max must be >= 1 when set")
+        if self.eta_min < 0:
+            raise ConfigError("scheduler.eta_min must be >= 0")
 
 
 @dataclass
@@ -63,12 +84,16 @@ class ProjectConfig(TrainConfig):
     model: ModelConfig = field(default_factory=ModelConfig)
     loss: LossConfig = field(default_factory=LossConfig)
     optim: OptimConfig = field(default_factory=OptimConfig)
+    scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
+    metrics: list[str] = field(default_factory=lambda: ["mae"])
     amp: bool = False
     grad_accum_steps: int = 1
     grad_clip: float | None = None
 
     def validate(self) -> None:
         super().validate()
+        if not self.metrics:
+            raise ConfigError("metrics must not be empty")
         if self.grad_accum_steps < 1:
             raise ConfigError("grad_accum_steps must be >= 1")
         if self.grad_clip is not None and self.grad_clip <= 0:

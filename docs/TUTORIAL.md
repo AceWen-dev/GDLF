@@ -260,14 +260,18 @@ python -m dlef.cli gc \
 
 ## 11. 换成你自己的数据/模型/loss/指标
 
-只改这四个文件：
+改数据 + 组件包：
 
 ```text
 myproject/data.py
-myproject/model.py
-myproject/loss.py
-myproject/metrics.py
+myproject/models/        # 每个模型一个文件 + models/build.py 注册
+myproject/losses/        # 每个 loss 一个文件 + losses/build.py 注册
+myproject/metrics/       # 每个指标一个文件 + metrics/build.py 注册
+myproject/optimizers/    # 需要换优化器时
+myproject/schedulers/    # 需要换调度器时
 ```
+
+`task.py` 是 composition root，通常不用改。
 
 ### data.py
 
@@ -282,45 +286,72 @@ def make_loaders(config, seed, *, distributed=False):
 每个 loader 是 **batch iterable**，batch 是 `Mapping[str, Any]`。
 给每个数据集一个 `DataSpec`（name / version / schema / splits / transform）。
 
-### model.py
+### models/
+
+一个模型一个文件：
 
 ```python
-def build_model(config, device="cpu") -> TorchModel:
+# models/my_model.py
+def build_my_model(config, device="cpu") -> TorchModel:
     module = MyModel(...)
     return TorchModel(module, lambda module, batch: module(batch["x"]), device=device)
 ```
 
-模型只做 forward；不做 I/O、不读 config、不搬 device、不算 loss。
-
-### loss.py
+在 `models/build.py` 注册：
 
 ```python
-def build_loss(config) -> TorchLoss:
+from .my_model import build_my_model
+
+BUILDERS = {
+    "mlp": build_mlp,
+    "linear": build_linear,
+    "my_model": build_my_model,
+}
+```
+
+模型只做 forward；不做 I/O、不读 config、不搬 device、不算 loss。
+
+### losses/
+
+一个 loss 一个文件，返回 `LossOutput(total, terms)`：
+
+```python
+# losses/my_loss.py
+def build_my_loss(config) -> TorchLoss:
     def loss_fn(output, batch):
         total = ...
         return LossOutput(total=total, terms={"main": total})
     return TorchLoss(loss_fn)
 ```
 
-每个 term 都命名；reduction 要明确。
+然后在 `losses/build.py` 注册。
 
-### metrics.py
+### metrics/
 
 ```python
-def build_metrics(config):
-    return {
-        "mae": TorchMetric(lambda preds, targets: {"mae": (preds - targets).abs().mean()}),
-    }
+# metrics/my_metric.py
+def build_my_metric() -> Metric:
+    return TorchMetric(lambda preds, targets: {"my_metric": ...})
 ```
+
+在 `metrics/build.py` 注册，并把名字加进 YAML 的 `metrics` 列表。
 
 ### config.py + configs/base.yaml
 
-把新字段加进 dataclass，再更新 YAML。
+把新组件名字加进对应 Config 的 `validate()`，再更新 YAML。
 unknown key 会报错；这是故意的。
 
 ### task.py
 
-通常不用改。它只负责把 model/loss/optimizer/scheduler/metrics 接起来。
+通常不用改。它只负责：
+
+```python
+model = build_model(config.model, device)
+loss = build_loss(config.loss)
+metrics = build_metrics(config.metrics)
+optimizer_fn = lambda model: build_optimizer(config.optim, model)
+scheduler_fn = lambda opt: build_scheduler(config.scheduler, opt, epochs=config.epochs)
+```
 
 ---
 
@@ -455,6 +486,6 @@ eval 会自动读训练 run 的 config；如果原 run 目录被删，才用
 
 ## 17. 一句话
 
-> **复制模板 → 改四个文件 → 跑 train/eval/sweep → claim/report → gc。**
+> **复制模板 → 改数据 + 组件包 → 跑 train/eval/sweep → claim/report → gc。**
 
 框架的职责是让每个数字有来源；你的职责是决定模型、数据和问题。

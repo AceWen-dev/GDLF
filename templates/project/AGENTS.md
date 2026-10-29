@@ -4,7 +4,8 @@ You are in a **DLEF project**. The framework is installed as the `dlef` package;
 it is not part of this repository. Read this file before editing.
 
 This project was copied from `templates/project/`. The placeholder is synthetic
-1-D regression. Replace the four REPLACE modules; keep the wiring.
+1-D regression. Replace/extend the component packages; keep `task.py` as the
+composition root.
 
 ---
 
@@ -15,10 +16,27 @@ configs/                 # one YAML per experiment/variant
 myproject/
   config.py              # typed dataclass schema
   data.py                # REPLACE: dataset + loaders + DataSpec
-  model.py               # REPLACE: architecture
-  loss.py                # REPLACE: loss + named terms
-  metrics.py             # REPLACE: metrics
-  task.py                # wiring only
+  models/
+    build.py             # name -> builder registry
+    mlp.py
+    linear.py
+  losses/
+    build.py
+    mse.py
+    huber.py
+  optimizers/
+    build.py
+    adamw.py
+    adam.py
+    sgd.py
+  schedulers/
+    build.py
+    cosine.py
+    constant.py
+  metrics/
+    build.py
+    mae.py
+  task.py                # composition root only
   runtime.py             # policy/runner/sweep result helper
 commands/
   train.py               # thin entry: train + eval
@@ -26,6 +44,7 @@ commands/
   sweep.py               # subprocess grid/random sweep
 tests/
   test_smoke.py
+  test_components.py
 claims/                  # one JSON per reported claim
 outputs/                 # generated; never edit by hand
 AGENTS.md                # this file
@@ -66,36 +85,42 @@ make doctor
 
 ---
 
-## 3. What to replace
+## 3. What to replace / extend
 
-Replace only these four modules first:
+Replace or extend these component packages:
 
 1. `myproject/data.py`
    - Keep a `DataSpec` (name, version, schema, splits, transform).
    - Return two batch iterables: train and val.
    - Batch is a `Mapping[str, Any]`; collate/batching belongs here.
 
-2. `myproject/model.py`
-   - Return a `TorchModel(module, forward_fn, device=...)`.
+2. `myproject/models/`
+   - One file per architecture.
+   - `models/build.py` maps `model.name` → builder.
+   - Each builder returns `TorchModel(module, forward_fn, device=...)`.
    - The model does no I/O, does not read config, does not move devices, does
      not compute loss.
 
-3. `myproject/loss.py`
-   - Return a `TorchLoss` producing `LossOutput(total=..., terms={...})`.
+3. `myproject/losses/`
+   - One file per loss; `losses/build.py` maps `loss.name` → builder.
+   - Return `TorchLoss` producing `LossOutput(total=..., terms={...})`.
    - Name every term; make reduction explicit.
 
-4. `myproject/metrics.py`
-   - Return `dict[str, Metric]`; `TorchMetric` is the convenience adapter.
+4. `myproject/optimizers/` and `myproject/schedulers/`
+   - One file per implementation; `build.py` maps config names to builders.
+   - Defaults (AdamW + cosine) already work; replace only when needed.
+
+5. `myproject/metrics/`
+   - One file per metric; `metrics/build.py` maps names → builders.
+   - Return `Metric` objects (`TorchMetric` is the convenience adapter).
    - Add a golden test for each metric.
 
-Keep `myproject/task.py` as wiring. It should only assemble model/loss/optimizer/
-scheduler/metrics. It should not contain data loading or metric math.
+Keep `myproject/task.py` as the **composition root**. It only calls
+`build_model`, `build_loss`, `build_optimizer`, `build_scheduler`,
+`build_metrics`; it should not contain implementations or data loading.
 
-If a module grows, split it into packages (`myproject/models/`,
-`myproject/losses/`, `myproject/metrics/`). Keep `model.py` / `loss.py` as thin
-`build_*` re-exports, or update `task.py` imports. Put reusable, cross-project
-torch code in the DLEF repo's `adapters/torch/`, not in `myproject/`; put
-project-specific research code in `myproject/`.
+Put reusable, cross-project torch code in the DLEF repo's `adapters/torch/`,
+not in `myproject/`; put project-specific research code in `myproject/`.
 
 ---
 
@@ -106,16 +131,18 @@ completed run.**
 
 The template is config-driven:
 
-- `model.name` selects the builder in `myproject/model.py`;
-- `loss.name` selects the builder in `myproject/loss.py`;
+- `model.name` selects the builder in `myproject/models/build.py`;
+- `loss.name` selects the builder in `myproject/losses/build.py`;
+- `optim.name` / `scheduler.name` / `metrics[]` select from their registries;
 - `myproject/task.py` stays unchanged.
 
 To add a variant:
 
-1. add the builder branch in `model.py` / `loss.py`;
-2. add the name to `ModelConfig` / `LossConfig` validation in `config.py`;
-3. add a smoke/shape test;
-4. commit the code.
+1. add `myproject/models/<name>.py` (or `losses/<name>.py` etc.) with its builder;
+2. register it in the matching `build.py`;
+3. allow the name in the matching `Config` validation in `config.py`;
+4. add a shape/golden test;
+5. commit the code.
 
 One-off variant:
 
@@ -331,14 +358,18 @@ Do not edit the installed `dlef` package in place.
 **New dataset** → edit `data.py`, add `DataSpec`, validate one batch, add a smoke
 test. Update `configs/*.yaml` if the shape/size changes.
 
-**New model** → edit `model.py`, add a forward-shape test, update
-`configs/*.yaml`.
+**New model** → add `models/<name>.py`; register it in `models/build.py`; allow
+the name in `ModelConfig`; add a forward-shape test; set `model.name`.
 
-**New loss term** → edit `loss.py`; return `LossOutput(total, terms={...})`; log
-and inspect terms in `metrics.jsonl`.
+**New loss term** → add `losses/<name>.py`; register it in `losses/build.py`;
+allow the name in `LossConfig`; return `LossOutput(total, terms={...})`; add a
+golden test.
 
-**New metric** → edit `metrics.py`; add a golden test; bind it to eval via the
-task's metric dict.
+**New metric** → add `metrics/<name>.py`; register it in `metrics/build.py`;
+add a golden test; add the name to `metrics` in YAML.
+
+**New optimizer/scheduler** → add a file under `optimizers/` or `schedulers/`;
+register it in that package's `build.py`; allow the name in the matching config.
 
 **New config field** → edit `config.py`, add validation, update YAML, run a
 config test.
