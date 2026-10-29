@@ -52,16 +52,19 @@ myproject/
 commands/
   train.py               # thin entry: train + eval
   eval.py                # thin entry: separate eval run (val or sealed test)
-  benchmark.py           # freeze / verify a benchmark manifest
-  run_info.py            # run card: config -> benchmark -> source files
-  runs.py                # list runs with config source + latest metric
-  configs.py             # list / validate experiment configs
   sweep.py               # subprocess grid/random sweep
+tools/
+  benchmark.py           # freeze / verify a benchmark manifest
+  configs.py             # list / validate experiment configs
+  runs.py                # list runs with config source + latest metric
+  run_info.py            # run card: config -> benchmark -> source files
+  _bootstrap.py          # internal: find the core when running in-repo
 tests/
   test_smoke.py
   test_components.py
   test_benchmark.py
   test_config_contract.py
+  test_command_surface.py
 benchmarks/              # one frozen JSON per benchmark (small, committed)
 claims/                  # one JSON per reported claim
 outputs/                 # generated; never edit by hand
@@ -72,7 +75,7 @@ If you rename `myproject`, update:
 
 - `pyproject.toml` → `[tool.setuptools.packages.find] include`;
 - imports in `commands/*.py` and `tests/*.py`;
-- source-path prefixes in `commands/run_info.py`;
+- source-path prefixes in `tools/run_info.py`;
 - any project docs.
 
 ---
@@ -87,9 +90,9 @@ python -m unittest discover -s tests -v
 python commands/train.py --config configs/base.yaml
 python commands/eval.py \
   --checkpoint outputs/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
-python commands/run_info.py --run <run_id>
-python commands/runs.py
-python commands/configs.py list
+python tools/run_info.py --run <run_id>
+python tools/runs.py
+python tools/configs.py list
 python commands/sweep.py --config configs/base.yaml
 ```
 
@@ -261,8 +264,8 @@ only. Report the comparison through `dlef compare` / `dlef report`.
   a parameter space; generated trial configs stay under
   `outputs/sweeps/<sweep_id>/configs/`, not in the repo.
 - Do not edit `base.yaml` for every experiment; copy/create a variant.
-- Discover configs with `python commands/configs.py list`; map runs to configs
-  with `python commands/runs.py`.
+- Discover configs with `python tools/configs.py list`; map runs to configs
+  with `python tools/runs.py`.
 - Never put output paths in config; run directories are derived.
 - Dataset bytes live under `$DLEF_DATA_ROOT`; config selects logical names and
   versions, not absolute data paths.
@@ -270,7 +273,7 @@ only. Report the comparison through `dlef compare` / `dlef report`.
 - For a debug run, create a separate debug config (tiny data, 1–2 steps); do not
   add `if debug` branches in model/task code.
 - A run is inspected from its run directory: `manifest.json` +
-  `config.resolved.json` + eval records. `commands/run_info.py --run <id>` prints
+  `config.resolved.json` + eval records. `tools/run_info.py --run <id>` prints
   the config-to-source map. The manifest records the original config source and
   code version, so a name cannot silently drift to different source.
 
@@ -399,6 +402,7 @@ Every project should have:
 - `tests/test_benchmark.py`: test membership stable across train changes;
   benchmark id changes with membership/metric protocol;
 - `tests/test_config_contract.py`: every config selector resolves to a builder;
+- `tests/test_command_surface.py`: `commands/` stays train/eval/sweep only;
 - a golden test for each metric;
 - a checkpoint round-trip test if you touch checkpoints.
 
@@ -428,6 +432,9 @@ Do not edit the installed `dlef` package in place.
 - Do not make a tracker the only record.
 - Do not put secrets in config/logs.
 - Do not commit dataset bytes or absolute data paths.
+- Do not add ad-hoc scripts to `commands/`; `commands/` is only train/eval/sweep.
+  Put maintenance/inspection tools under `tools/`; promote reusable code to
+  core/adapters instead of copying it into every project.
 - Do not add project-specific code to the installed core.
 
 ---
@@ -469,7 +476,7 @@ test that the same split name + seed yields the same membership.
 **New benchmark** → change the test membership, label version, eval transform
 or metric protocol, then create a new manifest:
 ```bash
-python commands/benchmark.py create \
+python tools/benchmark.py create \
   --config configs/base.yaml \
   --out benchmarks/my-benchmark-v2.json
 ```

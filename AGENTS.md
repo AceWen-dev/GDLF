@@ -74,6 +74,10 @@ Do **not** modify `dlef/` for project-specific needs.
     knob/selector is a typed config field; builders receive config instead of
     branching on names. The run manifest records config digest, config source
     and code version; `run_info` resolves config → source.
+15. **One command surface.** `commands/` contains only the core experiment
+    entries: train, eval, sweep. Maintenance/inspection utilities live in
+    `tools/`; reusable utilities belong in core/adapters. Do not use
+    `commands/` as a script dump.
 
 ---
 
@@ -143,11 +147,13 @@ A project has this shape (from `templates/project/`):
   commands/
     train.py               # thin entry: train + eval
     eval.py                # thin entry: separate eval run (val or sealed test)
-    benchmark.py           # freeze / verify a benchmark manifest
-    run_info.py            # run card: config -> benchmark -> source files
-    runs.py                # list runs with config source + latest metric
-    configs.py             # list / validate experiment configs
     sweep.py               # subprocess grid/random sweep
+  tools/
+    benchmark.py           # freeze / verify a benchmark manifest
+    configs.py             # list / validate experiment configs
+    runs.py                # list runs with config source + latest metric
+    run_info.py            # run card: config -> benchmark -> source files
+    _bootstrap.py          # internal: find the core when running in-repo
   tests/
     test_smoke.py
     test_components.py
@@ -206,8 +212,8 @@ Rules:
 - Sweeps describe a parameter space; generated per-trial configs live under
   `outputs/sweeps/<sweep_id>/configs/`, not in the repo.
 - The run manifest records `config_source` and `config_digest`; use
-  `commands/runs.py` to see which config produced each run and
-  `commands/run_info.py` for one run's config → source map.
+  `tools/runs.py` to see which config produced each run and
+  `tools/run_info.py` for one run's config → source map.
 - One seed per run. For a 3-seed result, add `seed` to the sweep params and
   compare the resulting runs; do not loop seeds inside a run.
 - Never tune on the test split. Use val for model selection; test belongs to a
@@ -279,7 +285,7 @@ Changing data/model/loss mid-experiment:
 - Every run dumps `config.resolved.json`; its SHA-256 and original
   `config_source` go into the manifest.
 - Inspect a run from its directory: `manifest.json` + `config.resolved.json` +
-  eval records. `commands/run_info.py --run <id>` prints the config-to-source
+  eval records. `tools/run_info.py --run <id>` prints the config-to-source
   map.
 - Secrets go through environment variables, never config files.
 - Do not put paths to outputs in config; run directories are derived.
@@ -437,6 +443,7 @@ Every project should have:
 - a benchmark identity test: test membership stable across train changes,
   benchmark id changes with membership/metric protocol;
 - a config-contract test: every selector in the config resolves to a builder;
+- a command-surface test: `commands/` stays train/eval/sweep only;
 - a golden metric test;
 - a checkpoint round-trip test if you touch checkpoints.
 

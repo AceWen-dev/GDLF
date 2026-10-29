@@ -114,7 +114,7 @@ examples/toy/outputs/
   different `benchmark_id`s are reported as not directly comparable.
 - Config is the single declaration of choices; the manifest records config
   digest, original config source and code version. The template's
-  `commands/run_info.py` resolves a run's config to its source files.
+  `tools/run_info.py` resolves a run's config to its source files.
 
 It does **not** prove a good model, a real dataset pipeline, or distributed
 training. Those are adapter concerns.
