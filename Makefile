@@ -24,7 +24,7 @@ torch-ddp:
 	CUDA_VISIBLE_DEVICES="" $(PYTHON) -m torch.distributed.run --standalone --nproc_per_node=2 examples/torch_regression/run.py
 
 template-smoke:
-	cd templates/project && PYTHONPATH=../.. $(PYTHON) -m unittest discover -s tests -v
+	cd templates/project && PYTHONPATH=../.. $(PYTHON) -m unittest discover -s core/tests -v
 
 doctor:
 	$(PYTHON) -m dlef.cli doctor

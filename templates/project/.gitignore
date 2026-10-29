@@ -3,12 +3,14 @@ __pycache__/
 .pytest_cache/
 .venv/
 *.egg-info/
-outputs/
-runs/
-artifacts/
+/output/runs/
+/output/artifacts/
+/output/sweeps/
+/output/test_access/
+/output/reports/
 
-# Dataset bytes live outside the repo; see myproject/data/paths.py.
-# Anchored at the project root so myproject/data/ (code) is not ignored.
+# Dataset bytes live outside the repo; see core/data/paths.py.
+# Anchored at the project root so core/data/ (code) is not ignored.
 /data/
 /datasets/
 /raw/

@@ -8,6 +8,5 @@ dist/
 runs/
 artifacts/
 examples/**/outputs/
-templates/**/outputs/
 # Local case study with project-specific paths; not part of the framework.
 docs/research/pilot-audit.md

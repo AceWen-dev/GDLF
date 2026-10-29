@@ -20,14 +20,14 @@ Do **not** modify `dlef/` for project-specific needs.
 4. Install core: `pip install -e /path/to/DLEF`.
 5. Install project: `pip install -e .`.
 6. Replace/extend the component packages:
-   - `myproject/data/` (`datasets/`, `transforms/`, `splits.py`, `loaders.py`,
+   - `core/data/` (`datasets/`, `transforms/`, `splits.py`, `loaders.py`,
      `benchmark.py`)
-   - `myproject/models/` + `models/build.py`
-   - `myproject/losses/` + `losses/build.py`
-   - `myproject/optimizers/`、`myproject/schedulers/`
-   - `myproject/metrics/` + `metrics/build.py`
-7. Keep `myproject/task.py` as the composition root; keep
-   `myproject/runtime.py`, `myproject/config.py` and `commands/` as the wiring
+   - `core/models/` + `models/build.py`
+   - `core/losses/` + `losses/build.py`
+   - `core/optimizers/`、`core/schedulers/`
+   - `core/metrics/` + `metrics/build.py`
+7. Keep `core/task.py` as the composition root; keep
+   `core/runtime.py`, `core/config.py` and `core/commands/` as the wiring
    unless the experiment genuinely needs a new seam.
 
 ### Mode B — change the framework itself
@@ -44,7 +44,7 @@ Do **not** modify `dlef/` for project-specific needs.
 
 1. **No domain words in `dlef/`.** No image/text/audio/video, no bbox/depth/mm,
    no classification/detection/segmentation, no RL/LLM, no case/lesion.
-   Domain code belongs in `adapters/`, `myproject/`, or `examples/`.
+   Domain code belongs in `adapters/`, the project `core/`, or `examples/`.
 2. **Dependency direction:** `core ← adapters ← examples / templates`.
    `dlef/` must never import `adapters/`, `examples/` or `templates/`.
 3. **One run = one resolved config × one seed.** Seeds are separate runs, not an
@@ -74,11 +74,12 @@ Do **not** modify `dlef/` for project-specific needs.
     knob/selector is a typed config field; builders receive config instead of
     branching on names. The run manifest records config digest, config source
     and code version; `run_info` resolves config → source.
-15. **One command surface; scripts are project-specific.** `commands/` contains
-    only the core experiment entries: train, eval, sweep. `tools/` contains only
-    generic template maintenance utilities. `scripts/` is intentionally
+15. **One command surface; scripts are project-specific.** `core/commands/` contains
+    only the core experiment entries: train, eval, sweep. `core/tools/` contains only
+    generic template maintenance utilities. `core/scripts/` is intentionally
     unstructured for project-specific automation; promote reusable logic to
-    `myproject/` or core/adapters. Do not use `commands/` or `tools/` as a dump.
+    the project `core/` package or DLEF core/adapters. Do not use
+    `core/commands/` or `core/tools/` as a dump.
 
 ---
 
@@ -123,11 +124,14 @@ A project has this shape (from `templates/project/`):
 
 ```text
 <project>/
-  configs/
-    base.yaml              # shared baseline / smoke
-    experiments/<experiment>/<variant>.yaml  # one per variant
-    sweeps/<sweep>.yaml    # optional parameter space
-  myproject/
+  input/                   # layer 1: immutable inputs
+    configs/
+      base.yaml            # shared baseline / smoke
+      experiments/<experiment>/<variant>.yaml
+      sweeps/<sweep>.yaml  # optional parameter space
+    benchmarks/            # one frozen JSON per benchmark
+    README.md
+  core/                    # layer 2: project source
     config.py              # typed dataclass schema
     data/
       datasets/            # one file per dataset + build.py registry
@@ -136,8 +140,8 @@ A project has this shape (from `templates/project/`):
       paths.py             # $DLEF_DATA_ROOT + external layout
       spec.py              # DataSpec + recipe digest
       loaders.py           # DataLoader assembly
-      benchmark.py         # frozen test set + metric protocol -> benchmark id
-      build.py             # data composition root: registry + make_loaders
+      benchmark.py         # frozen test set + metric protocol
+      build.py             # data composition root
     models/                # one file per architecture + build.py registry
     losses/                # one file per loss + build.py registry
     optimizers/            # one file per optimizer + build.py registry
@@ -145,57 +149,67 @@ A project has this shape (from `templates/project/`):
     metrics/               # one file per metric + build.py registry
     task.py                # composition root only
     runtime.py             # policy/runner/sweep result helper
-  commands/
-    train.py               # thin entry: train + eval
-    eval.py                # thin entry: separate eval run (val or sealed test)
-    sweep.py               # subprocess grid/random sweep
-  tools/                   # generic maintenance: benchmark/config/run inspection
-    benchmark.py
-    configs.py
-    runs.py
-    run_info.py
-    _bootstrap.py
-  scripts/                 # project-specific scripts, intentionally unstructured
-  tests/
-    test_smoke.py
-    test_components.py
-    test_benchmark.py
-  benchmarks/              # one frozen JSON per benchmark (small, committed)
-  claims/                  # one JSON per reported claim (created by ClaimStore)
-  outputs/                 # generated: runs / artifacts / sweeps / test_access
+    commands/
+      train.py             # thin entry: train + eval
+      eval.py              # thin entry: separate eval run (val or sealed test)
+      sweep.py             # subprocess grid/random sweep
+    tools/                 # generic maintenance: benchmark/config/run inspection
+      benchmark.py
+      configs.py
+      runs.py
+      run_info.py
+      _bootstrap.py
+    scripts/               # project-specific scripts, intentionally unstructured
+    tests/
+      test_smoke.py
+      test_components.py
+      test_benchmark.py
+      test_config_contract.py
+      test_command_surface.py
+  output/                  # layer 3: generated results
+    runs/
+    artifacts/
+    sweeps/
+    test_access/
+    claims/                # one JSON per reported claim
+    reports/
+    README.md
   AGENTS.md                # project-local guide (from the template)
+  README.md
+  pyproject.toml
+  Makefile
 ```
 
 Placement rules:
 
-- **Dataset / transforms / split / collate** → `myproject/data/` package:
+- **Dataset / transforms / split / collate** → `core/data/` package:
   `datasets/<name>.py`, `transforms/<name>.py`, `splits.py`, `loaders.py`.
   Always produce a `DataSpec`; materialize splits, never `random_split` at
   runtime.
-- **Architecture** → `myproject/models/<name>.py`; register in
+- **Architecture** → `core/models/<name>.py`; register in
   `models/build.py`.
-- **Loss / named terms** → `myproject/losses/<name>.py`; register in
+- **Loss / named terms** → `core/losses/<name>.py`; register in
   `losses/build.py`.
-- **Optimizer / scheduler** → `myproject/optimizers/<name>.py` /
-  `myproject/schedulers/<name>.py`; register in their `build.py`.
-- **Metrics** → `myproject/metrics/<name>.py`; register in
+- **Optimizer / scheduler** → `core/optimizers/<name>.py` /
+  `core/schedulers/<name>.py`; register in their `build.py`.
+- **Metrics** → `core/metrics/<name>.py`; register in
   `metrics/build.py`.
-- **Wiring only** → `myproject/task.py`. It is the composition root; it should
+- **Wiring only** → `core/task.py`. It is the composition root; it should
   only call `build_model` / `build_loss` / `build_optimizer` /
   `build_scheduler` / `build_metrics`.
-- **Config schema** → `myproject/config.py`; values →
-  `configs/experiments/<experiment>/<variant>.yaml`.
-- **Core experiment entries** → `commands/` only: `train`, `eval`, `sweep`.
-- **Project-specific automation** → `scripts/` (intentionally unstructured;
+- **Config schema** → `core/config.py`; values →
+  `input/configs/experiments/<experiment>/<variant>.yaml`.
+- **Core experiment entries** → `core/commands/` only: `train`, `eval`, `sweep`.
+- **Project-specific automation** → `core/scripts/` (intentionally unstructured;
   no task-specific subdirectory assumptions).
-- **Generic maintenance utilities** → `tools/` (template-provided only).
-- **Reusable script logic** → `myproject/` or core/adapters; keep the script a
+- **Generic maintenance utilities** → `core/tools/` (template-provided only).
+- **Reusable script logic** → `core/` or core/adapters; keep the script a
   thin CLI. No `utils.py` at project root.
-- **Project tests** → `tests/`.
-- **Claims** → `claims/<claim_id>.json` via `ClaimStore`.
-- **Generated artifacts** → `outputs/`; never edit by hand.
+- **Project tests** → `core/tests/`.
+- **Claims** → `output/claims/<claim_id>.json` via `ClaimStore`.
+- **Generated artifacts** → `output/`; never edit by hand.
 - **Reusable adapter** → `adapters/<stack>/` in the DLEF repo, not in a project.
-- **Project-specific adapter** → `myproject/`; do not force it into core.
+- **Project-specific adapter** → project `core/`; do not force it into the DLEF core.
 
 ---
 
@@ -214,27 +228,27 @@ Use the four IDs consistently:
 Rules:
 
 - One config file per **experiment variant** under
-  `configs/experiments/<experiment>/<variant>.yaml`; do not create a config per
+  `input/configs/experiments/<experiment>/<variant>.yaml`; do not create a config per
   run or per seed. Seeds are run dimensions, not config files.
-- Do not mutate `configs/base.yaml` for every experiment; create a variant.
+- Do not mutate `input/configs/base.yaml` for every experiment; create a variant.
 - Sweeps describe a parameter space; generated per-trial configs live under
-  `outputs/sweeps/<sweep_id>/configs/`, not in the repo.
+  `output/sweeps/<sweep_id>/configs/`, not in the repo.
 - The run manifest records `config_source` and `config_digest`; use
-  `tools/runs.py` to see which config produced each run and
-  `tools/run_info.py` for one run's config → source map.
+  `core/tools/runs.py` to see which config produced each run and
+  `core/tools/run_info.py` for one run's config → source map.
 - One seed per run. For a 3-seed result, add `seed` to the sweep params and
   compare the resulting runs; do not loop seeds inside a run.
 - Never tune on the test split. Use val for model selection; test belongs to a
   claim.
 - Tag runs that must survive cleanup: `baseline`, `reported`, `debug`.
 - A failed run/trial is still recorded (`failed` / `partial`); do not delete it.
-- To compare variants, use `commands/sweep.py` (subprocess) or `LocalSweep`
+- To compare variants, use `core/commands/sweep.py` (subprocess) or `LocalSweep`
   (thread/in-process for lightweight cases); one trial = one run.
 - To report a number, create a `Claim` with the eval id(s), then run
   `dlef report`.
 - To clean up, run `dlef gc` (dry-run first); keep `reported` tagged runs.
 
-Multi-seed sweep example (edit the template’s `commands/sweep.py`):
+Multi-seed sweep example (edit the template’s `core/commands/sweep.py`):
 
 ```python
 params={
@@ -250,8 +264,8 @@ Changing data/model/loss mid-experiment:
   an edit to an old run.
 - Core never knows datasets/architectures/losses. The project template is
   config-driven: `data.name` / `data.split` / `data.*_transform` select
-  `myproject/data/build.py` + `data/splits.py`; `model.name` selects
-  `myproject/models/build.py`; `loss.name` selects `myproject/losses/build.py`;
+  `core/data/build.py` + `data/splits.py`; `model.name` selects
+  `core/models/build.py`; `loss.name` selects `core/losses/build.py`;
   optimizer/scheduler/metrics have their own registries; `task.py` stays
   unchanged.
 - Materialize splits; never call `random_split` at runtime. A new data version
@@ -259,7 +273,7 @@ Changing data/model/loss mid-experiment:
   manifest; old runs keep their original version.
 - One-off variant:
   ```bash
-  python commands/train.py --config configs/base.yaml \
+  python core/commands/train.py --config input/configs/base.yaml \
     --set data.name=regression --set data.version=synthetic \
     --set data.split=holdout --set model.name=linear --set loss.name=huber \
     --set experiment=data-linear-loss-huber
@@ -267,12 +281,12 @@ Changing data/model/loss mid-experiment:
   For evaluation, point at the checkpoint; it reads the training run's resolved
   config, so architecture/loss match automatically:
   ```bash
-  python commands/eval.py --checkpoint outputs/runs/.../checkpoints/last.pt
+  python core/commands/eval.py --checkpoint output/runs/.../checkpoints/last.pt
   ```
 - Add the component file, register it in the matching `build.py`, extend config
   validation, add a smoke/shape test, and commit the code before official runs.
 - For a comparison, sweep `model.name` / `loss.name` / `seed`; one trial = one
-  run. The template’s `commands/sweep.py` has a `set_dotted` helper.
+  run. The template’s `core/commands/sweep.py` has a `set_dotted` helper.
 - Compare old vs new through `dlef compare` or `dlef report`; old runs remain
   valid because each has its own config digest and code version.
 
@@ -286,14 +300,14 @@ Changing data/model/loss mid-experiment:
   Do not hide switches in module globals, environment variables or `if name ==`
   branches. Environment variables are only for paths (`DLEF_DATA_ROOT`) and
   secrets.
-- Builders receive config objects. `task.py` / `data/build.py` / `commands/`
+- Builders receive config objects. `task.py` / `data/build.py` / `core/commands/`
   only wire; they do not branch on implementation names.
 - Unknown keys are errors. Do not add ad-hoc dict keys.
 - Validation belongs in `validate()` / `__post_init__`.
 - Every run dumps `config.resolved.json`; its SHA-256 and original
   `config_source` go into the manifest.
 - Inspect a run from its directory: `manifest.json` + `config.resolved.json` +
-  eval records. `tools/run_info.py --run <id>` prints the config-to-source
+  eval records. `core/tools/run_info.py --run <id>` prints the config-to-source
   map.
 - Secrets go through environment variables, never config files.
 - Do not put paths to outputs in config; run directories are derived.
@@ -307,7 +321,7 @@ Changing data/model/loss mid-experiment:
 
 - Every dataset exposes a `DataSpec`: name, version, schema, splits, transform,
   stats, provenance.
-- Dataset / split / transform implementations live in `myproject/data/`;
+- Dataset / split / transform implementations live in `core/data/`;
   `data/build.py` selects them by config, `task.py` does not load data.
 - Dataset **bytes** live outside the repo under `DLEF_DATA_ROOT`; the project
   holds code and small manifests only. Do not commit images/tables or absolute
@@ -381,7 +395,7 @@ Metric:
   must use a frozen benchmark.
 - `EvalRecord` carries split, checkpoint digest, data version, eval spec digest,
   metrics, test access, `benchmark_id` and `test_set_id`.
-- Test split access is counted per `test_set_id` in `outputs/test_access/`;
+- Test split access is counted per `test_set_id` in `output/test_access/`;
   report shows `WARN` when count > 1. Changing the eval transform must not reset
   the count.
 - A `Claim` must reference at least one eval id and should pin its
@@ -390,7 +404,7 @@ Metric:
 
 ```bash
 python -m dlef.cli report \
-  --runs outputs/runs \
+  --runs output/runs \
   --claims claims \
   --out report.md
 ```
@@ -440,8 +454,8 @@ python examples/torch_regression/sweep.py
 For project changes:
 
 ```bash
-python -m unittest discover -s tests -v
-python commands/train.py --config configs/base.yaml
+python -m unittest discover -s core/tests -v
+python core/commands/train.py --config input/configs/base.yaml
 ```
 
 Every project should have:
@@ -451,7 +465,7 @@ Every project should have:
 - a benchmark identity test: test membership stable across train changes,
   benchmark id changes with membership/metric protocol;
 - a config-contract test: every selector in the config resolves to a builder;
-- a command-surface test: `commands/` stays train/eval/sweep only;
+- a command-surface test: `core/commands/` stays train/eval/sweep only;
 - a golden metric test;
 - a checkpoint round-trip test if you touch checkpoints.
 
@@ -480,13 +494,13 @@ Every project should have:
 
 A project task is done when:
 
-1. `configs/*.yaml` is typed, strict, and validated.
+1. `input/configs/*.yaml` is typed, strict, and validated.
 2. `DataSpec` exists; one batch is validated; split provenance is recorded.
 3. Model/loss/metric contracts are implemented; loss terms are named.
-4. `tests/` smoke test passes on tiny data.
-5. `commands/train.py` produces a run with manifest, resolved config, metrics,
+4. `core/tests/` smoke test passes on tiny data.
+5. `core/commands/train.py` produces a run with manifest, resolved config, metrics,
    checkpoint.
-6. `commands/eval.py` produces an eval record bound to a checkpoint digest.
+6. `core/commands/eval.py` produces an eval record bound to a checkpoint digest.
 7. Sweep (if used) produces one run per trial and a sweep record.
 8. A claim (if reported) resolves to eval → checkpoint → run.
 9. `dlef gc` dry-run shows only intended deletions.

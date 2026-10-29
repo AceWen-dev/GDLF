@@ -190,7 +190,7 @@ core ← adapters ← examples / templates
 python -m dlef.cli doctor
 python -m dlef.cli compare <eval-json-or-run-dir> ...
 python -m dlef.cli gc --runs runs --keep-last 3 --keep-best 1 --metric-key mae
-python -m dlef.cli report --runs runs --claims claims --out report.md
+python -m dlef.cli report --runs output/runs --claims output/claims --out output/reports/report.md
 ```
 
 ---
@@ -205,26 +205,29 @@ cd ~/my-experiment
 git init
 pip install -e /path/to/DLEF
 pip install -e .
-python commands/train.py --config configs/base.yaml
+python core/commands/train.py --config input/configs/base.yaml
 ```
+
+模板按三层组织：`input/`（配置 + benchmark）、`core/`（项目源码）、`output/`
+（run / claim / report）。
 
 配置按 **variant** 组织，不按 run/seed：
 
 ```text
-configs/
+input/configs/
   base.yaml
   experiments/<experiment>/<variant>.yaml
   sweeps/<sweep>.yaml
 ```
 
-一个 seed 是一个 run，不是一份 config。`tools/configs.py list` 检查配置目录，
-`tools/runs.py` 列出每个 run 的 `config_source`；细节看
-`tools/run_info.py --run <id>`。
+一个 seed 是一个 run，不是一份 config。`core/tools/configs.py list` 检查配置目录，
+`core/tools/runs.py` 列出每个 run 的 `config_source`；细节看
+`core/tools/run_info.py --run <id>`。
 
 模板里需要替换/扩展的是数据 + 组件包：
 
 ```text
-myproject/data/          # 数据集 + split + transform + loader
+core/data/          # 数据集 + split + transform + loader
   datasets/              # 每个数据集一个文件
   splits.py              # 物化的 role -> indices
   transforms/            # 每个 transform 一个文件
@@ -233,11 +236,11 @@ myproject/data/          # 数据集 + split + transform + loader
   loaders.py             # DataLoader 组装
   benchmark.py           # 冻结 test set + metric protocol
   build.py               # 数据侧 composition root
-myproject/models/        # 每个模型一个文件 + models/build.py 注册
-myproject/losses/        # 每个 loss 一个文件 + losses/build.py 注册
-myproject/optimizers/    # 需要换优化器时
-myproject/schedulers/    # 需要换调度器时
-myproject/metrics/       # 每个指标一个文件 + metrics/build.py 注册
+core/models/        # 每个模型一个文件 + models/build.py 注册
+core/losses/        # 每个 loss 一个文件 + losses/build.py 注册
+core/optimizers/    # 需要换优化器时
+core/schedulers/    # 需要换调度器时
+core/metrics/       # 每个指标一个文件 + metrics/build.py 注册
 ```
 
 数据也是消融轴：`data.name` / `data.split` / `data.train_transform` /
@@ -253,22 +256,22 @@ $DLEF_DATA_ROOT/
   splits/<dataset>/<version>/<split>.json
 ```
 
-`myproject/data/paths.py` 负责解析；split 文件只存 membership，不复制
+`core/data/paths.py` 负责解析；split 文件只存 membership，不复制
 train/val/test 图片。项目里只保留代码和小 manifest。
 
-`config.py / task.py / runtime.py / commands/` 是接线；`task.py` 是 composition
+`config.py / task.py / runtime.py / core/commands/` 是接线；`task.py` 是 composition
 root，只负责把组件拼成 `TorchTask`。
 
 ### 6.2 训练 + 评测
 
 ```bash
-python commands/train.py --config configs/base.yaml
+python core/commands/train.py --config input/configs/base.yaml
 ```
 
 输出：
 
 ```text
-outputs/runs/<project>/<experiment>/<run_id>/
+output/runs/<project>/<experiment>/<run_id>/
   manifest.json
   config.resolved.json
   metrics.jsonl
@@ -279,14 +282,14 @@ outputs/runs/<project>/<experiment>/<run_id>/
 独立评测：
 
 ```bash
-python commands/eval.py \
-  --checkpoint outputs/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
+python core/commands/eval.py \
+  --checkpoint output/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
 ```
 
 查一个 run 的全部信息：
 
 ```bash
-python tools/run_info.py --run <run_id>
+python core/tools/run_info.py --run <run_id>
 ```
 
 它从 run 目录读取 `manifest.json` + `config.resolved.json` + eval records，打印
@@ -300,7 +303,7 @@ python tools/run_info.py --run <run_id>
 模板是配置驱动的：
 
 ```bash
-python commands/train.py --config configs/base.yaml \
+python core/commands/train.py --config input/configs/base.yaml \
   --set data.name=regression \
   --set data.version=synthetic \
   --set data.split=holdout \
@@ -319,7 +322,7 @@ python commands/train.py --config configs/base.yaml \
   `config.resolved.json`，自动复用同一份结构/超参，所以不需要手动重复
   `--set`；只有原 run 目录丢了才用 `--config` 兜底。
 - 最终 test eval 必须带冻结 benchmark：
-  `python commands/eval.py --checkpoint ... --split test --benchmark benchmarks/<id>.json`。
+  `python core/commands/eval.py --checkpoint ... --split test --benchmark input/benchmarks/<id>.json`。
 
 比较多个数据/架构/loss 时，用 sweep 把 `data.name`、`data.split`、
 `data.*_transform`、`model.name`、`loss.name`、`seed` 作为参数；一个 trial =
@@ -329,14 +332,14 @@ python commands/train.py --config configs/base.yaml \
 ### 6.4 扫参
 
 ```bash
-python commands/sweep.py --config configs/base.yaml
+python core/commands/sweep.py --config input/configs/base.yaml
 ```
 
 每个 trial：
 
 - 自动写一份 trial config；
 - 一个 subprocess；
-- 日志在 `outputs/sweeps/<sweep_id>/trials/<trial_id>.log`；
+- 日志在 `output/sweeps/<sweep_id>/trials/<trial_id>.log`；
 - result 在 `trials/<trial_id>.result.json`；
 - `train.py` 会自动把 run_id / metrics 写回 result。
 
@@ -356,7 +359,7 @@ ClaimStore("claims").add(
 ```
 
 ```bash
-python -m dlef.cli report --runs outputs/runs --claims claims --out report.md
+python -m dlef.cli report --runs output/runs --claims output/claims --out output/reports/report.md
 ```
 
 ### 6.6 清理
@@ -364,7 +367,7 @@ python -m dlef.cli report --runs outputs/runs --claims claims --out report.md
 ```bash
 # 默认 dry-run
 python -m dlef.cli gc \
-  --runs outputs/runs --sweeps outputs/sweeps \
+  --runs output/runs --sweeps output/sweeps \
   --keep-last 3 --keep-best 1 --metric-key mae \
   --keep-tag reported --artifact-ttl-days 30
 
@@ -390,7 +393,7 @@ python examples/torch_regression/sweep.py
 ### 6.9 DDP
 
 ```bash
-torchrun --nproc_per_node=N commands/train.py --config configs/base.yaml
+torchrun --nproc_per_node=N core/commands/train.py --config input/configs/base.yaml
 ```
 
 本地 CPU smoke：
@@ -616,15 +619,15 @@ DLEF/
 
 1. 复制 `templates/project/`，`git init`。
 2. 安装 core 和项目依赖。
-3. 写 `configs/base.yaml`：project / experiment / seed / epochs / 数据 / 模型 / 优化器。
+3. 写 `input/configs/base.yaml`：project / experiment / seed / epochs / 数据 / 模型 / 优化器。
 4. 设置 `DLEF_DATA_ROOT`，替换 `data/` 下的数据集/transform/split，并按需扩展 `models/`、`losses/`、`metrics/`、`optimizers/`、`schedulers/`。
 5. 冻结 benchmark 并提交 manifest：
    ```bash
-   python tools/benchmark.py create --config configs/base.yaml --out benchmarks/<name>.json
+   python core/tools/benchmark.py create --config input/configs/base.yaml --out input/benchmarks/<name>.json
    ```
 6. 跑 smoke test：
    ```bash
-   python -m unittest discover -s tests -v
+   python -m unittest discover -s core/tests -v
    ```
 7. 跑 baseline；确认 manifest / config / checkpoint 都对。
 8. 需要多 seed 时，把 `seed` 加进 sweep 的 params；一个 seed 一个 run。

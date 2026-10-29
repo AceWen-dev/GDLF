@@ -48,7 +48,7 @@ cd ~/dl-projects/demo
 git init
 ```
 
-现在这个 `demo/` 就是你的项目。`myproject/` 是占位包名；demo 先不用改。
+现在这个 `demo/` 就是你的项目。`core/` 是占位包名；demo 先不用改。
 
 ---
 
@@ -65,14 +65,14 @@ pip install -e .
 python -c "import dlef, torch; print('ok')"
 ```
 
-`dlef` 是框架 core；`myproject` 是你的项目包。
+`dlef` 是框架 core；`core` 是你的项目包。
 
 ---
 
 ## 4. 先跑 smoke test
 
 ```bash
-python -m unittest discover -s tests -v
+python -m unittest discover -s core/tests -v
 ```
 
 只跑 1 个测试：用很小的数据走一遍 train + eval。
@@ -83,7 +83,7 @@ python -m unittest discover -s tests -v
 ## 5. 跑第一次训练
 
 ```bash
-python commands/train.py --config configs/base.yaml
+python core/commands/train.py --config input/configs/base.yaml
 ```
 
 你会看到类似：
@@ -91,13 +91,13 @@ python commands/train.py --config configs/base.yaml
 ```text
 run: 20261029-..._s7_...
 metrics: {'mae': 0.13...}
-manifest: .../outputs/runs/my-project/baseline/.../manifest.json
+manifest: .../output/runs/my-project/baseline/.../manifest.json
 checkpoint: .../checkpoints/last.pt
 ```
 
 这一步做了：
 
-1. 读 `configs/base.yaml`；
+1. 读 `input/configs/base.yaml`；
 2. 建 data/model/loss/metrics；
 3. 训练；
 4. 在 val 上评测；
@@ -108,7 +108,7 @@ checkpoint: .../checkpoints/last.pt
 ## 6. 看一次 run 到底有什么
 
 ```bash
-RUN_DIR=$(find outputs/runs -name manifest.json | head -1 | xargs dirname)
+RUN_DIR=$(find output/runs -name manifest.json | head -1 | xargs dirname)
 echo "$RUN_DIR"
 find "$RUN_DIR" -maxdepth 2 -type f | sort
 ```
@@ -133,15 +133,15 @@ tail -5 "$RUN_DIR/metrics.jsonl"
 更快的入口：
 
 ```bash
-python tools/run_info.py --run <run_id>
-python tools/runs.py --experiment baseline
-python tools/configs.py list
+python core/tools/run_info.py --run <run_id>
+python core/tools/runs.py --experiment baseline
+python core/tools/configs.py list
 ```
 
-`configs/` 按 variant 组织，不按 run/seed：
+`input/configs/` 按 variant 组织，不按 run/seed：
 
 ```text
-configs/
+input/configs/
   base.yaml
   experiments/<experiment>/<variant>.yaml
   sweeps/<sweep>.yaml
@@ -157,7 +157,7 @@ configs/
 ## 7. 做一次独立评测
 
 ```bash
-python commands/eval.py --checkpoint "$RUN_DIR/checkpoints/last.pt"
+python core/commands/eval.py --checkpoint "$RUN_DIR/checkpoints/last.pt"
 ```
 
 输出：
@@ -178,7 +178,7 @@ eval record: .../evals/...json
 ## 8. 跑一次 sweep（多个变体）
 
 ```bash
-python commands/sweep.py --config configs/base.yaml
+python core/commands/sweep.py --config input/configs/base.yaml
 ```
 
 默认跑 4 个 trial（lr × grad accumulation），每个 trial 一个 subprocess。
@@ -195,7 +195,7 @@ sweep: ... status=completed
 每个 trial 的日志和结果在：
 
 ```text
-outputs/sweeps/<sweep_id>/trials/
+output/sweeps/<sweep_id>/trials/
 ```
 
 一个 trial = 一个新 run；旧 run 不动。
@@ -210,7 +210,7 @@ outputs/sweeps/<sweep_id>/trials/
 EVAL_ID=$(python - <<'PY'
 from pathlib import Path
 import json
-paths = sorted(Path("outputs/runs").rglob("evals/*.json"))
+paths = sorted(Path("output/runs").rglob("evals/*.json"))
 print(json.loads(paths[-1].read_text())["eval_id"])
 PY
 )
@@ -235,8 +235,8 @@ PY
 
 ```bash
 python -m dlef.cli report \
-  --runs outputs/runs \
-  --claims claims \
+  --runs output/runs \
+  --claims output/claims \
   --out report.md
 cat report.md
 ```
@@ -251,8 +251,8 @@ cat report.md
 
 ```bash
 python -m dlef.cli gc \
-  --runs outputs/runs \
-  --sweeps outputs/sweeps \
+  --runs output/runs \
+  --sweeps output/sweeps \
   --keep-last 2 \
   --keep-best 1 \
   --metric-key mae
@@ -274,7 +274,7 @@ python -m dlef.cli gc \
 - sweep 引用的 run；
 - 被 kept run 引用的 artifact。
 
-不要手动 `rm -rf outputs/runs`。
+不要手动 `rm -rf output/runs`。
 
 ---
 
@@ -283,7 +283,7 @@ python -m dlef.cli gc \
 改数据 + 组件包：
 
 ```text
-myproject/data/          # 数据集 + split + transform + loader
+core/data/          # 数据集 + split + transform + loader
   datasets/              # 每个数据集一个文件
   splits.py              # 物化的 role -> indices
   transforms/            # 每个 transform 一个文件
@@ -292,15 +292,15 @@ myproject/data/          # 数据集 + split + transform + loader
   loaders.py             # DataLoader 组装
   benchmark.py           # 冻结 test set + metric protocol -> benchmark id
   build.py               # 数据侧 composition root
-myproject/models/        # 每个模型一个文件 + models/build.py 注册
-myproject/losses/        # 每个 loss 一个文件 + losses/build.py 注册
-myproject/optimizers/    # 需要换优化器时
-myproject/schedulers/    # 需要换调度器时
-myproject/metrics/       # 每个指标一个文件 + metrics/build.py 注册
+core/models/        # 每个模型一个文件 + models/build.py 注册
+core/losses/        # 每个 loss 一个文件 + losses/build.py 注册
+core/optimizers/    # 需要换优化器时
+core/schedulers/    # 需要换调度器时
+core/metrics/       # 每个指标一个文件 + metrics/build.py 注册
 ```
 
 `task.py` 是 trainable task 的 composition root；`data/build.py` 是数据侧的
-composition root；`commands/train.py` 把两者接到同一个 run。
+composition root；`core/commands/train.py` 把两者接到同一个 run。
 
 ### 外部数据根目录
 
@@ -319,7 +319,7 @@ $DLEF_DATA_ROOT/
   splits/<dataset>/<version>/<split>.json
 ```
 
-`myproject/data/paths.py` 负责解析这些路径；真实 dataset builder 用
+`core/data/paths.py` 负责解析这些路径；真实 dataset builder 用
 `curated_dir(config.name, config.version)` 和
 `split_manifest_path(config.name, config.version, split)`。项目里只放代码和
 小 manifest。split 文件只存 membership（sample id 或相对路径），不复制
@@ -330,7 +330,7 @@ split，也不会把项目目录撑乱。
 test membership。
 
 项目的 `.gitignore` 会忽略根目录下的 `/data/`、`/datasets/`、`/raw/`，
-但不会忽略 `myproject/data/` 代码包。
+但不会忽略 `core/data/` 代码包。
 
 ### data/
 
@@ -398,22 +398,22 @@ benchmark = 测试集 membership + 标签版本 + eval transform + 指标实现/
 阈值。把这份 manifest 冻结并提交：
 
 ```bash
-python tools/benchmark.py create \
-  --config configs/base.yaml \
-  --out benchmarks/synthetic-test-v1.json
+python core/tools/benchmark.py create \
+  --config input/configs/base.yaml \
+  --out input/benchmarks/synthetic-test-v1.json
 
-python tools/benchmark.py verify \
-  --config configs/base.yaml \
-  --benchmark benchmarks/synthetic-test-v1.json
+python core/tools/benchmark.py verify \
+  --config input/configs/base.yaml \
+  --benchmark input/benchmarks/synthetic-test-v1.json
 ```
 
 test 评测必须带 benchmark：
 
 ```bash
-python commands/eval.py \
-  --checkpoint outputs/runs/.../checkpoints/last.pt \
+python core/commands/eval.py \
+  --checkpoint output/runs/.../checkpoints/last.pt \
   --split test \
-  --benchmark benchmarks/synthetic-test-v1.json
+  --benchmark input/benchmarks/synthetic-test-v1.json
 ```
 
 - `test_set_id` 用于 test access 计数，改 eval transform 不会重置；
@@ -470,7 +470,7 @@ def build_my_metric() -> Metric:
 
 在 `metrics/build.py` 注册，并把名字加进 YAML 的 `metrics` 列表。
 
-### config.py + configs/base.yaml
+### config.py + input/configs/base.yaml
 
 把新组件名字加进对应 Config 的 `validate()`，再更新 YAML。
 `data.name` / `data.version` / `data.split` / `data.*_transform` 和
@@ -499,7 +499,7 @@ metrics = build_metrics(config.metrics)
 模板已经配置驱动：
 
 ```bash
-python commands/train.py --config configs/base.yaml \
+python core/commands/train.py --config input/configs/base.yaml \
   --set data.name=regression \
   --set data.split=holdout \
   --set model.name=linear \
@@ -510,7 +510,7 @@ python commands/train.py --config configs/base.yaml \
 val 评测只给 checkpoint：
 
 ```bash
-python commands/eval.py --checkpoint .../last.pt
+python core/commands/eval.py --checkpoint .../last.pt
 ```
 
 它会自动读回训练配置。
@@ -518,13 +518,13 @@ python commands/eval.py --checkpoint .../last.pt
 最终 test 评测必须走冻结 benchmark：
 
 ```bash
-python commands/eval.py \
+python core/commands/eval.py \
   --checkpoint .../last.pt \
   --split test \
-  --benchmark benchmarks/synthetic-test-v1.json
+  --benchmark input/benchmarks/synthetic-test-v1.json
 ```
 
-要比较多个组合，改 `commands/sweep.py`：
+要比较多个组合，改 `core/commands/sweep.py`：
 
 ```python
 params={
@@ -544,7 +544,7 @@ params={
 入口是 run 目录，不是原始 YAML：
 
 ```text
-outputs/runs/<project>/<experiment>/<run_id>/
+output/runs/<project>/<experiment>/<run_id>/
   manifest.json            # config digest、config_source、code_version、data_versions
   config.resolved.json     # 权威配置：包含 --set / sweep 后的最终值
   evals/<eval_id>.json     # benchmark_id、test_set_id、metrics、test_access
@@ -552,7 +552,7 @@ outputs/runs/<project>/<experiment>/<run_id>/
 ```
 
 ```bash
-python tools/run_info.py --run <run_id>
+python core/tools/run_info.py --run <run_id>
 # 或 make inspect RUN=<run_id>
 ```
 
@@ -563,9 +563,9 @@ python tools/run_info.py --run <run_id>
   里的 `data_versions`；
 - 模型、loss、optimizer、scheduler、metrics、benchmark 的最终配置；
 - 每条 eval 的 `benchmark_id` / `test_set_id` / metrics / test access；
-- 配置名对应的源码文件，例如 `myproject/models/<name>.py`。
+- 配置名对应的源码文件，例如 `core/models/<name>.py`。
 
-注意：**原始 `configs/*.yaml` 不是权威**。如果用了 `--set` 或 sweep，最终值在
+注意：**原始 `input/configs/*.yaml` 不是权威**。如果用了 `--set` 或 sweep，最终值在
 `config.resolved.json`；源码由 `build.py` 注册表 + manifest 里的
 `code_version` 决定。所以“config → 源码”的完整链路是：
 
@@ -573,7 +573,7 @@ python tools/run_info.py --run <run_id>
 run dir
   → manifest.json (config_source, code_version, data_versions)
   → config.resolved.json (最终选择)
-  → myproject/{models,losses,optimizers,schedulers,metrics,data}/build.py
+  → core/{models,losses,optimizers,schedulers,metrics,data}/build.py
   → <name>.py
 ```
 
@@ -606,48 +606,48 @@ run dir
 
 ```bash
 # 训练
-python commands/train.py --config configs/base.yaml
+python core/commands/train.py --config input/configs/base.yaml
 
 # 查看 run 的 config / benchmark / 源码
-python tools/run_info.py --run <run_id>
-python tools/runs.py
+python core/tools/run_info.py --run <run_id>
+python core/tools/runs.py
 
 # 配置目录
-python tools/configs.py list
+python core/tools/configs.py list
 
 # 换模型/loss
-python commands/train.py --config configs/base.yaml \
+python core/commands/train.py --config input/configs/base.yaml \
   --set model.name=linear --set loss.name=huber
 
 # val 评测
-python commands/eval.py --checkpoint outputs/runs/.../checkpoints/last.pt
+python core/commands/eval.py --checkpoint output/runs/.../checkpoints/last.pt
 
 # 冻结 benchmark
-python tools/benchmark.py create \
-  --config configs/base.yaml \
-  --out benchmarks/synthetic-test-v1.json
+python core/tools/benchmark.py create \
+  --config input/configs/base.yaml \
+  --out input/benchmarks/synthetic-test-v1.json
 
 # 最终 test 评测（必须带 benchmark）
-python commands/eval.py \
-  --checkpoint outputs/runs/.../checkpoints/last.pt \
+python core/commands/eval.py \
+  --checkpoint output/runs/.../checkpoints/last.pt \
   --split test \
-  --benchmark benchmarks/synthetic-test-v1.json
+  --benchmark input/benchmarks/synthetic-test-v1.json
 
 # 扫参
-python commands/sweep.py --config configs/base.yaml
+python core/commands/sweep.py --config input/configs/base.yaml
 
 # 报告
-python -m dlef.cli report --runs outputs/runs --claims claims --out report.md
+python -m dlef.cli report --runs output/runs --claims output/claims --out output/reports/report.md
 
 # 清理（先 dry-run）
-python -m dlef.cli gc --runs outputs/runs --sweeps outputs/sweeps \
+python -m dlef.cli gc --runs output/runs --sweeps output/sweeps \
   --keep-last 2 --keep-best 1 --metric-key mae
 
 # 环境检查
 python -m dlef.cli doctor
 
 # DDP
-torchrun --nproc_per_node=N commands/train.py --config configs/base.yaml
+torchrun --nproc_per_node=N core/commands/train.py --config input/configs/base.yaml
 ```
 
 ---
@@ -665,7 +665,7 @@ eval 会自动读训练 run 的 config；如果原 run 目录被删，才用
 `--config` 兜底，并确保 model/loss 与 checkpoint 一致。
 
 **sweep 失败**
-看 `outputs/sweeps/<sweep_id>/trials/<trial>.log` 和 `.result.json`。
+看 `output/sweeps/<sweep_id>/trials/<trial>.log` 和 `.result.json`。
 
 **磁盘满了**
 先 `dlef gc` dry-run，确认后再 `--apply`；不要手动 rm。
@@ -684,7 +684,7 @@ eval 会自动读训练 run 的 config；如果原 run 目录被删，才用
 ## 16. 不要做
 
 - 不要改 `dlef/` 来放你的模型/loss。
-- 不要手写 `outputs/runs/...` 或 `manifest.json`。
+- 不要手写 `output/runs/...` 或 `manifest.json`。
 - 不要改已完成的 metrics/eval record。
 - 不要在一个 run 里循环 seed。
 - 不要用 test 调参。

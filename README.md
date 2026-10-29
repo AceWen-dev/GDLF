@@ -79,7 +79,7 @@ Config -> Run -> Eval -> Compare
 and writes:
 
 ```text
-examples/toy/outputs/
+examples/toy/output/
   runs/<project>/<experiment>/<run_id>/
     manifest.json
     metrics.jsonl
@@ -114,7 +114,7 @@ examples/toy/outputs/
   different `benchmark_id`s are reported as not directly comparable.
 - Config is the single declaration of choices; the manifest records config
   digest, original config source and code version. The template's
-  `tools/run_info.py` resolves a run's config to its source files.
+  `core/tools/run_info.py` resolves a run's config to its source files.
 
 It does **not** prove a good model, a real dataset pipeline, or distributed
 training. Those are adapter concerns.
@@ -130,7 +130,7 @@ spec = SweepSpec(
     method="grid",
 )
 record = LocalSweep(
-    SweepStore("outputs/sweeps"),
+    SweepStore("output/sweeps"),
     gpu_ids=(0, 1),
     max_parallel=2,
 ).run(spec, trial_fn)
@@ -156,7 +156,7 @@ def command_fn(trial, context):
     )
 
 record = SubprocessSweep(
-    SweepStore("outputs/sweeps"),
+    SweepStore("output/sweeps"),
     gpu_ids=(0, 1),
     max_parallel=2,
 ).run(spec, command_fn)
@@ -253,7 +253,9 @@ DDP evaluation and distributed checkpoint resume are v0 gaps.
 ## Project template
 
 `templates/project/` is the copyable skeleton. It imports `dlef`; it does not
-vendor the core.
+vendor the core. The project is organized into three layers: `input/` (configs
+and benchmarks), `core/` (project source), and `output/` (runs, claims,
+reports).
 
 ```bash
 cp -r templates/project ~/my-experiment
@@ -261,7 +263,7 @@ cd ~/my-experiment
 git init
 pip install -e /path/to/DLEF
 pip install -e .
-python commands/train.py --config configs/base.yaml
+python core/commands/train.py --config input/configs/base.yaml
 ```
 
 See `templates/project/README.md` for the replace points and commands. The
@@ -287,7 +289,7 @@ ClaimStore("claims").add(
 ```
 
 ```bash
-python -m dlef.cli report --runs runs --claims claims --out report.md
+python -m dlef.cli report --runs output/runs --claims output/claims --out output/reports/report.md
 ```
 
 Test-set access is logged under `runs/../test_access/`, keyed by `test_set_id`,

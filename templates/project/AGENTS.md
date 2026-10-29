@@ -12,11 +12,15 @@ composition root.
 ## 1. Layout
 
 ```text
-configs/
-  base.yaml              # shared baseline / smoke
-  experiments/<experiment>/<variant>.yaml  # one file per variant
-  sweeps/<sweep>.yaml    # optional parameter space
-myproject/
+input/                    # layer 1: immutable inputs
+  configs/
+    base.yaml            # shared baseline / smoke
+    experiments/<experiment>/<variant>.yaml
+    sweeps/<sweep>.yaml  # optional parameter space
+  benchmarks/            # one frozen JSON per benchmark
+  README.md
+
+core/                     # layer 2: project source
   config.py              # typed dataclass schema
   data/
     datasets/            # REPLACE: one file per dataset
@@ -49,62 +53,73 @@ myproject/
     mae.py
   task.py                # composition root only
   runtime.py             # policy/runner/sweep result helper
-commands/
-  train.py               # thin entry: train + eval
-  eval.py                # thin entry: separate eval run (val or sealed test)
-  sweep.py               # subprocess grid/random sweep
-tools/
-  benchmark.py           # freeze / verify a benchmark manifest
-  configs.py             # list / validate experiment configs
-  runs.py                # list runs with config source + latest metric
-  run_info.py            # run card: config -> benchmark -> source files
-  _bootstrap.py          # internal: find the core when running in-repo
+  commands/
+    train.py             # thin entry: train + eval
+    eval.py              # thin entry: separate eval run (val or sealed test)
+    sweep.py             # subprocess grid/random sweep
+  tools/
+    benchmark.py         # freeze / verify a benchmark manifest
+    configs.py           # list / validate experiment configs
+    runs.py              # list runs with config source + latest metric
+    run_info.py          # run card: config -> benchmark -> source files
+    _bootstrap.py        # internal: find the core when running in-repo
+    README.md
+  scripts/               # project-specific scripts, intentionally unstructured
+    README.md
+  tests/
+    test_smoke.py
+    test_components.py
+    test_benchmark.py
+    test_config_contract.py
+    test_command_surface.py
   README.md
-scripts/                 # project-specific scripts, intentionally unstructured
+
+output/                   # layer 3: generated results
+  runs/
+  artifacts/
+  sweeps/
+  test_access/
+  claims/                 # one JSON per reported claim
+  reports/
   README.md
-tests/
-  test_smoke.py
-  test_components.py
-  test_benchmark.py
-  test_config_contract.py
-  test_command_surface.py
-benchmarks/              # one frozen JSON per benchmark (small, committed)
-claims/                  # one JSON per reported claim
-outputs/                 # generated; never edit by hand
-AGENTS.md                # this file
+
+AGENTS.md                # project-local guide
+README.md
+pyproject.toml
+Makefile
 ```
 
-If you rename `myproject`, update:
+If you rename `core`, update:
 
 - `pyproject.toml` → `[tool.setuptools.packages.find] include`;
-- imports in `commands/*.py`, `tools/*.py` and `tests/*.py`;
-- source-path prefixes in `tools/run_info.py`;
+- imports in `core/commands/*.py`, `core/tools/*.py` and `core/tests/*.py`;
+- source-path prefixes in `core/tools/run_info.py`;
 - any project docs.
 
 ### 1.1 Placement matrix
 
 | You are adding... | Put it here | Also update |
 |---|---|---|
-| dataset reader / acquisition library code | `myproject/data/` | `data/build.py` if selectable |
-| project-specific automation (acquisition, cleaning, query, export) | `scripts/` | no fixed structure; promote reusable logic |
-| transform | `myproject/data/transforms/<name>.py` | `data/build.py`, `DataConfig.validate` |
-| split strategy | `myproject/data/splits.py` | `SPLITTERS`, `DataConfig.validate` |
-| model | `myproject/models/<name>.py` | `models/build.py`, `ModelConfig.validate` |
-| loss | `myproject/losses/<name>.py` | `losses/build.py`, `LossConfig.validate` |
-| optimizer / scheduler | `myproject/optimizers/<name>.py`, `myproject/schedulers/<name>.py` | matching `build.py` + config |
-| metric | `myproject/metrics/<name>.py` | `metrics/build.py` + `metrics` list |
-| benchmark manifest | `benchmarks/` | create via `tools/benchmark.py` |
-| experiment config | `configs/experiments/<experiment>/<variant>.yaml` | `tools/configs.py list --check` |
-| generic maintenance utility (provided by template) | `tools/` | keep generic; do not dump project scripts |
-| test | `tests/test_*.py` | run `python -m unittest discover -s tests` |
-| claim | `claims/` | `ClaimStore` |
-| reusable cross-project code | DLEF core or `adapters/` | not in `myproject/` |
-| generated run output | `outputs/` | never edit by hand |
+| dataset reader / acquisition library code | `core/data/` | `data/build.py` if selectable |
+| project-specific automation (acquisition, cleaning, query, export) | `core/scripts/` | no fixed structure; promote reusable logic |
+| transform | `core/data/transforms/<name>.py` | `data/build.py`, `DataConfig.validate` |
+| split strategy | `core/data/splits.py` | `SPLITTERS`, `DataConfig.validate` |
+| model | `core/models/<name>.py` | `models/build.py`, `ModelConfig.validate` |
+| loss | `core/losses/<name>.py` | `losses/build.py`, `LossConfig.validate` |
+| optimizer / scheduler | `core/optimizers/<name>.py`, `core/schedulers/<name>.py` | matching `build.py` + config |
+| metric | `core/metrics/<name>.py` | `metrics/build.py` + `metrics` list |
+| benchmark manifest | `input/benchmarks/` | create via `core/tools/benchmark.py` |
+| experiment config | `input/configs/experiments/<experiment>/<variant>.yaml` | `core/tools/configs.py list --check` |
+| generic maintenance utility (provided by template) | `core/tools/` | keep generic; do not dump project scripts |
+| test | `core/tests/test_*.py` | run `python -m unittest discover -s core/tests` |
+| claim | `output/claims/` | `ClaimStore` |
+| reusable cross-project code | DLEF core or `adapters/` | not in `core/` |
+| generated run output | `output/` | never edit by hand |
 
-**Rules:** no ad-hoc scripts in `commands/`; `scripts/` is intentionally
-unstructured and project-specific (no video/data assumptions); `tools/` holds
+**Rules:** no ad-hoc scripts in `core/commands/`; `core/scripts/` is intentionally
+unstructured and project-specific (no video/data assumptions); `core/tools/` holds
 only generic maintenance utilities. If a script grows reusable logic, move the
-logic into `myproject/` (or core/adapters) and leave a thin CLI. No `utils.py`
+logic into `core/` (or core/adapters) and leave a thin CLI. No `utils.py`
 at the project root.
 
 ---
@@ -116,20 +131,20 @@ pip install -e /path/to/DLEF   # core
 pip install -e .               # project deps (torch, PyYAML)
 
 python -m unittest discover -s tests -v
-python commands/train.py --config configs/base.yaml
-python commands/eval.py \
-  --checkpoint outputs/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
-python tools/run_info.py --run <run_id>
-python tools/runs.py
-python tools/configs.py list
-python commands/sweep.py --config configs/base.yaml
+python core/commands/train.py --config input/configs/base.yaml
+python core/commands/eval.py \
+  --checkpoint output/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
+python core/tools/run_info.py --run <run_id>
+python core/tools/runs.py
+python core/tools/configs.py list
+python core/commands/sweep.py --config input/configs/base.yaml
 ```
 
 Or:
 
 ```bash
 make train
-make eval CHECKPOINT=outputs/runs/.../checkpoints/last.pt
+make eval CHECKPOINT=output/runs/.../checkpoints/last.pt
 make inspect RUN=<run_id>
 make runs
 make configs
@@ -146,7 +161,7 @@ make doctor
 
 Replace or extend these component packages:
 
-1. `myproject/data/`
+1. `core/data/`
    - One dataset per file in `data/datasets/`; register it in `data/build.py`.
    - One transform per file in `data/transforms/`; register it in `data/build.py`.
    - `data/splits.py` materializes membership (`role -> indices`); loaders never
@@ -164,36 +179,36 @@ Replace or extend these component packages:
    - Data is an ablation axis: `data.name`, `data.version`, `data.split`,
      `data.train_transform`, `data.eval_transform` are config-selected.
 
-2. `myproject/models/`
+2. `core/models/`
    - One file per architecture.
    - `models/build.py` maps `model.name` → builder.
    - Each builder returns `TorchModel(module, forward_fn, device=...)`.
    - The model does no I/O, does not read config, does not move devices, does
      not compute loss.
 
-3. `myproject/losses/`
+3. `core/losses/`
    - One file per loss; `losses/build.py` maps `loss.name` → builder.
    - Return `TorchLoss` producing `LossOutput(total=..., terms={...})`.
    - Name every term; make reduction explicit.
 
-4. `myproject/optimizers/` and `myproject/schedulers/`
+4. `core/optimizers/` and `core/schedulers/`
    - One file per implementation; `build.py` maps config names to builders.
    - Defaults (AdamW + cosine) already work; replace only when needed.
 
-5. `myproject/metrics/`
+5. `core/metrics/`
    - One file per metric; `metrics/build.py` maps names → builders.
    - Return `Metric` objects (`TorchMetric` is the convenience adapter).
    - Add a golden test for each metric.
 
-Keep `myproject/task.py` as the **task composition root**. It only calls
+Keep `core/task.py` as the **task composition root**. It only calls
 `build_model`, `build_loss`, `build_optimizer`, `build_scheduler`,
 `build_metrics`; it should not contain implementations or data loading.
-`myproject/data/build.py` is the **data composition root**; `commands/` wires
+`core/data/build.py` is the **data composition root**; `core/commands/` wires
 the data loaders and the task into one run. Both are config-selected and part of
 the ablation surface.
 
 Put reusable, cross-project torch code in the DLEF repo's `adapters/torch/`,
-not in `myproject/`; put project-specific research code in `myproject/`.
+not in `core/`; put project-specific research code in `core/`.
 
 ---
 
@@ -204,15 +219,15 @@ edit a completed run.**
 
 The template is config-driven:
 
-- `data.name` selects the dataset builder in `myproject/data/build.py`;
+- `data.name` selects the dataset builder in `core/data/build.py`;
 - `data.version` selects the curated dataset version under `$DLEF_DATA_ROOT`;
-- `data.split` selects the splitter in `myproject/data/splits.py`;
+- `data.split` selects the splitter in `core/data/splits.py`;
 - `data.train_transform` / `data.eval_transform` select transforms in
-  `myproject/data/transforms/`;
-- `model.name` selects the builder in `myproject/models/build.py`;
-- `loss.name` selects the builder in `myproject/losses/build.py`;
+  `core/data/transforms/`;
+- `model.name` selects the builder in `core/models/build.py`;
+- `loss.name` selects the builder in `core/losses/build.py`;
 - `optim.name` / `scheduler.name` / `metrics[]` select from their registries;
-- `myproject/task.py` stays unchanged.
+- `core/task.py` stays unchanged.
 
 Data rule: **new data or a new split is a new run.** The loader records the
 materialized `DataSpec.version` in the run manifest; never re-split at runtime
@@ -235,7 +250,7 @@ To add a variant:
 One-off variant:
 
 ```bash
-python commands/train.py --config configs/base.yaml \
+python core/commands/train.py --config input/configs/base.yaml \
   --set data.name=regression \
   --set data.version=synthetic \
   --set data.split=holdout \
@@ -247,7 +262,7 @@ python commands/train.py --config configs/base.yaml \
 For evaluation, just point at the checkpoint:
 
 ```bash
-python commands/eval.py --checkpoint outputs/runs/.../checkpoints/last.pt
+python core/commands/eval.py --checkpoint output/runs/.../checkpoints/last.pt
 ```
 
 `eval.py` reads the training run's `config.resolved.json` via the checkpoint
@@ -256,7 +271,7 @@ grouped under the training experiment (`...-eval`). `--config` is only a
 fallback when the original run directory is unavailable. Do not hand-sync
 model/loss flags unless you are deliberately evaluating a different setup.
 
-For a comparison, sweep data/model/loss/seed. `commands/sweep.py` already has a
+For a comparison, sweep data/model/loss/seed. `core/commands/sweep.py` already has a
 `set_dotted` helper; replace the params with:
 
 ```python
@@ -277,24 +292,24 @@ only. Report the comparison through `dlef compare` / `dlef report`.
 
 ## 4. Config rules
 
-- `myproject/config.py` is the schema; `configs/*.yaml` are values.
+- `core/config.py` is the schema; `input/configs/*.yaml` are values.
 - **Every behavior-affecting choice is a typed config field.** Data
   name/version/seed/split/transforms, model, loss, optimizer, scheduler,
   metrics, benchmark and training policy all live in the config. No hidden
   module-level constants or `if name == ...` switches.
-- Builders receive config objects; `task.py`, `data/build.py` and `commands/`
+- Builders receive config objects; `task.py`, `data/build.py` and `core/commands/`
   only wire. They do not read environment-specific overrides.
 - Use nested dataclasses (`data`, `model`, `optim`, ...) for real projects.
 - Unknown keys are errors by design.
 - Add validation in `validate()` (ranges, mutual exclusion).
 - One config file per **experiment variant**, not per run or seed:
-  `configs/experiments/<experiment>/<variant>.yaml`.
+  `input/configs/experiments/<experiment>/<variant>.yaml`.
 - A seed is a run dimension; two seeds reuse the same config. A sweep describes
   a parameter space; generated trial configs stay under
-  `outputs/sweeps/<sweep_id>/configs/`, not in the repo.
+  `output/sweeps/<sweep_id>/configs/`, not in the repo.
 - Do not edit `base.yaml` for every experiment; copy/create a variant.
-- Discover configs with `python tools/configs.py list`; map runs to configs
-  with `python tools/runs.py`.
+- Discover configs with `python core/tools/configs.py list`; map runs to configs
+  with `python core/tools/runs.py`.
 - Never put output paths in config; run directories are derived.
 - Dataset bytes live under `$DLEF_DATA_ROOT`; config selects logical names and
   versions, not absolute data paths.
@@ -302,7 +317,7 @@ only. Report the comparison through `dlef compare` / `dlef report`.
 - For a debug run, create a separate debug config (tiny data, 1–2 steps); do not
   add `if debug` branches in model/task code.
 - A run is inspected from its run directory: `manifest.json` +
-  `config.resolved.json` + eval records. `tools/run_info.py --run <id>` prints
+  `config.resolved.json` + eval records. `core/tools/run_info.py --run <id>` prints
   the config-to-source map. The manifest records the original config source and
   code version, so a name cannot silently drift to different source.
 
@@ -331,7 +346,7 @@ Recommended order:
 7. For a 3-seed result, add `seed` to the sweep params:
    ```python
    params={"optim.lr": Choice((...)), "seed": Choice((1, 2, 3))}
-   # commands/sweep.py maps every param with set_dotted; one seed = one run.
+   # core/commands/sweep.py maps every param with set_dotted; one seed = one run.
    ```
 8. Create a claim for each reported number.
 9. Run `dlef gc` dry-run; tag runs that must survive (`reported`, `baseline`).
@@ -360,7 +375,7 @@ Rules:
   `.pt` files.
 - Resume must restore model, optimizer, scheduler, scaler, RNG, epoch/step,
   policy state. Loading only model weights is not a resume.
-- DDP training: `torchrun --nproc_per_node=N commands/train.py ...`; rank 0 writes
+- DDP training: `torchrun --nproc_per_node=N core/commands/train.py ...`; rank 0 writes
   the run. Multi-rank eval/resume is not built into this template.
 
 ---
@@ -370,15 +385,15 @@ Rules:
 - Train/val evaluation is for model selection.
 - Final test evaluation is a separate run. It must use a frozen benchmark:
   ```bash
-  python commands/eval.py \
+  python core/commands/eval.py \
     --checkpoint ... \
     --split test \
-    --benchmark benchmarks/synthetic-test-v1.json
+    --benchmark input/benchmarks/synthetic-test-v1.json
   ```
   `eval.py` verifies the current test membership/metric protocol against the
   manifest and refuses to run on a mismatch. `--config` is only a fallback when
   the original run directory is gone.
-- Test access is counted under `outputs/test_access/` by `test_set_id`; report
+- Test access is counted under `output/test_access/` by `test_set_id`; report
   shows `WARN` when the same test set is accessed more than once.
 - A `Claim` must reference at least one eval id and should pin the benchmark
   id it belongs to:
@@ -397,7 +412,7 @@ Rules:
 - Generate the report, do not hand-copy numbers:
   ```bash
   make report
-  # or: python -m dlef.cli report --runs outputs/runs --claims claims --out report.md
+  # or: python -m dlef.cli report --runs output/runs --claims claims --out report.md
   ```
 
 ---
@@ -408,13 +423,13 @@ Rules:
 make gc-dry
 # inspect the plan; then:
 python -m dlef.cli gc \
-  --runs outputs/runs --sweeps outputs/sweeps \
+  --runs output/runs --sweeps output/sweeps \
   --keep-last 3 --keep-best 1 --metric-key <your-metric> \
   --keep-tag reported --artifact-ttl-days 30 --apply
 ```
 
 - Default is dry-run; `--apply` is explicit.
-- Never `rm -rf outputs/runs/...` manually.
+- Never `rm -rf output/runs/...` manually.
 - Keep `reported`/`baseline` runs; the plan protects parent lineage and
   sweep-referenced runs.
 - Artifacts are content-addressed; only unreferenced + TTL-expired ones are
@@ -426,12 +441,12 @@ python -m dlef.cli gc \
 
 Every project should have:
 
-- `tests/test_smoke.py`: 1–2 steps on tiny data, asserts a manifest/checkpoint;
+- `core/tests/test_smoke.py`: 1–2 steps on tiny data, asserts a manifest/checkpoint;
 - a shape/contract test for data/model/loss;
-- `tests/test_benchmark.py`: test membership stable across train changes;
+- `core/tests/test_benchmark.py`: test membership stable across train changes;
   benchmark id changes with membership/metric protocol;
-- `tests/test_config_contract.py`: every config selector resolves to a builder;
-- `tests/test_command_surface.py`: `commands/` stays train/eval/sweep only;
+- `core/tests/test_config_contract.py`: every config selector resolves to a builder;
+- `core/tests/test_command_surface.py`: `core/commands/` stays train/eval/sweep only;
 - a golden test for each metric;
 - a checkpoint round-trip test if you touch checkpoints.
 
@@ -451,7 +466,7 @@ Do not edit the installed `dlef` package in place.
 
 - Do not copy `dlef` core code into this project.
 - Do not call `loss.backward()` / `optimizer.step()` inside a Task.
-- Do not write to `outputs/runs/...` by hand.
+- Do not write to `output/runs/...` by hand.
 - Do not edit completed manifests/metrics/eval records.
 - Do not delete runs/artifacts manually.
 - Do not tune on test; do not report a single lucky seed.
@@ -461,10 +476,10 @@ Do not edit the installed `dlef` package in place.
 - Do not make a tracker the only record.
 - Do not put secrets in config/logs.
 - Do not commit dataset bytes or absolute data paths.
-- Do not add ad-hoc scripts to `commands/`; `commands/` is only train/eval/sweep.
-- Project-specific automation goes under `scripts/` (intentionally unstructured).
-  `tools/` is only for the template's generic maintenance utilities.
-  Promote reusable logic to `myproject/` or core/adapters.
+- Do not add ad-hoc scripts to `core/commands/`; `core/commands/` is only train/eval/sweep.
+- Project-specific automation goes under `core/scripts/` (intentionally unstructured).
+  `core/tools/` is only for the template's generic maintenance utilities.
+  Promote reusable logic to `core/` or core/adapters.
 - Do not add project-specific code to the installed core.
 
 ---
@@ -492,7 +507,7 @@ Do not edit the installed `dlef` package in place.
 `DataBundle(dataset=..., spec=DataSpec(...))`; register it in `data/build.py`;
 allow the name in `DataConfig`; validate one batch; add a smoke test. Resolve
 bytes with `data/paths.py` (`$DLEF_DATA_ROOT`), never with a path in config.
-Update `configs/*.yaml`.
+Update `input/configs/*.yaml`.
 
 **New transform** → add `data/transforms/<name>.py` returning a named
 `Transform`; register it in `data/build.py`; allow the name in `DataConfig`;
@@ -506,9 +521,9 @@ test that the same split name + seed yields the same membership.
 **New benchmark** → change the test membership, label version, eval transform
 or metric protocol, then create a new manifest:
 ```bash
-python tools/benchmark.py create \
-  --config configs/base.yaml \
-  --out benchmarks/my-benchmark-v2.json
+python core/tools/benchmark.py create \
+  --config input/configs/base.yaml \
+  --out input/benchmarks/my-benchmark-v2.json
 ```
 Never edit the old manifest. Test eval must pass `--benchmark`; `compare` /
 `report` show the benchmark id.
@@ -529,13 +544,13 @@ register it in that package's `build.py`; allow the name in the matching config.
 **New config field** → edit `config.py`, add validation, update YAML, run a
 config test.
 
-**New sweep parameter** → edit `commands/sweep.py`:
+**New sweep parameter** → edit `core/commands/sweep.py`:
 1. add it to `SweepSpec.params`;
 2. map it into `trial_raw` in `command_fn`;
 3. ensure `train.py` sees it in the trial config.
 
-**New claim** → create `claims/<id>.json` via `ClaimStore`; reference eval id(s);
+**New claim** → create `output/claims/<id>.json` via `ClaimStore`; reference eval id(s);
 run `dlef report`.
 
 **New adapter** → if reusable, add it to the DLEF repo under `adapters/<stack>/`;
-if project-specific, keep it under `myproject/`.
+if project-specific, keep it under `core/`.

@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "myproject"
+name = "dlef-project"
 version = "0.1.0"
 description = "A project skeleton for DLEF"
 readme = "README.md"
@@ -20,4 +20,4 @@ dependencies = [
 dev = ["pytest>=7"]
 
 [tool.setuptools.packages.find]
-include = ["myproject*"]
+include = ["core*"]
