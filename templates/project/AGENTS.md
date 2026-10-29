@@ -12,7 +12,10 @@ composition root.
 ## 1. Layout
 
 ```text
-configs/                 # one YAML per experiment/variant
+configs/
+  base.yaml              # shared baseline / smoke
+  experiments/<experiment>/<variant>.yaml  # one file per variant
+  sweeps/<sweep>.yaml    # optional parameter space
 myproject/
   config.py              # typed dataclass schema
   data/
@@ -50,7 +53,9 @@ commands/
   train.py               # thin entry: train + eval
   eval.py                # thin entry: separate eval run (val or sealed test)
   benchmark.py           # freeze / verify a benchmark manifest
-  run_info.py           # run card: config -> benchmark -> source files
+  run_info.py            # run card: config -> benchmark -> source files
+  runs.py                # list runs with config source + latest metric
+  configs.py             # list / validate experiment configs
   sweep.py               # subprocess grid/random sweep
 tests/
   test_smoke.py
@@ -83,6 +88,8 @@ python commands/train.py --config configs/base.yaml
 python commands/eval.py \
   --checkpoint outputs/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
 python commands/run_info.py --run <run_id>
+python commands/runs.py
+python commands/configs.py list
 python commands/sweep.py --config configs/base.yaml
 ```
 
@@ -92,6 +99,8 @@ Or:
 make train
 make eval CHECKPOINT=outputs/runs/.../checkpoints/last.pt
 make inspect RUN=<run_id>
+make runs
+make configs
 make sweep
 make test
 make report
@@ -246,7 +255,14 @@ only. Report the comparison through `dlef compare` / `dlef report`.
 - Use nested dataclasses (`data`, `model`, `optim`, ...) for real projects.
 - Unknown keys are errors by design.
 - Add validation in `validate()` (ranges, mutual exclusion).
-- One config file per experiment/variant. Do not edit `base.yaml` for every run.
+- One config file per **experiment variant**, not per run or seed:
+  `configs/experiments/<experiment>/<variant>.yaml`.
+- A seed is a run dimension; two seeds reuse the same config. A sweep describes
+  a parameter space; generated trial configs stay under
+  `outputs/sweeps/<sweep_id>/configs/`, not in the repo.
+- Do not edit `base.yaml` for every experiment; copy/create a variant.
+- Discover configs with `python commands/configs.py list`; map runs to configs
+  with `python commands/runs.py`.
 - Never put output paths in config; run directories are derived.
 - Dataset bytes live under `$DLEF_DATA_ROOT`; config selects logical names and
   versions, not absolute data paths.

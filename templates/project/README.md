@@ -9,7 +9,9 @@ asking a coding agent to edit.
 ## What is here
 
 ```text
-configs/base.yaml        # experiment config
+configs/base.yaml        # shared baseline / smoke config
+configs/experiments/     # one YAML per experiment variant
+configs/sweeps/          # optional parameter-space specs
 myproject/config.py      # typed config schema
 myproject/data/          # REPLACE/EXTEND: datasets, splits, transforms, loaders
   datasets/              # one file per dataset
@@ -31,6 +33,8 @@ commands/train.py        # thin entry: train + eval
 commands/eval.py         # thin entry: separate eval run (val or sealed test)
 commands/benchmark.py    # freeze / verify a benchmark manifest
 commands/run_info.py      # run card: config -> benchmark -> source files
+commands/runs.py          # list runs with config source + latest metric
+commands/configs.py       # list / validate experiment configs
 commands/sweep.py        # subprocess grid sweep
 tests/test_smoke.py      # one tiny end-to-end test
 tests/test_components.py # component shape/golden tests
@@ -193,16 +197,33 @@ python commands/train.py --config configs/base.yaml
 python commands/eval.py \
   --checkpoint outputs/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
 python commands/run_info.py --run <run_id>
+python commands/runs.py
+python commands/configs.py list
 python commands/sweep.py --config configs/base.yaml
 python -m unittest discover -s tests -v
 python -m dlef.cli report --runs outputs/runs --claims claims --out report.md
 ```
 
-Or `make train`, `make sweep`, `make report`, `make gc-dry`, `make test`,
-`make doctor`. `make eval CHECKPOINT=...` needs the checkpoint path explicitly;
-`make inspect RUN=<run_id>` prints the run card.
+Or `make train`, `make runs`, `make configs`, `make sweep`, `make report`,
+`make gc-dry`, `make test`, `make doctor`. `make eval CHECKPOINT=...` needs the
+checkpoint path explicitly; `make inspect RUN=<run_id>` prints the run card.
 `make gc-dry` is a dry-run; change `--metric-key` to your primary metric before
 using `--apply`.
+
+## Config organization
+
+One config file per **experiment variant**, not per run or seed:
+
+```text
+configs/
+  base.yaml
+  experiments/<experiment>/<variant>.yaml
+  sweeps/<sweep>.yaml          # optional parameter space
+```
+
+See [`configs/README.md`](configs/README.md). Use `commands/configs.py list` to
+validate the catalog and `commands/runs.py` to see which config produced each
+run. Seeds and sweep trials are runs, not extra config files.
 
 ## Inspect a run
 

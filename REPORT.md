@@ -208,6 +208,19 @@ pip install -e .
 python commands/train.py --config configs/base.yaml
 ```
 
+配置按 **variant** 组织，不按 run/seed：
+
+```text
+configs/
+  base.yaml
+  experiments/<experiment>/<variant>.yaml
+  sweeps/<sweep>.yaml
+```
+
+一个 seed 是一个 run，不是一份 config。`commands/configs.py list` 检查配置目录，
+`commands/runs.py` 列出每个 run 的 `config_source`；细节看
+`commands/run_info.py --run <id>`。
+
 模板里需要替换/扩展的是数据 + 组件包：
 
 ```text

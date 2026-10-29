@@ -73,7 +73,7 @@ Do **not** modify `dlef/` for project-specific needs.
 14. **Config is the single declaration of choices.** Every behavior-affecting
     knob/selector is a typed config field; builders receive config instead of
     branching on names. The run manifest records config digest, config source
-    and code version; `inspect` resolves config → source.
+    and code version; `run_info` resolves config → source.
 
 ---
 
@@ -119,7 +119,9 @@ A project has this shape (from `templates/project/`):
 ```text
 <project>/
   configs/
-    base.yaml              # one config per baseline / experiment variant
+    base.yaml              # shared baseline / smoke
+    experiments/<experiment>/<variant>.yaml  # one per variant
+    sweeps/<sweep>.yaml    # optional parameter space
   myproject/
     config.py              # typed dataclass schema
     data/
@@ -142,7 +144,9 @@ A project has this shape (from `templates/project/`):
     train.py               # thin entry: train + eval
     eval.py                # thin entry: separate eval run (val or sealed test)
     benchmark.py           # freeze / verify a benchmark manifest
-    run_info.py           # run card: config -> benchmark -> source files
+    run_info.py            # run card: config -> benchmark -> source files
+    runs.py                # list runs with config source + latest metric
+    configs.py             # list / validate experiment configs
     sweep.py               # subprocess grid/random sweep
   tests/
     test_smoke.py
@@ -195,8 +199,15 @@ Use the four IDs consistently:
 
 Rules:
 
-- One config file per experiment/variant. Do not mutate `configs/base.yaml` for
-  every run; copy it or let a sweep generate per-trial configs.
+- One config file per **experiment variant** under
+  `configs/experiments/<experiment>/<variant>.yaml`; do not create a config per
+  run or per seed. Seeds are run dimensions, not config files.
+- Do not mutate `configs/base.yaml` for every experiment; create a variant.
+- Sweeps describe a parameter space; generated per-trial configs live under
+  `outputs/sweeps/<sweep_id>/configs/`, not in the repo.
+- The run manifest records `config_source` and `config_digest`; use
+  `commands/runs.py` to see which config produced each run and
+  `commands/run_info.py` for one run's config → source map.
 - One seed per run. For a 3-seed result, add `seed` to the sweep params and
   compare the resulting runs; do not loop seeds inside a run.
 - Never tune on the test split. Use val for model selection; test belongs to a

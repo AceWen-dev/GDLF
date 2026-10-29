@@ -130,7 +130,27 @@ cat "$RUN_DIR/config.resolved.json"
 tail -5 "$RUN_DIR/metrics.jsonl"
 ```
 
-建议养成习惯：**每跑完一次，先看 manifest 和 config，再看指标。**
+更快的入口：
+
+```bash
+python commands/run_info.py --run <run_id>
+python commands/runs.py --experiment baseline
+python commands/configs.py list
+```
+
+`configs/` 按 variant 组织，不按 run/seed：
+
+```text
+configs/
+  base.yaml
+  experiments/<experiment>/<variant>.yaml
+  sweeps/<sweep>.yaml
+```
+
+一个 seed 是一个 run，不是一份 config。`runs.py` 直接显示每个 run 的
+`config_source`；`run_info.py` 再把 config 映射到源码文件。
+
+建议养成习惯：**每跑完一次，先看 manifest 和 `config.resolved.json`，再看指标。**
 
 ---
 
@@ -590,6 +610,10 @@ python commands/train.py --config configs/base.yaml
 
 # 查看 run 的 config / benchmark / 源码
 python commands/run_info.py --run <run_id>
+python commands/runs.py
+
+# 配置目录
+python commands/configs.py list
 
 # 换模型/loss
 python commands/train.py --config configs/base.yaml \
