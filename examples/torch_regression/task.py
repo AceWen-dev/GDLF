@@ -46,7 +46,7 @@ def build_task(config: TorchConfig, device: str | torch.device = "cpu") -> Torch
         model=model,
         loss=loss,
         optimizer_fn=optimizer_fn,
-        metrics=metrics,
         scheduler_fn=scheduler_fn,
+        metrics=metrics,
         device=device,
     )

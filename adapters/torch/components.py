@@ -36,10 +36,10 @@ class TorchDataLoader:
         self.loader = loader
         self.spec = spec
 
-    def __iter__(self):
+    def __iter__(self): # 魔法方法让对象支持for循环
         return iter(self.loader)
 
-    def __len__(self) -> int:
+    def __len__(self) -> int: #让对象支持len()获取数据长度
         return len(self.loader)
 
     def set_epoch(self, epoch: int) -> None:
@@ -67,7 +67,7 @@ class TorchModel:
         self.device = torch.device(device)
         self.forward_fn = forward_fn
 
-    def __call__(self, batch: Batch) -> ModelOutput:
+    def __call__(self, batch: Batch) -> ModelOutput: #调用（TorchModel()其实在调用这个）
         return ModelOutput(predictions=self.forward_fn(self.module, batch))
 
     def parameters(self):
@@ -185,16 +185,16 @@ class TorchTask:
         model: TorchModel,
         loss: TorchLoss,
         optimizer_fn: Callable[[TorchModel], TorchOptimizer],
-        metrics: Mapping[str, Metric],
         scheduler_fn: Callable[[TorchOptimizer], TorchScheduler | None] | None = None,
+        metrics: Mapping[str, Metric],
         callbacks: Sequence[Callback] = (),
         device: str | torch.device | None = None,
     ) -> None:
         self.model = model
         self.loss = loss
         self.optimizer_fn = optimizer_fn
-        self.metrics = dict(metrics)
         self.scheduler_fn = scheduler_fn
+        self.metrics = dict(metrics)
         self.callbacks = list(callbacks)
         self.device = torch.device(device) if device is not None else model.device
 

@@ -21,7 +21,6 @@ from .schedulers import build_scheduler
 def build_task(config: ProjectConfig, device: Any = "cpu") -> TorchTask:
     model = build_model(config.model, device=device)
     loss = build_loss(config.loss)
-    metrics = build_metrics(config.metrics)
 
     def optimizer_fn(model):
         return build_optimizer(config.optim, model)
@@ -29,11 +28,13 @@ def build_task(config: ProjectConfig, device: Any = "cpu") -> TorchTask:
     def scheduler_fn(optimizer):
         return build_scheduler(config.scheduler, optimizer, epochs=config.epochs)
 
+    metrics = build_metrics(config.metrics)
+
     return TorchTask(
         model=model,
         loss=loss,
         optimizer_fn=optimizer_fn,
-        metrics=metrics,
         scheduler_fn=scheduler_fn,
+        metrics=metrics,
         device=device,
     )
