@@ -52,8 +52,11 @@ class TorchDataLoader:
 class TorchModel:
     """Wrap an ``nn.Module`` plus an explicit forward function.
 
-    The forward function receives ``(module, batch)`` and returns predictions.
-    Inputs are expected to be on the module's device; ``TorchTask`` moves them.
+    The forward function receives ``(module, batch)`` and returns either
+    predictions or a complete ``ModelOutput``. Returning a ``ModelOutput`` lets
+    a model expose ``aux`` features (for example a ranking loss) without a
+    project-specific ``TorchModel`` subclass. Inputs are expected to be on the
+    module's device; ``TorchTask`` moves them.
     """
 
     def __init__(
@@ -68,7 +71,10 @@ class TorchModel:
         self.forward_fn = forward_fn
 
     def __call__(self, batch: Batch) -> ModelOutput: #调用（TorchModel()其实在调用这个）
-        return ModelOutput(predictions=self.forward_fn(self.module, batch))
+        output = self.forward_fn(self.module, batch)
+        if isinstance(output, ModelOutput):
+            return output
+        return ModelOutput(predictions=output)
 
     def parameters(self):
         return self.module.parameters()

@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from dlef.config import resolve_config
-from dlef.contracts import LossOutput
+from dlef.contracts import LossOutput, ModelOutput
 from dlef.eval import EvalSpec
 from dlef.run import ArtifactStore, RunStore
 from dlef.runner import Runner
@@ -40,6 +40,18 @@ class TorchAdapterTests(unittest.TestCase):
         batch = {"x": torch.randn(4, 1), "y": torch.randn(4, 1)}
         output = model(batch)
         self.assertEqual(tuple(output.predictions.shape), (4, 1))
+
+        aux_model = TorchModel(
+            module,
+            lambda module, batch: ModelOutput(
+                predictions=module(batch["x"]),
+                aux={"features": batch["x"]},
+            ),
+            device="cpu",
+        )
+        aux_output = aux_model(batch)
+        self.assertIn("features", aux_output.aux)
+        self.assertTrue(torch.equal(aux_output.aux["features"], batch["x"]))
 
         loss = TorchLoss(
             lambda out, b: LossOutput(total=((out.predictions - b["y"]) ** 2).mean())
