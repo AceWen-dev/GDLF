@@ -546,6 +546,9 @@ Rules:
 
 ## 6. Training / policy rules
 
+- Call `dlef.seed.seed_everything(config.seed)` in any new entry point before
+  building data/models. `Runner.fit` re-seeds before training, but it cannot
+  make already-created model parameters deterministic.
 - `Task.train_step` returns `StepOutput(loss=...)`; it does **not** call
   `backward`, `optimizer.step`, or `zero_grad`.
 - AMP / accumulation / clipping / DDP are configured via

@@ -562,7 +562,8 @@ output/sweeps/<sweep_id>/
 ## Rules
 
 - Core stays domain-agnostic; all project-specific words live here.
-- One run = one resolved config × one seed.
+- One run = one resolved config × one seed. Entry points call
+  `seed_everything(config.seed)` before building data/models.
 - Eval is a separate run; every number links to a checkpoint.
 - Use the sweep backend for variants; don't write nested loops in a single run.
 - Keep failed runs; retention is reference-checked (`dlef gc`).

@@ -23,6 +23,7 @@ from dlef.config import resolve_config  # noqa: E402
 from dlef.eval import EvalSpec  # noqa: E402
 from dlef.run import ArtifactStore, RunStore  # noqa: E402
 from dlef.runner import Runner  # noqa: E402
+from dlef.seed import seed_everything  # noqa: E402
 from dlef.sweep import TrialResult  # noqa: E402
 from examples.torch_regression.config import TorchConfig  # noqa: E402
 from examples.torch_regression.data import make_loaders  # noqa: E402
@@ -64,6 +65,7 @@ def main() -> int:
         },
     )
 
+    seed_everything(config.schema.seed)
     policy = TorchTrainingPolicy(
         amp=config.schema.amp,
         grad_accum_steps=config.schema.grad_accum_steps,

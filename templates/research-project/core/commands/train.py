@@ -17,6 +17,7 @@ ensure_core()
 
 from dlef.config import load_config  # noqa: E402
 from dlef.eval import EvalSpec  # noqa: E402
+from dlef.seed import seed_everything  # noqa: E402
 from core.config import ProjectConfig  # noqa: E402
 from core.data import make_loaders  # noqa: E402
 from core.runtime import (  # noqa: E402
@@ -67,6 +68,7 @@ def main() -> int:
         ProjectConfig,
         overrides=[overrides] if overrides else [],
     )
+    seed_everything(config.schema.seed)
     ddp = int(os.environ.get("WORLD_SIZE", "1")) > 1
     policy = build_policy(config.schema, ddp=ddp)
     policy.setup()

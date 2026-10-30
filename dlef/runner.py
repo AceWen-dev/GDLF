@@ -13,7 +13,6 @@ The default policy reproduces plain single-process training.
 from __future__ import annotations
 
 import json
-import random
 import traceback
 from pathlib import Path
 from typing import Any, Mapping
@@ -40,6 +39,7 @@ from .contracts import (
 from .eval import EvalRecord, EvalSpec, eval_spec_digest
 from .policy import NoOpTrainingPolicy, TrainingPolicy
 from .run import ArtifactStore, Run, RunStore, sha256_file, utc_now
+from .seed import capture_rng_state, restore_rng_state, seed_everything
 
 
 class Runner:
@@ -79,6 +79,10 @@ class Runner:
         early = schema.early_stopping
         policy = self.training_policy
         policy.setup()
+        # Safety net for direct Runner users. Entry points should call
+        # seed_everything before building data/task so parameter init is also
+        # reproducible; this call makes the training loop itself deterministic.
+        seed_everything(schema.seed)
 
         run: Run | None = None
         if policy.is_main_process:
@@ -393,11 +397,7 @@ class Runner:
             scheduler.load_state_dict(payload.scheduler)
         if payload.policy:
             self.training_policy.load_state_dict(payload.policy)
-        rng_state = payload.rng_state
-        if rng_state:
-            if isinstance(rng_state, list):
-                rng_state = (rng_state[0], tuple(rng_state[1]), rng_state[2])
-            random.setstate(rng_state)
+        restore_rng_state(payload.rng_state)
         return payload
 
     # ------------------------------------------------------------------
@@ -443,7 +443,7 @@ class Runner:
             model=task.get_model().state_dict(),
             optimizer=optimizer.state_dict(),
             scheduler=scheduler.state_dict() if scheduler is not None else None,
-            rng_state=random.getstate(),
+            rng_state=capture_rng_state(),
             epoch=epoch,
             step=step,
             manifest=run.manifest.to_dict(),

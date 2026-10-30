@@ -25,6 +25,7 @@ from adapters.torch import TorchCheckpointCodec  # noqa: E402
 from dlef.benchmark import BenchmarkSpec  # noqa: E402
 from dlef.config import load_config, resolve_config  # noqa: E402
 from dlef.eval import EvalSpec  # noqa: E402
+from dlef.seed import seed_everything  # noqa: E402
 from core.config import ProjectConfig  # noqa: E402
 from core.data import build_benchmark, make_loader  # noqa: E402
 from core.runtime import (  # noqa: E402
@@ -100,6 +101,7 @@ def main() -> int:
     if not train_experiment:
         train_experiment = config.schema.experiment
 
+    seed_everything(config.schema.seed)
     policy = build_policy(config.schema)
     policy.setup()
     device = policy.device

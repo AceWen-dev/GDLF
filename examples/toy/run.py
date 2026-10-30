@@ -21,6 +21,7 @@ from dlef.eval import EvalSpec  # noqa: E402
 from dlef.report import format_comparison, write_comparison  # noqa: E402
 from dlef.run import ArtifactStore, RunStore  # noqa: E402
 from dlef.runner import Runner  # noqa: E402
+from dlef.seed import seed_everything  # noqa: E402
 from examples.toy.components import ToyDataset  # noqa: E402
 from examples.toy.config import ToyConfig  # noqa: E402
 from examples.toy.task import ToyTask  # noqa: E402
@@ -49,6 +50,7 @@ def main() -> int:
                 "log_every": 20,
             },
         )
+        seed_everything(config.schema.seed)
         train_data = ToyDataset(
             n=config.schema.n_train,
             batch_size=config.schema.batch_size,

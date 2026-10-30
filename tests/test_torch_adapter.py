@@ -138,6 +138,10 @@ class TorchAdapterTests(unittest.TestCase):
             task2 = build_task(config.schema, device="cpu")
             optimizer2 = task2.configure_optimizer(task2.get_model())
             runner.load_checkpoint(run.checkpoint_path, task2, optimizer2)
+            payload = TorchCheckpointCodec().load(run.checkpoint_path)
+            self.assertIn("python", payload.rng_state)
+            self.assertIn("torch", payload.rng_state)
+            self.assertEqual(torch.get_rng_state().tolist(), payload.rng_state["torch"])
             for (name1, value1), (name2, value2) in zip(
                 task.get_model().state_dict().items(),
                 task2.get_model().state_dict().items(),

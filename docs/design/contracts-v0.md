@@ -370,6 +370,17 @@ class RunManifest:
 
 core 拥有 `Checkpoint` envelope；codec 拥有字节序列化。这样 core 不需要 import 任何张量库。
 
+`Checkpoint.rng_state` 是一个 JSON 可序列化的 snapshot：Python `random`、
+NumPy 全局 RNG、Torch CPU RNG，以及有 CUDA 时的每个 device RNG。库不存在时
+对应 key 省略；加载旧 checkpoint 时仍接受裸的 Python `random.getstate()`。
+写 checkpoint 用 `dlef.seed.capture_rng_state()`，加载用
+`dlef.seed.restore_rng_state()`。
+
+训练入口必须在构建 data/model 之前调用
+`dlef.seed.seed_everything(config.schema.seed)`；`Runner.fit` 在第一个 step
+前会再调用一次，作为直接使用 `Runner` 时的安全网。`Runner` 无法为已经构建
+好的模型参数补做种子，所以入口调用仍然必要。
+
 ### 4.3 Eval
 
 ```python
@@ -565,7 +576,8 @@ class Claim:
 5. **Loss**：`total` + 命名 `terms`；每个 term 都记录。
 6. **Metrics**：按 split 命名；eval 是独立 run。
 7. **Lineage**：claim → eval → checkpoint → run，逐级可追。
-8. **Resume**：checkpoint 包含 model / optimizer / scheduler / scaler / RNG / data position。
+8. **Resume**：checkpoint 包含 model / optimizer / scheduler / scaler /
+   Python/NumPy/Torch/CUDA RNG / data position。
 9. **Data**：只读；split 和 transform 版本化。
 10. **Tracker**：只是索引；RunStore 是 canonical。
 11. **Core purity**：core 无领域词；领域代码只在 adapter。

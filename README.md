@@ -39,6 +39,7 @@ dlef/
   benchmark.py     # test set + metric protocol -> benchmark id
   claim.py         # Claim / ClaimStore / TestAccessLog
   runner.py        # minimal train/eval loop
+  seed.py          # seed + capture/restore Python/NumPy/Torch RNG
   policy.py        # TrainingPolicy: AMP / accumulation / clipping / DDP seam
   checkpoint.py    # CheckpointCodec: JSON default, binary adapters
   sweep.py         # SweepSpec, trials, local GPU-aware queue
@@ -134,10 +135,14 @@ examples/toy/output/
 - The manifest is written before the first step; status is explicit.
 - Each run keeps `metrics.jsonl` plus a human-readable `logs/train.log`; sweep
   child stdout/stderr is captured in the sweep trial log.
+- `dlef.seed.seed_everything` seeds Python, NumPy and Torch (including CUDA)
+  when installed; entry points call it before building data/models, and the
+  Runner calls it again before training.
 - Loss terms are named and logged.
 - Eval is a separate record linked to a checkpoint digest.
 - `compare` reads eval records, not hand-copied numbers.
-- Checkpoints round-trip model/optimizer/RNG state.
+- Checkpoints round-trip model/optimizer/RNG state, including Python, NumPy,
+  Torch and CUDA RNGs when those libraries are present.
 - The Runner supports epoch-based or step-limited training (`epochs`, `max_steps`)
   and configurable early stopping on a validation metric.
 - Callbacks and step/epoch schedulers are lifecycle-tested.
@@ -294,6 +299,31 @@ CUDA_VISIBLE_DEVICES="" python -m torch.distributed.run \
 Multi-GPU: `torchrun --nproc_per_node=N examples/torch_regression/run.py`.
 Rank 0 writes the run, logs and checkpoint; other ranks train without writing.
 DDP evaluation and distributed checkpoint resume are v0 gaps.
+
+## Reproducibility / RNG
+
+The run seed is applied, not only recorded. Entry points call
+`seed_everything(config.schema.seed)` before constructing data and models:
+
+```python
+from dlef.seed import seed_everything
+
+config = load_config(...)
+seed_everything(config.schema.seed)
+train_loader, val_loader = make_loaders(...)
+task = build_task(...)
+runner.fit(task, train_loader, val_loader, config)
+```
+
+`Runner.fit` calls it again before the first step, so direct `Runner` users get
+deterministic training-time stochasticity even if they forget. To make model
+initialization reproducible, call it *before* `build_task`; the Runner cannot
+retroactively seed parameters that were already created.
+
+Checkpoints store `capture_rng_state()` and `Runner.load_checkpoint` restores it
+with `restore_rng_state()`. The snapshot includes Python, NumPy, Torch and CUDA
+RNGs when available; absent libraries are skipped. `deterministic=True` is
+available on `seed_everything` for cuDNN deterministic kernels.
 
 ## Project template
 

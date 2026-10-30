@@ -21,6 +21,7 @@ from dlef.config import resolve_config  # noqa: E402
 from dlef.eval import EvalSpec  # noqa: E402
 from dlef.run import ArtifactStore, RunStore  # noqa: E402
 from dlef.runner import Runner  # noqa: E402
+from dlef.seed import seed_everything  # noqa: E402
 from dlef.sweep import Choice, LocalSweep, SweepSpec, SweepStore, TrialResult  # noqa: E402
 from examples.toy.components import ToyDataset  # noqa: E402
 from examples.toy.config import ToyConfig  # noqa: E402
@@ -44,6 +45,7 @@ def make_trial_fn(run_store: RunStore, runner: Runner):
         raw.update(trial.params)
         raw["experiment"] = f"trial-{trial.index:02d}"
         config = resolve_config(ToyConfig, raw)
+        seed_everything(config.schema.seed)
         train_data = ToyDataset(
             config.schema.n_train,
             config.schema.batch_size,

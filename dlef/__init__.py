@@ -42,6 +42,7 @@ from .registry import Registry, RegistryError
 from .run import ArtifactStore, Run, RunManifest, RunStore
 from .eval import EvalRecord, EvalSpec, eval_spec_digest
 from .runner import Runner
+from .seed import capture_rng_state, restore_rng_state, seed_everything
 from .report import format_claim_report, format_comparison, write_claim_report, write_comparison
 from .launcher import Launcher, LocalLauncher
 from .sweep import (
@@ -120,6 +121,9 @@ __all__ = [
     "EvalSpec",
     "eval_spec_digest",
     "Runner",
+    "capture_rng_state",
+    "restore_rng_state",
+    "seed_everything",
     "format_claim_report",
     "format_comparison",
     "write_claim_report",

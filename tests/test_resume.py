@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from dlef.config import resolve_config
+from dlef.seed import capture_rng_state, restore_rng_state
 from dlef.run import ArtifactStore, RunStore
 from dlef.runner import Runner
 from examples.toy.components import ToyDataset
@@ -36,8 +37,41 @@ class ResumeTests(unittest.TestCase):
 
             self.assertEqual(task2.get_model().state_dict(), payload["model"])
             self.assertEqual(optimizer2.state_dict()["lr"], payload["optimizer"]["lr"])
-            rng_state = random.getstate()
-            self.assertEqual(list(rng_state[1]), payload["rng_state"][1])
+            rng_state = payload["rng_state"]
+            self.assertIn("python", rng_state)
+            self.assertEqual(list(random.getstate()[1]), rng_state["python"][1])
+
+            try:
+                import numpy as np
+            except ImportError:
+                pass
+            else:
+                self.assertIn("numpy", rng_state)
+                self.assertEqual(
+                    np.random.get_state()[1].tolist(), rng_state["numpy"]["keys"]
+                )
+
+            try:
+                import torch
+            except ImportError:
+                pass
+            else:
+                self.assertIn("torch", rng_state)
+                self.assertEqual(torch.get_rng_state().tolist(), rng_state["torch"])
+
+    def test_legacy_python_rng_state(self) -> None:
+        random.seed(99)
+        legacy = random.getstate()
+        restore_rng_state(legacy)
+        self.assertEqual(list(random.getstate()[1]), list(legacy[1]))
+
+    def test_capture_restore_python_rng(self) -> None:
+        random.seed(123)
+        state = capture_rng_state()
+        expected = [random.random() for _ in range(3)]
+        random.random()
+        restore_rng_state(state)
+        self.assertEqual([random.random() for _ in range(3)], expected)
 
 
 if __name__ == "__main__":

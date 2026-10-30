@@ -292,6 +292,11 @@ python core/commands/eval.py \
 
 val 用于模型选择。不要用 test 调参。
 
+`train.py` / `eval.py` 在构建数据和模型之前调用
+`dlef.seed.seed_everything(config.seed)`；checkpoint 同时保存 Python / NumPy /
+Torch / CUDA RNG。新增入口脚本时也要先 seed，再 `build_task`，否则模型初始化
+不可复现。
+
 如果训练中断，先看 `logs/train.log` 的 traceback 和 `manifest.json` 的 status；
 失败 run 也是记录，不要手工删。
 
