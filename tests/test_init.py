@@ -16,6 +16,7 @@ class InitTests(unittest.TestCase):
             self.assertTrue((dest / "PROJECT.yaml").is_file())
             self.assertTrue((dest / "STATE.md").is_file())
             self.assertTrue((dest / "DECISIONS.md").is_file())
+            self.assertFalse((dest / "TUTORIAL.md").exists())
             self.assertTrue((dest / "input" / "configs" / "base.yaml").is_file())
 
             project = (dest / "PROJECT.yaml").read_text(encoding="utf-8")

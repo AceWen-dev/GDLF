@@ -54,9 +54,9 @@ make test
   `make audit`、`make check`。然后让 agent 读 `AGENTS.md` 第 0 节：
   先出计划，不要先写代码。
 
-> **项目内版本**：复制完成后，项目根目录里会有一份 `TUTORIAL.md`
-> （来自 `templates/research-project/TUTORIAL.md`），后续步骤可以直接看它。
-> 这份 `docs/TUTORIAL.md` 是 DLEF 仓库的完整版，额外包含 examples / 框架改动 / FAQ。
+> **教程不随项目复制**：`dlef init` 不会把 `TUTORIAL.md` 写进项目；这份
+> `docs/TUTORIAL.md` 留在 DLEF 仓库，作为框架 runbook。项目应写自己的
+> `README.md` / `AGENTS.md` / runbook，而不是继承一份通用教程。
 
 ---
 
@@ -124,14 +124,15 @@ rsync -a \
   --exclude '__pycache__' --exclude '*.pyc' \
   --exclude 'output/runs' --exclude 'output/artifacts' \
   --exclude 'output/sweeps' --exclude 'output/test_access' \
+  --exclude 'TUTORIAL.md' \
   /path/to/DLEF/templates/research-project/ ~/dl-projects/demo/
 ```
 
 现在这个 `demo/` 就是你的项目。`core/` 是项目包名。项目根目录里还有
-`PROJECT.yaml`、`TUTORIAL.md`、`STATE.md`、`DECISIONS.md`（都随模板复制）：
+`PROJECT.yaml`、`STATE.md`、`DECISIONS.md`（随模板复制）；
 `PROJECT.yaml` 是稳定契约，`STATE.md` 是当前项目快照，
 `DECISIONS.md` 是 append-only 决策日志。先填 `PROJECT.yaml` / `STATE.md`，
-再开始真实实验。
+再开始真实实验。`TUTORIAL.md` 留在 DLEF 仓库，不复制。
 
 > **不要复制**：`dlef/`、`adapters/`、`examples/`、DLEF 根目录的 `tests/`、
 > `docs/`、`.git/`、`output/runs|artifacts|sweeps|test_access`。

@@ -1,6 +1,7 @@
-# 从零跑通这个 DLEF 项目（项目内教程）
+# 从零跑通一个 DLEF 项目（模板维护教程）
 
-这份文件随 `templates/research-project/` 一起复制，目的是让你在**项目目录内**完成：
+这份文件是 `templates/research-project/` 的维护教程；`dlef init` **不会**把它
+复制进项目。项目应写自己的 `README.md` / `AGENTS.md` / runbook。
 
 ```text
 装依赖 → 跑通模板 → 换成自己的数据/模型/loss/metric
@@ -311,7 +312,9 @@ output/runs/<project>/<experiment>/<run_id>/tensorboard/
 启动：
 
 ```bash
-tensorboard --logdir output/runs --port 6006
+make tensorboard
+# 等价于
+python -m tensorboard.main --logdir output/runs --port 6006
 # 浏览器打开 http://localhost:6006
 ```
 

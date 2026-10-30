@@ -7,8 +7,8 @@ This project was copied from `templates/research-project/`. The placeholder is s
 1-D regression. Replace/extend the component packages; keep `task.py` as the
 composition root.
 
-For the step-by-step runbook, read [`TUTORIAL.md`](TUTORIAL.md); this file is
-the contract.
+The framework runbook lives in `docs/TUTORIAL.md` in the DLEF checkout; it is
+not copied into the project. This file is the project contract.
 
 Project memory lives in [`STATE.md`](STATE.md) (current snapshot) and
 [`DECISIONS.md`](DECISIONS.md) (append-only decision log). Read both before
@@ -100,7 +100,7 @@ steps 1–4.
 4. `PROJECT.yaml` — stable brief: question, data contract, splits, benchmark,
    primary metric.
 5. `README.md` — project overview and commands.
-6. `TUTORIAL.md` — step-by-step runbook: install, smoke, train, eval, sweep.
+6. DLEF `docs/TUTORIAL.md` — framework runbook (not part of this project).
 7. `core/README.md` and `core/data/README.md` — source layout and data rules.
 8. `core/config.py` — typed schema and selectors.
 9. `core/task.py` — composition root (model → loss → optimizer → scheduler →
@@ -213,7 +213,6 @@ AGENTS.md                # project-local guide
 PROJECT.yaml             # stable project brief (what we are doing)
 STATE.md                 # current project snapshot (read + update)
 DECISIONS.md             # append-only decision log
-TUTORIAL.md              # step-by-step runbook
 README.md
 pyproject.toml
 Makefile

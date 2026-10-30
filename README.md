@@ -5,7 +5,7 @@ General deep learning experiment framework. The Python package is `dlef`.
 DLEF is domain-agnostic: it owns contracts, run records, evaluation, sweeps and
 reports; training stacks live in adapters.
 
-**Tutorial:** [`docs/TUTORIAL.md`](docs/TUTORIAL.md) (project-local: [`templates/research-project/TUTORIAL.md`](templates/research-project/TUTORIAL.md)). **Final report:** [`REPORT.md`](REPORT.md). **Agent guide:** [`AGENTS.md`](AGENTS.md).
+**Tutorial:** [`docs/TUTORIAL.md`](docs/TUTORIAL.md) (framework runbook; not copied into projects). **Final report:** [`REPORT.md`](REPORT.md). **Agent guide:** [`AGENTS.md`](AGENTS.md).
 
 **One-file bootstrap:** [`init_dlef.py`](init_dlef.py) — run `python init_dlef.py` on any machine with Python 3.10+.
 
@@ -348,10 +348,10 @@ make test
 Fill `PROJECT.yaml` / `STATE.md`, then run `make audit` and `make check` before
 the first real baseline. The copied project includes `AGENTS.md` (rules),
 `PROJECT.yaml` (brief), `STATE.md` (snapshot), `DECISIONS.md` (append-only log),
-`TUTORIAL.md` (runbook), a configurable `output_root`, and an optional
-TensorBoard mirror. `make check` fails while the project still uses the
-synthetic placeholder. See `templates/research-project/README.md` for the
-replace points and commands.
+a configurable `output_root`, and an optional TensorBoard mirror. The framework
+runbook stays in `docs/TUTORIAL.md` and is not copied into the project.
+`make check` fails while the project still uses the synthetic placeholder. See
+`templates/research-project/README.md` for the replace points and commands.
 
 ## Claims / report
 

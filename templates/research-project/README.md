@@ -6,8 +6,8 @@ vendor or copy the core.
 **Agent guide:** [`AGENTS.md`](AGENTS.md) — read this before editing, or before
 asking a coding agent to edit.
 
-**Tutorial:** [`TUTORIAL.md`](TUTORIAL.md) — copy → install → smoke → first
-claim, written for the project directory (it travels with the template).
+**Framework tutorial:** see `docs/TUTORIAL.md` in the DLEF checkout. It is not
+copied into the project; write a project-specific runbook when needed.
 
 **Project memory:** [`PROJECT.yaml`](PROJECT.yaml) is the stable brief;
 [`STATE.md`](STATE.md) is the current snapshot (read and update it);
@@ -36,7 +36,7 @@ Fallback (older core, or if you want a custom copy):
 ```bash
 mkdir -p ~/code/my-project
 git -C /path/to/DLEF archive HEAD templates/research-project \
-  | tar -x -C ~/code/my-project --strip-components=2
+  | tar -x -C ~/code/my-project --strip-components=2 --exclude=TUTORIAL.md
 cd ~/code/my-project
 git init
 pip install -e /path/to/DLEF
@@ -46,12 +46,13 @@ make test
 ```
 
 Then read [`AGENTS.md`](AGENTS.md), [`STATE.md`](STATE.md),
-[`DECISIONS.md`](DECISIONS.md), [`PROJECT.yaml`](PROJECT.yaml) and
-[`TUTORIAL.md`](TUTORIAL.md), or give them to your coding agent.
-`AGENTS.md` contains the framework orientation, the one-time init/verify steps,
-the placement matrix, and the "plan before code" protocol; `TUTORIAL.md` is the
-step-by-step runbook. Fill `PROJECT.yaml` and `STATE.md` with the real project
-question/data before the first real run; do not leave placeholders.
+[`DECISIONS.md`](DECISIONS.md) and [`PROJECT.yaml`](PROJECT.yaml), or give them
+to your coding agent. `AGENTS.md` contains the framework orientation, the
+one-time init/verify steps, the placement matrix, and the "plan before code"
+protocol. The framework runbook lives in the DLEF checkout
+(`docs/TUTORIAL.md`), not in the project. Fill `PROJECT.yaml` and `STATE.md`
+with the real project question/data before the first real run; do not leave
+placeholders.
 
 `dlef/` and `adapters/` are installed, not copied. Data bytes stay outside the
 repo under `$DLEF_DATA_ROOT`.
@@ -114,7 +115,6 @@ AGENTS.md                 # project-local agent guide
 PROJECT.yaml              # stable project brief (what we are doing)
 STATE.md                  # current project snapshot (read + update)
 DECISIONS.md              # append-only decision log
-TUTORIAL.md               # step-by-step runbook for this project
 README.md
 pyproject.toml
 Makefile
@@ -375,15 +375,17 @@ output/runs/<project>/<experiment>/<run_id>/tensorboard/
 Start TensorBoard:
 
 ```bash
-tensorboard --logdir output/runs --port 6006
+make tensorboard
+# equivalent to:
+python -m tensorboard.main --logdir output/runs --port 6006
 # open http://localhost:6006
 ```
 
 Remote machine:
 
 ```bash
-tensorboard --logdir output/runs --port 6006 --bind_all
-# on your laptop:
+make tensorboard TENSORBOARD_ARGS=--bind_all
+# or keep it local and tunnel from your laptop:
 ssh -L 6006:localhost:6006 user@host
 ```
 

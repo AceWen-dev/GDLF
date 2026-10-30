@@ -1,8 +1,10 @@
 PYTHON ?= python
 OUTPUT ?= $(if $(DLEF_OUTPUT_ROOT),$(DLEF_OUTPUT_ROOT),output)
 EXPERIMENT ?= baseline
+TENSORBOARD_PORT ?= 6006
+TENSORBOARD_ARGS ?=
 
-.PHONY: train eval inspect runs runs-all configs sweep report gc-dry check audit new-experiment new-benchmark status handoff test doctor
+.PHONY: train eval inspect runs runs-all configs sweep report gc-dry check audit new-experiment new-benchmark status handoff test doctor tensorboard
 
 train:
 	$(PYTHON) core/commands/train.py --config input/configs/base.yaml
@@ -20,6 +22,9 @@ runs:
 
 runs-all:
 	$(PYTHON) core/tools/runs.py --runs $(OUTPUT)/runs --all
+
+tensorboard:
+	$(PYTHON) -m tensorboard.main --logdir $(OUTPUT)/runs --port $(TENSORBOARD_PORT) $(TENSORBOARD_ARGS)
 
 configs:
 	$(PYTHON) core/tools/configs.py list

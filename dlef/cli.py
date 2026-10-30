@@ -110,6 +110,10 @@ def _ignore_generated(directory: str, names: list[str]) -> set[str]:
     for name in names:
         if name == "__pycache__" or name.endswith(".pyc"):
             ignored.add(name)
+        elif name == "TUTORIAL.md":
+            # The framework tutorial belongs to the DLEF checkout; a project
+            # should write its own runbook instead of inheriting this one.
+            ignored.add(name)
         elif Path(directory).name == "output" and name in {
             "runs",
             "artifacts",
