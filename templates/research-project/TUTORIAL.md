@@ -11,16 +11,40 @@
 项目契约在 [`PROJECT.yaml`](PROJECT.yaml)（稳定的 what），当前快照在
 [`STATE.md`](STATE.md)，历史在 [`DECISIONS.md`](DECISIONS.md)
 （append-only）；开工前读，收工前更新。
-如果你还没有项目目录，推荐：
+
+## 初始化一个新项目（5 步）
+
+把 `<...>` 换成你机器上的真实路径：
 
 ```bash
-pip install -e /path/to/DLEF
-dlef init ~/code/my-project --project my-project
+# 1. 安装 DLEF core（只做一次）
+pip install -e <DLEF_ROOT>
+
+# 2. 初始化项目
+dlef init <PROJECT_DIR> --project <PROJECT_ID>
+
+# 3. 安装项目
+cd <PROJECT_DIR>
+pip install -e .
+
+# 4. 指定数据根目录
+export DLEF_DATA_ROOT=<DATA_ROOT>
+
+# 5. 验证模板
+make test
 ```
 
+- `<DLEF_ROOT>`：DLEF 仓库目录，不是项目目录。
+- `<PROJECT_DIR>`：新项目目录，例如 `~/code/my-project`。
+- `<PROJECT_ID>`：项目 id，会出现在 `output/runs/<project>/...`。
+- `<DATA_ROOT>`：数据根目录，里面是 `raw/`、`curated/`、`splits/`，不是某个数据集文件夹。
+- 如果你已经在空的 `<PROJECT_DIR>` 里，用 `dlef init . --project <PROJECT_ID>`。
+- `make test` 只验证模板接线；真实实验前先填 `PROJECT.yaml`，再跑
+  `make audit` / `make check`。
+
 `dlef init` 只复制模板内容、`git init`、写入 project 元数据到
-`PROJECT.yaml` / `STATE.md` / `pyproject.toml` / `base.yaml`，不会替你填研究字段
-或决定研究问题。不要复制整个 DLEF 仓库。
+`PROJECT.yaml` / `STATE.md` / `pyproject.toml` / `base.yaml`，不会安装依赖，
+也不会替你填研究问题。不要复制整个 DLEF 仓库。
 
 ---
 

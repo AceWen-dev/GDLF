@@ -1,21 +1,39 @@
 # 从零跑通一个 DLEF 项目（手把手）
 
-这份教程只做一件事：**让你在自己的机器上，从复制模板到跑出第一个可追溯的实验结果**。
+这份教程只做一件事：**让你在自己的机器上，从初始化项目到跑出第一个可追溯的实验结果**。
 
 你不需要先读源码。
 
-> **TL;DR（给 coding agent）**
->
-> ```bash
-> pip install -e /path/to/DLEF
-> dlef init ~/code/my-project --project my-project
-> cd ~/code/my-project
-> pip install -e .
-> make test
-> ```
->
-> 填 `PROJECT.yaml` / `STATE.md`，跑 `make audit`、`make check`；
-> 然后让它读 `AGENTS.md` 第 0 节：先出计划，不要先写代码。
+## 初始化一个新项目（5 步速查）
+
+把 `<...>` 换成真实路径：
+
+```bash
+# 1. 安装 DLEF core（只做一次）
+pip install -e <DLEF_ROOT>
+
+# 2. 初始化项目
+dlef init <PROJECT_DIR> --project <PROJECT_ID>
+
+# 3. 安装项目
+cd <PROJECT_DIR>
+pip install -e .
+
+# 4. 指定数据根目录
+export DLEF_DATA_ROOT=<DATA_ROOT>
+
+# 5. 验证模板
+make test
+```
+
+- `<DLEF_ROOT>`：DLEF 仓库目录，例如 `/path/to/DLEF`。
+- `<PROJECT_DIR>`：新项目目录，例如 `~/code/my-project`。
+- `<PROJECT_ID>`：项目 id，会出现在 `output/runs/<project>/...`。
+- `<DATA_ROOT>`：数据根目录，里面是 `raw/`、`curated/`、`splits/`，不是某个数据集文件夹。
+- 已经在空的 `<PROJECT_DIR>` 里时，用 `dlef init . --project <PROJECT_ID>`。
+- `make test` 只验证模板；真实实验前填 `PROJECT.yaml`，再跑
+  `make audit`、`make check`。然后让 agent 读 `AGENTS.md` 第 0 节：
+  先出计划，不要先写代码。
 
 > **项目内版本**：复制完成后，项目根目录里会有一份 `TUTORIAL.md`
 > （来自 `templates/research-project/TUTORIAL.md`），后续步骤可以直接看它。
