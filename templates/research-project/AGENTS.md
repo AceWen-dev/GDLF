@@ -61,7 +61,8 @@ and `checkpoints/last.pt`.
 **First response = plan, not code.** Follow the reading order in §0.2, then
 state:
 
-0. what `STATE.md` currently says and which parts your plan will change;
+0. what `PROJECT.yaml` and `STATE.md` currently say, and which parts your
+   plan will change;
 1. the task and the comparison;
 2. where the data lives (`$DLEF_DATA_ROOT`), sample ids, label units;
 3. the train/val/test membership rules and the grouping that prevents leakage;
@@ -76,6 +77,9 @@ Do not write code until the plan is confirmed.
 
 ### 0.1 Project memory
 
+- `PROJECT.yaml` is the stable project brief: question, unit, data contract,
+  split policy, benchmark and primary metric. Fill it before real runs; if it
+  changes, record a `DECISIONS.md` entry.
 - `STATE.md` is the current snapshot: question, data, splits, benchmark,
   baseline, open questions, next actions. Read it before planning; update it at
   the end of every session. Replace stale values; do not turn it into a log.
@@ -88,21 +92,23 @@ Do not write code until the plan is confirmed.
 ### 0.2 Reading order
 
 Read in this order; stop when the task is covered. Do not start editing before
-steps 1–3.
+steps 1–4.
 
 1. `AGENTS.md` — this file: hard rules, placement, forbidden actions.
 2. `STATE.md` — current snapshot: what exists, what is frozen, what is next.
 3. `DECISIONS.md` — accepted/superseded decisions; do not re-litigate them.
-4. `README.md` — project overview and commands.
-5. `TUTORIAL.md` — step-by-step runbook: install, smoke, train, eval, sweep.
-6. `core/README.md` and `core/data/README.md` — source layout and data rules.
-7. `core/config.py` — typed schema and selectors.
-8. `core/task.py` — composition root (model → loss → optimizer → scheduler →
+4. `PROJECT.yaml` — stable brief: question, data contract, splits, benchmark,
+   primary metric.
+5. `README.md` — project overview and commands.
+6. `TUTORIAL.md` — step-by-step runbook: install, smoke, train, eval, sweep.
+7. `core/README.md` and `core/data/README.md` — source layout and data rules.
+8. `core/config.py` — typed schema and selectors.
+9. `core/task.py` — composition root (model → loss → optimizer → scheduler →
    metrics).
-9. `input/configs/base.yaml` — current configuration;
-   `input/benchmarks/README.md` and the frozen manifest if the task touches
-   test evaluation.
-10. Only then open the component files the task actually changes:
+10. `input/configs/base.yaml` — current configuration;
+    `input/benchmarks/README.md` and the frozen manifest if the task touches
+    test evaluation.
+11. Only then open the component files the task actually changes:
     `core/data/...`, `core/models/...`, `core/losses/...`, `core/metrics/...`,
     `core/commands/...`, or `core/tools/...`.
 
@@ -168,6 +174,8 @@ core/                     # layer 2: project source
     sweep.py             # subprocess grid/random sweep
   tools/
     benchmark.py         # freeze / verify a benchmark manifest
+    check.py             # initialization gate: brief + config + benchmark + memory
+    audit_data.py        # data / split / leakage first pass
     configs.py           # list / validate experiment configs
     runs.py              # experiment summary / run index (filters, --all, --json)
     run_info.py          # run card: config -> benchmark -> source files
@@ -182,6 +190,7 @@ core/                     # layer 2: project source
     test_paths.py
     test_runs_tool.py
     test_project_memory.py
+    test_check_tools.py
   README.md
 
 scripts/                 # project-specific scripts, intentionally unstructured
@@ -197,6 +206,7 @@ output/                   # layer 3: generated results (default output_root)
   README.md
 
 AGENTS.md                # project-local guide
+PROJECT.yaml             # stable project brief (what we are doing)
 STATE.md                 # current project snapshot (read + update)
 DECISIONS.md             # append-only decision log
 TUTORIAL.md              # step-by-step runbook
@@ -258,6 +268,8 @@ python core/tools/run_info.py --run <run_id>
 python core/tools/configs.py list
 python core/commands/sweep.py --config input/configs/base.yaml
 tensorboard --logdir output/runs --port 6006
+make audit                                  # data / split / leakage first pass
+make check                                  # initialization + config gate
 ```
 
 Or:
@@ -270,6 +282,8 @@ make runs
 make runs-all
 make configs
 make sweep
+make audit
+make check
 make test
 make report
 make gc-dry
@@ -472,7 +486,8 @@ claim        one reported number/table/figure
 
 Recommended order:
 
-0. Read `STATE.md` and `DECISIONS.md`; if STATE is stale, fix it first.
+0. Read `PROJECT.yaml`, `STATE.md` and `DECISIONS.md`; if STATE is stale, fix
+   it first. `make check` must pass before a real baseline.
 1. Write the baseline config.
 2. Replace `data/` + model/loss/metrics.
 3. Run the smoke test.
@@ -641,18 +656,19 @@ Do not edit the installed `dlef` package in place.
 1. Config validates; unknown keys fail.
 2. `DataSpec` exists; train/val/test membership materialized; one batch validated.
 3. Model/loss/metrics implement the contracts; loss terms named.
-4. Smoke test + benchmark identity test pass.
-5. Train produces manifest + resolved config + metrics + checkpoint.
-6. Test eval uses a frozen benchmark and produces an eval record bound to the
+4. `make audit` reviewed: sample ids, labels, split sizes, group overlap.
+5. Smoke test + benchmark identity test + `make check` pass.
+6. Train produces manifest + resolved config + metrics + checkpoint.
+7. Test eval uses a frozen benchmark and produces an eval record bound to the
    checkpoint digest + benchmark id.
-7. Sweep (if used) produces one run per trial and a sweep record.
-8. Claim (if reported) resolves to eval → checkpoint → run and names its
+8. Sweep (if used) produces one run per trial and a sweep record.
+9. Claim (if reported) resolves to eval → checkpoint → run and names its
    benchmark.
-9. `gc` dry-run shows only intended deletions.
-10. No project-specific changes in the installed core.
-11. `STATE.md` is current; `DECISIONS.md` has an entry for every
+10. `gc` dry-run shows only intended deletions.
+11. No project-specific changes in the installed core.
+12. `STATE.md` is current; `DECISIONS.md` has an entry for every
     hard-to-reverse choice.
-12. No secrets or absolute data paths in project memory.
+13. No secrets or absolute data paths in project memory.
 
 ---
 

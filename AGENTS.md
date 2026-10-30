@@ -14,19 +14,20 @@ retention and reports; training stacks live in adapters.
 
 Do **not** modify `dlef/` for project-specific needs.
 
-1. Copy `templates/research-project/` to the new project directory.
-2. `cd` into it and `git init`.
-3. Read `templates/research-project/AGENTS.md` — it is the project-local guide.
-4. Install core: `pip install -e /path/to/DLEF`.
-5. Install project: `pip install -e .`.
-6. Replace/extend the component packages:
+1. Initialize with `dlef init <project-dir> --project <name>` (copies the
+   template, runs `git init`, fills `PROJECT.yaml` / `STATE.md` / metadata).
+   Manual fallback: copy `templates/research-project/` and `git init`.
+2. Read `templates/research-project/AGENTS.md` — it is the project-local guide.
+3. Install core: `pip install -e /path/to/DLEF`.
+4. Install project: `pip install -e .`.
+5. Replace/extend the component packages:
    - `core/data/` (`datasets/`, `transforms/`, `splits.py`, `loaders.py`,
      `benchmark.py`)
    - `core/models/` + `models/build.py`
    - `core/losses/` + `losses/build.py`
    - `core/optimizers/`、`core/schedulers/`
    - `core/metrics/` + `metrics/build.py`
-7. Keep `core/task.py` as the composition root; keep
+6. Keep `core/task.py` as the composition root; keep
    `core/runtime.py`, `core/config.py` and `core/commands/` as the wiring
    unless the experiment genuinely needs a new seam.
 
@@ -517,6 +518,7 @@ A project task is done when:
 - `README.md` — quickstart and commands.
 - `templates/research-project/AGENTS.md` — project-local rules.
 - `templates/research-project/TUTORIAL.md` — project-local runbook (copied with the template).
+- `templates/research-project/PROJECT.yaml` — stable project brief template (question/data/split/benchmark).
 - `templates/research-project/STATE.md` — current-project snapshot template (read + update).
 - `templates/research-project/DECISIONS.md` — append-only decision log template.
 - `docs/design/contracts-v0.md` — contract map and invariants.

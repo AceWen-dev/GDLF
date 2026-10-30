@@ -6,6 +6,8 @@ experiment commands and not project-specific scripts.
 ```text
 core/tools/
   benchmark.py   # create / verify a frozen benchmark manifest
+  check.py       # initialization gate: brief + config + benchmark + memory
+  audit_data.py  # data/split/leakage first pass
   configs.py     # list / validate experiment configs
   runs.py        # experiment summary / run index (filters, --all, --json)
   run_info.py    # one run: config -> benchmark -> source files

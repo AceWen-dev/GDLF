@@ -9,13 +9,29 @@ asking a coding agent to edit.
 **Tutorial:** [`TUTORIAL.md`](TUTORIAL.md) — copy → install → smoke → first
 claim, written for the project directory (it travels with the template).
 
-**Project memory:** [`STATE.md`](STATE.md) is the current snapshot (read and
-update it); [`DECISIONS.md`](DECISIONS.md) is the append-only decision log.
+**Project memory:** [`PROJECT.yaml`](PROJECT.yaml) is the stable brief;
+[`STATE.md`](STATE.md) is the current snapshot (read and update it);
+[`DECISIONS.md`](DECISIONS.md) is the append-only decision log.
 
 ## Start a new project
 
-Copy **only this directory's contents** into a new project root; do not copy
-the DLEF repository. From the DLEF repo:
+Install the core once, then let `dlef init` copy the template and fill metadata:
+
+```bash
+pip install -e /path/to/DLEF
+dlef init ~/code/my-project --project my-project
+cd ~/code/my-project
+pip install -e .               # this project
+export DLEF_DATA_ROOT=/path/to/data
+make test
+```
+
+`dlef init` copies only the template contents, runs `git init`, and writes
+project metadata into `PROJECT.yaml`, `STATE.md`, `pyproject.toml` and
+`base.yaml`. It does not install packages or fill the research fields
+(question/data/split/benchmark/metric).
+
+Fallback (older core, or if you want a custom copy):
 
 ```bash
 mkdir -p ~/code/my-project
@@ -23,19 +39,19 @@ git -C /path/to/DLEF archive HEAD templates/research-project \
   | tar -x -C ~/code/my-project --strip-components=2
 cd ~/code/my-project
 git init
-pip install -e /path/to/DLEF   # dlef + adapters
-pip install -e .               # this project
+pip install -e /path/to/DLEF
+pip install -e .
 export DLEF_DATA_ROOT=/path/to/data
 make test
 ```
 
 Then read [`AGENTS.md`](AGENTS.md), [`STATE.md`](STATE.md),
-[`DECISIONS.md`](DECISIONS.md) and [`TUTORIAL.md`](TUTORIAL.md), or give them
-to your coding agent. `AGENTS.md` contains the framework orientation, the
-one-time init/verify steps, the placement matrix, and the "plan before code"
-protocol; `TUTORIAL.md` is the step-by-step runbook. Fill `STATE.md` with the
-real project question/data before the first real run; do not leave the
-placeholder.
+[`DECISIONS.md`](DECISIONS.md), [`PROJECT.yaml`](PROJECT.yaml) and
+[`TUTORIAL.md`](TUTORIAL.md), or give them to your coding agent.
+`AGENTS.md` contains the framework orientation, the one-time init/verify steps,
+the placement matrix, and the "plan before code" protocol; `TUTORIAL.md` is the
+step-by-step runbook. Fill `PROJECT.yaml` and `STATE.md` with the real project
+question/data before the first real run; do not leave placeholders.
 
 `dlef/` and `adapters/` are installed, not copied. Data bytes stay outside the
 repo under `$DLEF_DATA_ROOT`.
@@ -95,6 +111,7 @@ output/                   # layer 3: generated results
   README.md
 
 AGENTS.md                 # project-local agent guide
+PROJECT.yaml              # stable project brief (what we are doing)
 STATE.md                  # current project snapshot (read + update)
 DECISIONS.md              # append-only decision log
 TUTORIAL.md               # step-by-step runbook for this project
@@ -261,13 +278,16 @@ python core/tools/runs.py --experiment <name>
 python core/tools/run_info.py --run <run_id>
 python core/tools/configs.py list
 python core/commands/sweep.py --config input/configs/base.yaml
+make audit                                  # data / split / leakage first pass
+make check                                  # initialization + config gate
 python -m unittest discover -s core/tests -v
 python -m dlef.cli report --runs output/runs --claims output/claims --out output/reports/report.md
 tensorboard --logdir output/runs --port 6006
 ```
 
 Or `make train`, `make runs`, `make runs-all`, `make configs`, `make sweep`,
-`make report`, `make gc-dry`, `make test`, `make doctor`.
+`make report`, `make gc-dry`, `make audit`, `make check`, `make test`,
+`make doctor`.
 `OUTPUT=<path>` overrides the output root for the tools (`make runs OUTPUT=...`).
 `make eval CHECKPOINT=...` needs the checkpoint path explicitly;
 `make inspect RUN=<run_id>` prints the run card. `make gc-dry` is a dry-run;
@@ -375,6 +395,26 @@ TensorBoard is a **mirror**, not the record: `manifest.json`,
 `config.resolved.json`, `metrics.jsonl` and `logs/train.log` remain the source
 of truth. Set `tensorboard.enabled: false` to disable it, or change `subdir` if
 you do not want `tensorboard/` inside each run.
+
+## Project brief, audit and check
+
+`PROJECT.yaml` is the stable brief: question, unit, data contract, splits,
+benchmark, primary metric, success criterion. Fill it before a real baseline.
+If it changes, append a `DECISIONS.md` entry.
+
+```bash
+make audit    # data/split/leakage first pass
+make check    # brief + config + benchmark + STATE/DECISIONS + tests
+```
+
+`make audit` is generic: it reports split sizes, numeric stats, NaNs/infs,
+duplicate sample ids and group overlap when the batches expose the keys named
+in `PROJECT.yaml`. If `sample_id` / `group_by` are missing it warns; add those
+keys or audit the membership manifest manually.
+
+`make check` is intentionally stricter than `make test`: it fails while
+`PROJECT.yaml`, the config or the benchmark still contain template placeholders.
+The template's tests pass before initialization; `make check` should not.
 
 ## Inspect a run
 

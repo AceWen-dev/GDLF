@@ -42,7 +42,7 @@ dlef/
   sweep.py         # SweepSpec, trials, local GPU-aware queue
   retention.py     # reference-checked retention / gc
   report.py        # comparison table from eval records
-  cli.py           # doctor / compare / gc
+  cli.py           # init / doctor / compare / gc
   launcher.py      # local launcher stub
 adapters/torch/    # optional PyTorch adapter (not imported by core)
 examples/toy/      # synthetic linear regression; proves the chain
@@ -259,28 +259,28 @@ DDP evaluation and distributed checkpoint resume are v0 gaps.
 
 ## Project template
 
-`templates/research-project/` is the copyable skeleton. Copy **only its contents**; do
-not copy the DLEF repository. It imports `dlef`; it does not vendor the core.
-The project is organized into three layers: `input/` (configs and benchmarks),
-`core/` (project source), and `output/` (runs, claims, reports).
+`templates/research-project/` is the copyable skeleton. Use `dlef init` to copy
+**only its contents**; do not copy the DLEF repository. It imports `dlef`; it
+does not vendor the core. The project is organized into three layers: `input/`
+(configs and benchmarks), `core/` (project source), and `output/` (runs,
+claims, reports).
 
 ```bash
-mkdir -p ~/my-experiment
-git -C /path/to/DLEF archive HEAD templates/research-project \
-  | tar -x -C ~/my-experiment --strip-components=2
-cd ~/my-experiment
-git init
 pip install -e /path/to/DLEF
+dlef init ~/my-experiment --project my-experiment
+cd ~/my-experiment
 pip install -e .
+export DLEF_DATA_ROOT=/path/to/data
 make test
 ```
 
-The copied project includes `AGENTS.md` (rules), `STATE.md` (current snapshot),
-`DECISIONS.md` (append-only decision log), `TUTORIAL.md` (runbook), a
-configurable `output_root`, and an optional TensorBoard mirror.
-See `templates/research-project/README.md` for the replace points and commands.
-The template contains a synthetic placeholder; replace the data/model/loss/metrics
-modules with your own.
+Fill `PROJECT.yaml` / `STATE.md`, then run `make audit` and `make check` before
+the first real baseline. The copied project includes `AGENTS.md` (rules),
+`PROJECT.yaml` (brief), `STATE.md` (snapshot), `DECISIONS.md` (append-only log),
+`TUTORIAL.md` (runbook), a configurable `output_root`, and an optional
+TensorBoard mirror. `make check` fails while the project still uses the
+synthetic placeholder. See `templates/research-project/README.md` for the
+replace points and commands.
 
 ## Claims / report
 

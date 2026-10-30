@@ -1,4 +1,4 @@
-"""Tiny CLI: ``doctor``, ``compare``, and ``gc``.
+"""Tiny CLI: ``init``, ``doctor``, ``compare``, ``gc``.
 
 Training is project-specific by design; a project provides a thin entry point
 that builds its Task/Dataset and calls Runner.fit.
@@ -10,13 +10,15 @@ import argparse
 import json
 import platform
 import shutil
+import subprocess
+from datetime import date
 from pathlib import Path
 
 from .claim import ClaimStore
 from .eval import EvalRecord
 from .report import format_claim_report, format_comparison
 from .retention import RetentionPolicy, RetentionService
-from .run import RunStore
+from .run import RunStore, git_version
 from .sweep import SweepStore
 
 
@@ -25,6 +27,13 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("doctor", help="check the local environment")
+
+    init = sub.add_parser("init", help="create a new project from the template")
+    init.add_argument("path", help="destination project directory")
+    init.add_argument("--project", default=None, help="project id (default: dest name)")
+    init.add_argument("--template", default=None, help="template directory")
+    init.add_argument("--force", action="store_true", help="write into a non-empty directory")
+    init.add_argument("--no-git", action="store_true", help="skip git init")
 
     compare = sub.add_parser("compare", help="print a comparison table from eval records")
     compare.add_argument("paths", nargs="+", help="eval JSON files or run directories")
@@ -52,6 +61,8 @@ def main(argv: list[str] | None = None) -> int:
     gc.add_argument("--apply", action="store_true", help="actually delete; default is dry-run")
 
     args = parser.parse_args(argv)
+    if args.command == "init":
+        return init_command(args)
     if args.command == "doctor":
         return doctor()
     if args.command == "compare":
@@ -61,6 +72,125 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "gc":
         return gc_command(args)
     return 2
+
+
+def _default_template() -> Path:
+    root = Path(__file__).resolve().parents[1]
+    candidate = root / "templates" / "research-project"
+    if not candidate.is_dir():
+        raise SystemExit(
+            "template not found; pass --template /path/to/DLEF/templates/research-project"
+        )
+    return candidate
+
+
+def _ignore_generated(directory: str, names: list[str]) -> set[str]:
+    ignored: set[str] = set()
+    for name in names:
+        if name == "__pycache__" or name.endswith(".pyc"):
+            ignored.add(name)
+        elif Path(directory).name == "output" and name in {
+            "runs",
+            "artifacts",
+            "sweeps",
+            "test_access",
+        }:
+            ignored.add(name)
+    return ignored
+
+
+def _replace(path: Path, old: str, new: str) -> None:
+    if not path.is_file():
+        return
+    text = path.read_text(encoding="utf-8")
+    if old in text:
+        path.write_text(text.replace(old, new), encoding="utf-8")
+
+
+def _slug(text: str) -> str:
+    slug = "".join(ch.lower() if ch.isalnum() else "-" for ch in text).strip("-")
+    return slug or "project"
+
+
+def init_command(args: argparse.Namespace) -> int:
+    dest = Path(args.path).expanduser()
+    template = (
+        Path(args.template).expanduser() if args.template else _default_template()
+    )
+    if not template.is_dir():
+        print(f"template not found: {template}")
+        return 2
+    if dest.exists() and not dest.is_dir():
+        print(f"destination is not a directory: {dest}")
+        return 2
+    if dest.exists() and any(dest.iterdir()) and not args.force:
+        print(f"destination is not empty: {dest}; pass --force to overwrite")
+        return 2
+
+    project = (args.project or dest.name).strip()
+    if not project:
+        print("project id must not be empty")
+        return 2
+    if (
+        project in {".", ".."}
+        or "/" in project
+        or "\\" in project
+        or '"' in project
+        or "\n" in project
+    ):
+        print("project id may not contain '/', '\\', '\"', or newlines")
+        return 2
+
+    shutil.copytree(
+        template,
+        dest,
+        dirs_exist_ok=True,
+        ignore=_ignore_generated,
+    )
+    today = date.today().isoformat()
+    dlef_root = Path(__file__).resolve().parents[1]
+    dlef_ref = git_version(dlef_root)
+
+    _replace(dest / "PROJECT.yaml", 'project: "<project-id>"', f'project: "{project}"')
+    _replace(dest / "PROJECT.yaml", 'created: "YYYY-MM-DD"', f'created: "{today}"')
+    _replace(dest / "PROJECT.yaml", 'dlef_commit: "<sha>"', f'dlef_commit: "{dlef_ref}"')
+    _replace(dest / "STATE.md", "project: <project-id>", f'project: "{project}"')
+    _replace(dest / "STATE.md", "updated: YYYY-MM-DD", f'updated: "{today}"')
+    _replace(dest / "DECISIONS.md", "<YYYY-MM-DD>", today)
+    _replace(
+        dest / "pyproject.toml",
+        'name = "dlef-project"',
+        f'name = "{_slug(project)}"',
+    )
+    _replace(dest / "input" / "configs" / "base.yaml", "project: my-project", f"project: {project}")
+
+    git_status = "skipped"
+    if not args.no_git:
+        try:
+            subprocess.run(
+                ["git", "init"],
+                cwd=dest,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            git_status = "initialized"
+        except (OSError, subprocess.CalledProcessError) as exc:
+            git_status = f"failed ({exc})"
+
+    print(f"project: {dest.resolve()}")
+    print(f"template: {template}")
+    print(f"project id: {project}")
+    print(f"git: {git_status}")
+    print(f"dlef: {dlef_ref}")
+    print()
+    print("next:")
+    print(f"  pip install -e {dlef_root}")
+    print(f"  cd {dest} && pip install -e .")
+    print("  edit PROJECT.yaml, STATE.md and DECISIONS.md")
+    print("  make audit")
+    print("  make check")
+    return 0
 
 
 def doctor() -> int:

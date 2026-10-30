@@ -20,6 +20,8 @@ benchmark: "-"          # benchmark id
 
 ## 1. Question and scope
 
+<!-- Mirror PROJECT.yaml. A semantic change here needs a DECISIONS.md entry. -->
+
 - Research question:
 - Unit of analysis:
 - Input:

@@ -15,7 +15,7 @@
 - 支持 **retention / gc**：默认 dry-run，引用检查、血缘保护、artifact TTL。
 - 支持 **Claim / Markdown report**：报告里的数字可以反向解析到 eval record；test split 按 `test_set_id` 计数，重复访问标 `WARN`；跨 benchmark 标为不可比。
 - 项目模板 `templates/research-project/` 可以直接复制，**依赖 core 包，不复制 core**。
-- 测试：主套件 **59 个**；模板 smoke **21 个**（torch 环境全过）。
+- 测试：主套件 **61 个**；模板 smoke **23 个**（torch 环境全过）。
 - 真实跑通：CUDA AMP、2 进程 CPU DDP、subprocess sweep、模板 train/eval/sweep。
 
 ---
@@ -206,21 +206,20 @@ python -m dlef.cli report --runs output/runs --claims output/claims --out output
 ### 6.1 从模板开始
 
 ```bash
-mkdir -p ~/my-experiment
-git -C /path/to/DLEF archive HEAD templates/research-project \
-  | tar -x -C ~/my-experiment --strip-components=2
-cd ~/my-experiment
-git init
 pip install -e /path/to/DLEF
+dlef init ~/my-experiment --project my-experiment
+cd ~/my-experiment
 pip install -e .
+export DLEF_DATA_ROOT=/path/to/data
 make test
-python core/commands/train.py --config input/configs/base.yaml
 ```
 
 模板按三层组织：`input/`（配置 + benchmark）、`core/`（项目源码）、`output/`
-（run / claim / report）。项目根目录还有 `AGENTS.md`、`STATE.md`、
-`DECISIONS.md`、`TUTORIAL.md`：`STATE.md` 是当前快照，`DECISIONS.md` 是
-append-only 决策日志。只复制模板内容，不要复制整个 DLEF 仓库。
+（run / claim / report）。项目根目录还有 `AGENTS.md`、`PROJECT.yaml`、
+`STATE.md`、`DECISIONS.md`、`TUTORIAL.md`：`PROJECT.yaml` 是稳定契约，
+`STATE.md` 是当前快照，`DECISIONS.md` 是 append-only 决策日志。
+填完 brief 后先跑 `make audit` + `make check`；`make check` 在
+`PROJECT.yaml` / config / benchmark 还有占位符时会失败，这是初始化门禁。
 
 配置按 **variant** 组织，不按 run/seed：
 

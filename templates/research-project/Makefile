@@ -1,7 +1,7 @@
 PYTHON ?= python
 OUTPUT ?= $(if $(DLEF_OUTPUT_ROOT),$(DLEF_OUTPUT_ROOT),output)
 
-.PHONY: train eval inspect runs runs-all configs sweep report gc-dry test doctor
+.PHONY: train eval inspect runs runs-all configs sweep report gc-dry check audit test doctor
 
 train:
 	$(PYTHON) core/commands/train.py --config input/configs/base.yaml
@@ -32,6 +32,13 @@ report:
 # Change --metric-key to this project's primary metric before relying on it.
 gc-dry:
 	$(PYTHON) -m dlef.cli gc --runs $(OUTPUT)/runs --sweeps $(OUTPUT)/sweeps --keep-last 3 --keep-best 1 --metric-key mae --keep-tag reported --keep-tag baseline --artifact-ttl-days 30 --sweep-ttl-days 30
+
+check:
+	$(PYTHON) core/tools/check.py --project PROJECT.yaml --config input/configs/base.yaml
+	$(PYTHON) -m unittest discover -s core/tests -v
+
+audit:
+	$(PYTHON) core/tools/audit_data.py --config input/configs/base.yaml --project PROJECT.yaml
 
 test:
 	$(PYTHON) -m unittest discover -s core/tests -v

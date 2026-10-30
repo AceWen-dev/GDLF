@@ -52,7 +52,7 @@ IDs are sequential (`D-0001`, `D-0002`, ...) and are never reused.
 - Alternatives: an ad-hoc training repo; copying `dlef/` into the project.
 - Consequences: every run has a manifest/config/checkpoint; test evaluation
   requires a frozen benchmark; project code stays in `core/`.
-- Evidence: `AGENTS.md`, `TUTORIAL.md`
+- Evidence: `AGENTS.md`, `PROJECT.yaml`, `TUTORIAL.md`
 - Owner: <name>
 
 ### D-0002 — Synthetic regression is smoke-only

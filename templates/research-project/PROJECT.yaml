@@ -1,0 +1,41 @@
+# PROJECT.yaml — stable project brief
+#
+# Fill every field before `make check` can pass. `dlef init` fills
+# project/created/dlef_commit; the research decisions are yours.
+#
+# PROJECT.yaml is the stable "what are we doing" contract.
+# STATE.md is the current snapshot ("where are we now").
+# DECISIONS.md is the append-only history ("why did we change").
+
+project: "<project-id>"
+question: "<one sentence: what question does this project answer?>"
+unit: "<sample | case | patient | video>"
+input: "<what the model sees>"
+output: "<what the model predicts>"
+primary_metric: "<metric name from config.metrics>"
+success: "<quantitative success criterion>"
+non_goals:
+  - "<what this project does not try to do>"
+
+data:
+  root: "<relative path under DLEF_DATA_ROOT>"
+  name: "<data.name in base.yaml>"
+  version: "<data.version in base.yaml>"
+  sample_id: "<batch key for a unique sample id>"
+  labels: "<batch key for the label/target>"
+  units: "<label unit>"
+
+splits:
+  train: "<membership rule>"
+  val: "<membership rule>"
+  test: "<membership rule>"
+  group_by: "<case | patient | none>"
+  test_frozen: true
+
+benchmark:
+  name: "<benchmark name>"
+  label_version: "<label version>"
+  metric_protocol: "<aggregation / thresholds / evaluator version>"
+
+created: "YYYY-MM-DD"
+dlef_commit: "<sha>"

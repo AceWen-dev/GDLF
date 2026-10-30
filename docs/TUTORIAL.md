@@ -7,14 +7,14 @@
 > **TL;DR（给 coding agent）**
 >
 > ```bash
-> mkdir -p ~/code/my-project
-> git -C /path/to/DLEF archive HEAD templates/research-project \
->   | tar -x -C ~/code/my-project --strip-components=2
-> cd ~/code/my-project && git init
-> pip install -e /path/to/DLEF && pip install -e .
+> pip install -e /path/to/DLEF
+> dlef init ~/code/my-project --project my-project
+> cd ~/code/my-project
+> pip install -e .
 > make test
 > ```
 >
+> 填 `PROJECT.yaml` / `STATE.md`，跑 `make audit`、`make check`；
 > 然后让它读 `AGENTS.md` 第 0 节：先出计划，不要先写代码。
 
 > **项目内版本**：复制完成后，项目根目录里会有一份 `TUTORIAL.md`
@@ -55,12 +55,21 @@ pip install -U pip
 
 ---
 
-## 2. 复制模板
+## 2. 初始化项目
 
-只复制 `templates/research-project/` 的**内容**，不要复制整个 DLEF 仓库。`dlef/` 和
-`adapters/` 是安装进来的依赖，不是项目文件。
+只复制 `templates/research-project/` 的**内容**，不要复制整个 DLEF 仓库。
+`dlef/` 和 `adapters/` 是安装进来的依赖，不是项目文件。
 
-从 DLEF 仓库精确复制（不含 `output/` 里的旧 run、`__pycache__`）：
+推荐用 `dlef init`（复制 + `git init` + 写入 project 元数据到
+`PROJECT.yaml` / `STATE.md` / `pyproject.toml` / `base.yaml`；研究字段仍要你填）：
+
+```bash
+pip install -e /path/to/DLEF
+dlef init ~/dl-projects/demo --project demo
+cd ~/dl-projects/demo
+```
+
+如果 core 较旧、或你想自己控制复制，使用 `git archive` 回退：
 
 ```bash
 mkdir -p ~/dl-projects/demo
@@ -82,9 +91,10 @@ rsync -a \
 ```
 
 现在这个 `demo/` 就是你的项目。`core/` 是项目包名。项目根目录里还有
-`TUTORIAL.md`、`STATE.md`、`DECISIONS.md`（都随模板复制）：
-`STATE.md` 是当前项目快照，`DECISIONS.md` 是 append-only 决策日志。
-先填 `STATE.md`，再开始真实实验。
+`PROJECT.yaml`、`TUTORIAL.md`、`STATE.md`、`DECISIONS.md`（都随模板复制）：
+`PROJECT.yaml` 是稳定契约，`STATE.md` 是当前项目快照，
+`DECISIONS.md` 是 append-only 决策日志。先填 `PROJECT.yaml` / `STATE.md`，
+再开始真实实验。
 
 > **不要复制**：`dlef/`、`adapters/`、`examples/`、DLEF 根目录的 `tests/`、
 > `docs/`、`.git/`、`output/runs|artifacts|sweeps|test_access`。
@@ -107,20 +117,32 @@ python -c "import dlef, torch; print('ok')"
 
 `dlef` 是框架 core；`core` 是你的项目包。
 
+填完 `PROJECT.yaml` / `STATE.md` 后，先跑初始化和数据门禁：
+
+```bash
+make audit    # 数据量、标签、NaN、重复 id、split/group overlap
+make check    # brief + config + benchmark + STATE/DECISIONS + tests
+```
+
+`make check` 在 `PROJECT.yaml` / config / benchmark 还有占位符时会失败；
+它不过，不要开始真实 baseline。
+
 ### 让 coding agent 接手
 
 环境装好之后（模板 smoke 见下一节），把项目目录交给 agent，第一段话可以只有：
 
 ```text
-读 AGENTS.md、STATE.md、DECISIONS.md，按 AGENTS.md 的 0. Start here 执行。
+读 AGENTS.md、PROJECT.yaml、STATE.md、DECISIONS.md，按 AGENTS.md 的 0. Start here 执行。
 先给我计划，不要先写代码：
 任务 / 数据 / split / benchmark / metric / 要改的文件 / smoke test。
-我确认后再实现；结束时更新 STATE.md，硬决策追加到 DECISIONS.md。
+我确认后再实现；先让 make audit / make check 过，结束时更新 STATE.md，
+硬决策追加到 DECISIONS.md。
 ```
 
 `AGENTS.md` 已经写了框架是什么、三层结构、文件放置、配置规则、
-run/eval/claim 生命周期和禁止事项；`STATE.md` 是当前快照，
-`DECISIONS.md` 是不可改写的决策日志。agent 不需要你再解释 DLEF。
+run/eval/claim 生命周期和禁止事项；`PROJECT.yaml` 是稳定契约，
+`STATE.md` 是当前快照，`DECISIONS.md` 是不可改写的决策日志。
+agent 不需要你再解释 DLEF。
 如果它问“这个框架怎么用”，让它重新读 `AGENTS.md` 第 0 节。
 
 ---
@@ -755,6 +777,10 @@ make runs
 make runs-all
 python core/tools/runs.py --experiment baseline
 python core/tools/run_info.py --run <run_id>
+
+# 初始化门禁 / 数据审计
+make check
+make audit
 
 # TensorBoard
 tensorboard --logdir output/runs --port 6006
