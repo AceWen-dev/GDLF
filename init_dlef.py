@@ -6,7 +6,7 @@ Use it on any machine with Python 3.10+:
     python init_dlef.py
     python init_dlef.py ~/code/my-project --project my-project
     python init_dlef.py ~/code/my-project --source /path/to/DLEF
-    python init_dlef.py ~/code/my-project --repo git@github.com:AceWen-dev/GDLF.git
+    python init_dlef.py ~/code/my-project --repo git+ssh://git@github.com/AceWen-dev/GDLF.git
 
 It installs the `dlef` core if needed, then runs `dlef init`. It does not
 install torch/tensorboard unless you pass --install-project.
@@ -69,6 +69,9 @@ def install_dlef(source: Path | None, repo: str, ref: str) -> int:
     pip = [sys.executable, "-m", "pip", "install"]
     if source is not None:
         return run([*pip, "-e", str(source)])
+    if repo.startswith("git@"):
+        host, path = repo.split(":", 1)
+        repo = f"git+ssh://{host}/{path}"
     spec = repo if repo.startswith("git+") else f"git+{repo}"
     if ref:
         spec = f"{spec}@{ref}"
