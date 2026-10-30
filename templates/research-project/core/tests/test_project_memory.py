@@ -18,6 +18,8 @@ class ProjectMemoryTests(unittest.TestCase):
         text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn("STATE.md", text)
         self.assertIn("DECISIONS.md", text)
+        self.assertIn("Reading order", text)
+        self.assertIn("0.2", text)
 
 
 if __name__ == "__main__":

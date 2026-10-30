@@ -58,10 +58,8 @@ Success means `output/runs/<project>/smoke/<run_id>/` contains
 `manifest.json`, `config.resolved.json`, `metrics.jsonl`, `logs/train.log`
 and `checkpoints/last.pt`.
 
-**First response = plan, not code.** Read this file, `STATE.md`,
-`DECISIONS.md`, `TUTORIAL.md`, `README.md`, `core/README.md`,
-`core/data/README.md`, `core/config.py`, `core/task.py` and
-`input/configs/base.yaml`. Then state:
+**First response = plan, not code.** Follow the reading order in §0.2, then
+state:
 
 0. what `STATE.md` currently says and which parts your plan will change;
 1. the task and the comparison;
@@ -86,6 +84,36 @@ Do not write code until the plan is confirmed.
   one `superseded by D-000X`.
 - If `STATE.md` and the RunStore disagree, the RunStore wins; fix STATE.
 - Do not report a number that is not backed by an eval/run id.
+
+### 0.2 Reading order
+
+Read in this order; stop when the task is covered. Do not start editing before
+steps 1–3.
+
+1. `AGENTS.md` — this file: hard rules, placement, forbidden actions.
+2. `STATE.md` — current snapshot: what exists, what is frozen, what is next.
+3. `DECISIONS.md` — accepted/superseded decisions; do not re-litigate them.
+4. `README.md` — project overview and commands.
+5. `TUTORIAL.md` — step-by-step runbook: install, smoke, train, eval, sweep.
+6. `core/README.md` and `core/data/README.md` — source layout and data rules.
+7. `core/config.py` — typed schema and selectors.
+8. `core/task.py` — composition root (model → loss → optimizer → scheduler →
+   metrics).
+9. `input/configs/base.yaml` — current configuration;
+   `input/benchmarks/README.md` and the frozen manifest if the task touches
+   test evaluation.
+10. Only then open the component files the task actually changes:
+    `core/data/...`, `core/models/...`, `core/losses/...`, `core/metrics/...`,
+    `core/commands/...`, or `core/tools/...`.
+
+As needed, not upfront:
+
+- `input/configs/README.md` — variant/sweep layout;
+- `core/tools/README.md` — maintenance utilities;
+- `core/commands/train.py` / `eval.py` / `sweep.py` — entry wiring;
+- `core/tests/` — the contract tests you must keep green.
+
+If a referenced file is missing, report it; do not invent framework behavior.
 
 ---
 
