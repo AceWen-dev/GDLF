@@ -15,7 +15,7 @@
 - 支持 **retention / gc**：默认 dry-run，引用检查、血缘保护、artifact TTL。
 - 支持 **Claim / Markdown report**：报告里的数字可以反向解析到 eval record；test split 按 `test_set_id` 计数，重复访问标 `WARN`；跨 benchmark 标为不可比。
 - 项目模板 `templates/research-project/` 可以直接复制，**依赖 core 包，不复制 core**。
-- 测试：主套件 **48 个**（无 torch 环境 4 个 skip；torch 环境全过）；模板 smoke **1 个**。
+- 测试：主套件 **59 个**；模板 smoke **21 个**（torch 环境全过）。
 - 真实跑通：CUDA AMP、2 进程 CPU DDP、subprocess sweep、模板 train/eval/sweep。
 
 ---
@@ -218,7 +218,9 @@ python core/commands/train.py --config input/configs/base.yaml
 ```
 
 模板按三层组织：`input/`（配置 + benchmark）、`core/`（项目源码）、`output/`
-（run / claim / report）。只复制模板内容，不要复制整个 DLEF 仓库。
+（run / claim / report）。项目根目录还有 `AGENTS.md`、`STATE.md`、
+`DECISIONS.md`、`TUTORIAL.md`：`STATE.md` 是当前快照，`DECISIONS.md` 是
+append-only 决策日志。只复制模板内容，不要复制整个 DLEF 仓库。
 
 配置按 **variant** 组织，不按 run/seed：
 
@@ -588,7 +590,7 @@ DLEF/
   adapters/torch/           # 可选 PyTorch adapter
   examples/toy/             # stdlib 线性回归
   examples/torch_regression/# torch 玩具 + sweep
-  templates/research-project/        # 项目模板
+  templates/research-project/        # 项目模板（AGENTS / STATE / DECISIONS / TUTORIAL）
   tests/                    # 主测试套件
   docs/
     adr/                    # 架构决策

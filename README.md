@@ -275,7 +275,8 @@ pip install -e .
 make test
 ```
 
-The copied project includes `AGENTS.md` (rules), `TUTORIAL.md` (runbook), a
+The copied project includes `AGENTS.md` (rules), `STATE.md` (current snapshot),
+`DECISIONS.md` (append-only decision log), `TUTORIAL.md` (runbook), a
 configurable `output_root`, and an optional TensorBoard mirror.
 See `templates/research-project/README.md` for the replace points and commands.
 The template contains a synthetic placeholder; replace the data/model/loss/metrics

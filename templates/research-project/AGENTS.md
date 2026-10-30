@@ -10,6 +10,10 @@ composition root.
 For the step-by-step runbook, read [`TUTORIAL.md`](TUTORIAL.md); this file is
 the contract.
 
+Project memory lives in [`STATE.md`](STATE.md) (current snapshot) and
+[`DECISIONS.md`](DECISIONS.md) (append-only decision log). Read both before
+planning; update them before handing off.
+
 ---
 
 ## 0. Start here (agent quickstart)
@@ -54,10 +58,12 @@ Success means `output/runs/<project>/smoke/<run_id>/` contains
 `manifest.json`, `config.resolved.json`, `metrics.jsonl`, `logs/train.log`
 and `checkpoints/last.pt`.
 
-**First response = plan, not code.** Read this file, `TUTORIAL.md`, `README.md`,
-`core/README.md`, `core/data/README.md`, `core/config.py`, `core/task.py` and
+**First response = plan, not code.** Read this file, `STATE.md`,
+`DECISIONS.md`, `TUTORIAL.md`, `README.md`, `core/README.md`,
+`core/data/README.md`, `core/config.py`, `core/task.py` and
 `input/configs/base.yaml`. Then state:
 
+0. what `STATE.md` currently says and which parts your plan will change;
 1. the task and the comparison;
 2. where the data lives (`$DLEF_DATA_ROOT`), sample ids, label units;
 3. the train/val/test membership rules and the grouping that prevents leakage;
@@ -69,6 +75,17 @@ and `checkpoints/last.pt`.
 Ask the human only for data/split/benchmark/metric semantics that cannot be
 inferred from the repo. Do not ask "what is DLEF" — this file is the answer.
 Do not write code until the plan is confirmed.
+
+### 0.1 Project memory
+
+- `STATE.md` is the current snapshot: question, data, splits, benchmark,
+  baseline, open questions, next actions. Read it before planning; update it at
+  the end of every session. Replace stale values; do not turn it into a log.
+- `DECISIONS.md` is append-only: one entry per hard-to-reverse or surprising
+  choice. Never rewrite or delete an old entry; add a new one and mark the old
+  one `superseded by D-000X`.
+- If `STATE.md` and the RunStore disagree, the RunStore wins; fix STATE.
+- Do not report a number that is not backed by an eval/run id.
 
 ---
 
@@ -136,6 +153,7 @@ core/                     # layer 2: project source
     test_command_surface.py
     test_paths.py
     test_runs_tool.py
+    test_project_memory.py
   README.md
 
 scripts/                 # project-specific scripts, intentionally unstructured
@@ -151,6 +169,8 @@ output/                   # layer 3: generated results (default output_root)
   README.md
 
 AGENTS.md                # project-local guide
+STATE.md                 # current project snapshot (read + update)
+DECISIONS.md             # append-only decision log
 TUTORIAL.md              # step-by-step runbook
 README.md
 pyproject.toml
@@ -424,6 +444,7 @@ claim        one reported number/table/figure
 
 Recommended order:
 
+0. Read `STATE.md` and `DECISIONS.md`; if STATE is stale, fix it first.
 1. Write the baseline config.
 2. Replace `data/` + model/loss/metrics.
 3. Run the smoke test.
@@ -442,6 +463,8 @@ Recommended order:
 10. Run `dlef gc` dry-run; tag runs that must survive (`reported`, `baseline`)
     at launch, not after deletion.
 11. Archive manifest/config/report/key checkpoints.
+12. Update `STATE.md` with the run/eval ids and metrics; append a
+    `DECISIONS.md` entry if the choice is hard to reverse.
 
 Rules:
 
@@ -577,6 +600,11 @@ Do not edit the installed `dlef` package in place.
   `core/tools/` is only for the template's generic maintenance utilities.
   Promote reusable logic to `core/` or core/adapters.
 - Do not add project-specific code to the installed core.
+- Do not rewrite or delete an entry in `DECISIONS.md`; supersede it with a new
+  entry and link the old id.
+- Do not leave `STATE.md` stale after a run; a task is not done until it is
+  updated.
+- Do not put secrets or absolute data paths in `STATE.md` / `DECISIONS.md`.
 
 ---
 
@@ -594,10 +622,18 @@ Do not edit the installed `dlef` package in place.
    benchmark.
 9. `gc` dry-run shows only intended deletions.
 10. No project-specific changes in the installed core.
+11. `STATE.md` is current; `DECISIONS.md` has an entry for every
+    hard-to-reverse choice.
+12. No secrets or absolute data paths in project memory.
 
 ---
 
 ## 12. Quick recipes
+
+**New decision** → append `D-00X` to `DECISIONS.md` with context, decision,
+alternatives, consequences and evidence (config/run/eval/benchmark ids); never
+edit an old entry. **New run** → update `STATE.md` with the run/eval ids and
+metrics; do not turn STATE into a log.
 
 **New dataset** → add `data/datasets/<name>.py` returning
 `DataBundle(dataset=..., spec=DataSpec(...))`; register it in `data/build.py`;

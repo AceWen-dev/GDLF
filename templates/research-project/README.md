@@ -9,6 +9,9 @@ asking a coding agent to edit.
 **Tutorial:** [`TUTORIAL.md`](TUTORIAL.md) — copy → install → smoke → first
 claim, written for the project directory (it travels with the template).
 
+**Project memory:** [`STATE.md`](STATE.md) is the current snapshot (read and
+update it); [`DECISIONS.md`](DECISIONS.md) is the append-only decision log.
+
 ## Start a new project
 
 Copy **only this directory's contents** into a new project root; do not copy
@@ -26,10 +29,13 @@ export DLEF_DATA_ROOT=/path/to/data
 make test
 ```
 
-Then read [`AGENTS.md`](AGENTS.md) and [`TUTORIAL.md`](TUTORIAL.md), or give
-them to your coding agent. `AGENTS.md` contains the framework orientation, the
+Then read [`AGENTS.md`](AGENTS.md), [`STATE.md`](STATE.md),
+[`DECISIONS.md`](DECISIONS.md) and [`TUTORIAL.md`](TUTORIAL.md), or give them
+to your coding agent. `AGENTS.md` contains the framework orientation, the
 one-time init/verify steps, the placement matrix, and the "plan before code"
-protocol; `TUTORIAL.md` is the step-by-step runbook.
+protocol; `TUTORIAL.md` is the step-by-step runbook. Fill `STATE.md` with the
+real project question/data before the first real run; do not leave the
+placeholder.
 
 `dlef/` and `adapters/` are installed, not copied. Data bytes stay outside the
 repo under `$DLEF_DATA_ROOT`.
@@ -89,6 +95,8 @@ output/                   # layer 3: generated results
   README.md
 
 AGENTS.md                 # project-local agent guide
+STATE.md                  # current project snapshot (read + update)
+DECISIONS.md              # append-only decision log
 TUTORIAL.md               # step-by-step runbook for this project
 README.md
 pyproject.toml

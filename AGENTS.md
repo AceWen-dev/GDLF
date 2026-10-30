@@ -517,6 +517,8 @@ A project task is done when:
 - `README.md` — quickstart and commands.
 - `templates/research-project/AGENTS.md` — project-local rules.
 - `templates/research-project/TUTORIAL.md` — project-local runbook (copied with the template).
+- `templates/research-project/STATE.md` — current-project snapshot template (read + update).
+- `templates/research-project/DECISIONS.md` — append-only decision log template.
 - `docs/design/contracts-v0.md` — contract map and invariants.
 - `docs/adr/0001-thin-experiment-os.md` — why thin, domain-agnostic core.
 - `docs/adr/0002-template-imports-core.md` — why the template does not vendor core.

@@ -8,6 +8,8 @@
 ```
 
 框架规则以 [`AGENTS.md`](AGENTS.md) 为准；这份教程只讲操作顺序。
+项目记忆在 [`STATE.md`](STATE.md)（当前快照）和
+[`DECISIONS.md`](DECISIONS.md)（append-only 决策日志）；开工前读，收工前更新。
 如果你还没有项目目录，先看 DLEF 仓库的 `docs/TUTORIAL.md` 或 `README.md`
 里的复制命令；复制时**只复制模板内容**，不要复制整个 DLEF 仓库。
 
@@ -74,6 +76,11 @@ output/runs/<project>/smoke/<run_id>/
 
 模板占位是 synthetic 1-D regression；它只证明接线正确，不是你的实验。
 给这个 run 打 `smoke` / `debug` 标签，以后用 `dlef gc` 清理。
+
+跑通后先填项目记忆，再开始真实实验：
+
+- `STATE.md`：项目/问题/数据/split/benchmark/当前 baseline/下一步；
+- `DECISIONS.md`：读模板条目 D-0001/D-0002，第一个项目决策从 D-0003 开始。
 
 ---
 
@@ -376,14 +383,15 @@ python -m dlef.cli gc \
 环境装好之后，第一段话可以只有：
 
 ```text
-读 AGENTS.md，按第 0 节执行。
+读 AGENTS.md、STATE.md、DECISIONS.md，按 AGENTS.md 第 0 节执行。
 先给我计划，不要先写代码：
 任务 / 数据 / split / benchmark / metric / 要改的文件 / smoke test。
-我确认后再实现。
+我确认后再实现；结束时更新 STATE.md，硬决策追加到 DECISIONS.md。
 ```
 
 `AGENTS.md` 已经写了框架是什么、三层结构、文件放置、配置规则、
-run/eval/claim 生命周期和禁止事项；agent 不需要你再解释 DLEF。
+run/eval/claim 生命周期和禁止事项；`STATE.md` 是当前状态，`DECISIONS.md`
+是不可改写的决策日志。agent 不需要你再解释 DLEF。
 如果它问“这个框架怎么用”，让它重新读 `AGENTS.md` 第 0 节。
 
 ---
@@ -404,6 +412,9 @@ run/eval/claim 生命周期和禁止事项；agent 不需要你再解释 DLEF。
   再 `--experiment` / `run_info.py` 钻取。
 - 在 test 上调参，或看完 test 结果再改 benchmark：不要。
 - 从 `train.log` 手抄数字：不要；用 eval + claim + report。
+- 把 `STATE.md` 当日志、一直追加：不要；它是快照，结束时替换过期值。
+- 改旧的 `DECISIONS.md` 条目：不要；追加新条目并标 `superseded by`。
+- 在 `STATE.md` / `DECISIONS.md` 写绝对数据路径或秘密：不要。
 - 在项目根目录加 `utils.py`：不要；逻辑放 `core/`，一次性脚本放 `scripts/`。
 
 ---
@@ -419,4 +430,6 @@ run/eval/claim 生命周期和禁止事项；agent 不需要你再解释 DLEF。
 7. sweep（如使用）一个 trial 一个 run，有 sweep 记录；
 8. claim（如报告）能解析到 eval → checkpoint → run，并写清 benchmark；
 9. `dlef gc` dry-run 只显示预期删除；
-10. 没有把项目代码写进已安装的 core。
+10. 没有把项目代码写进已安装的 core；
+11. `STATE.md` 已更新，`DECISIONS.md` 有硬决策条目；
+12. 项目记忆里没有秘密或绝对数据路径。

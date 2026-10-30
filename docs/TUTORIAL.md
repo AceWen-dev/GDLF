@@ -81,8 +81,10 @@ rsync -a \
   /path/to/DLEF/templates/research-project/ ~/dl-projects/demo/
 ```
 
-现在这个 `demo/` 就是你的项目。`core/` 是项目包名。项目根目录里还有一份
-`TUTORIAL.md`（随模板复制），后续操作可以直接按它走。
+现在这个 `demo/` 就是你的项目。`core/` 是项目包名。项目根目录里还有
+`TUTORIAL.md`、`STATE.md`、`DECISIONS.md`（都随模板复制）：
+`STATE.md` 是当前项目快照，`DECISIONS.md` 是 append-only 决策日志。
+先填 `STATE.md`，再开始真实实验。
 
 > **不要复制**：`dlef/`、`adapters/`、`examples/`、DLEF 根目录的 `tests/`、
 > `docs/`、`.git/`、`output/runs|artifacts|sweeps|test_access`。
@@ -110,14 +112,15 @@ python -c "import dlef, torch; print('ok')"
 环境装好之后（模板 smoke 见下一节），把项目目录交给 agent，第一段话可以只有：
 
 ```text
-读 AGENTS.md，按里面的 0. Start here 执行。
+读 AGENTS.md、STATE.md、DECISIONS.md，按 AGENTS.md 的 0. Start here 执行。
 先给我计划，不要先写代码：
 任务 / 数据 / split / benchmark / metric / 要改的文件 / smoke test。
-我确认后再实现。
+我确认后再实现；结束时更新 STATE.md，硬决策追加到 DECISIONS.md。
 ```
 
 `AGENTS.md` 已经写了框架是什么、三层结构、文件放置、配置规则、
-run/eval/claim 生命周期和禁止事项；agent 不需要你再解释 DLEF。
+run/eval/claim 生命周期和禁止事项；`STATE.md` 是当前快照，
+`DECISIONS.md` 是不可改写的决策日志。agent 不需要你再解释 DLEF。
 如果它问“这个框架怎么用”，让它重新读 `AGENTS.md` 第 0 节。
 
 ---
