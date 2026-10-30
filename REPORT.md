@@ -15,7 +15,7 @@
 - 支持 **retention / gc**：默认 dry-run，引用检查、血缘保护、artifact TTL。
 - 支持 **Claim / Markdown report**：报告里的数字可以反向解析到 eval record；test split 按 `test_set_id` 计数，重复访问标 `WARN`；跨 benchmark 标为不可比。
 - 项目模板 `templates/research-project/` 可以直接复制，**依赖 core 包，不复制 core**。
-- 测试：主套件 **61 个**；模板 smoke **27 个**（torch 环境全过）。
+- 测试：主套件 **62 个**；模板 smoke **27 个**（torch 环境全过）。
 - 真实跑通：CUDA AMP、2 进程 CPU DDP、subprocess sweep、模板 train/eval/sweep。
 
 ---
@@ -206,6 +206,10 @@ python -m dlef.cli report --runs output/runs --claims output/claims --out output
 ### 6.1 从模板开始
 
 ```bash
+# 最省事：单文件脚本（自动装 core + dlef init）
+python /path/to/DLEF/init_dlef.py
+
+# 或手动：
 pip install -e /path/to/DLEF
 dlef init ~/my-experiment --project my-experiment
 cd ~/my-experiment

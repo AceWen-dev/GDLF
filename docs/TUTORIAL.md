@@ -4,7 +4,26 @@
 
 你不需要先读源码。
 
-## 初始化一个新项目（5 步速查）
+## 一键脚本（推荐）
+
+不想记命令时，用 DLEF 仓库里的单文件脚本：
+
+```bash
+python /path/to/DLEF/init_dlef.py
+```
+
+它会问你目标目录和项目 id，自动安装 `dlef` core，然后执行 `dlef init`。
+非交互：
+
+```bash
+python /path/to/DLEF/init_dlef.py ~/code/my-project --project my-project
+```
+
+常用参数：`--source /path/to/DLEF`（本地源码）、`--repo <git-url>`（远程仓库）、
+`--install-project`（顺便安装项目依赖，torch 较大）、`--yes`（全默认）、
+`--no-git`。脚本不依赖具体操作系统路径；只要有 Python 3.10+ 和 pip 即可。
+
+## 手动初始化（5 步）
 
 把 `<...>` 换成真实路径：
 

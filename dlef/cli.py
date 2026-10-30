@@ -7,10 +7,13 @@ that builds its Task/Dataset and calls Runner.fit.
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import platform
 import shutil
 import subprocess
+import tempfile
+import zipfile
 from datetime import date
 from pathlib import Path
 
@@ -74,14 +77,32 @@ def main(argv: list[str] | None = None) -> int:
     return 2
 
 
-def _default_template() -> Path:
+def _materialize_template() -> tuple[Path, tempfile.TemporaryDirectory | None]:
+    """Use the repo template when present, otherwise the embedded wheel copy."""
+
     root = Path(__file__).resolve().parents[1]
     candidate = root / "templates" / "research-project"
-    if not candidate.is_dir():
+    if candidate.is_dir():
+        return candidate, None
+
+    try:
+        from ._template_data import TEMPLATE_B64
+    except ImportError as exc:
         raise SystemExit(
-            "template not found; pass --template /path/to/DLEF/templates/research-project"
-        )
-    return candidate
+            "template not found; install a newer dlef wheel or pass "
+            "--template /path/to/DLEF/templates/research-project"
+        ) from exc
+
+    temporary = tempfile.TemporaryDirectory(prefix="dlef-template-")
+    archive = Path(temporary.name) / "template.zip"
+    archive.write_bytes(base64.b64decode(TEMPLATE_B64))
+    with zipfile.ZipFile(archive) as handle:
+        handle.extractall(temporary.name)
+    template = Path(temporary.name) / "research-project"
+    if not template.is_dir():
+        temporary.cleanup()
+        raise SystemExit("embedded template is corrupt; pass --template explicitly")
+    return template, temporary
 
 
 def _ignore_generated(directory: str, names: list[str]) -> set[str]:
@@ -114,9 +135,11 @@ def _slug(text: str) -> str:
 
 def init_command(args: argparse.Namespace) -> int:
     dest = Path(args.path).expanduser()
-    template = (
-        Path(args.template).expanduser() if args.template else _default_template()
-    )
+    cleanup: tempfile.TemporaryDirectory | None = None
+    if args.template:
+        template = Path(args.template).expanduser()
+    else:
+        template, cleanup = _materialize_template()
     if not template.is_dir():
         print(f"template not found: {template}")
         return 2
@@ -141,12 +164,17 @@ def init_command(args: argparse.Namespace) -> int:
         print("project id may not contain '/', '\\', '\"', or newlines")
         return 2
 
-    shutil.copytree(
-        template,
-        dest,
-        dirs_exist_ok=True,
-        ignore=_ignore_generated,
-    )
+    template_label = "embedded" if cleanup is not None else str(template)
+    try:
+        shutil.copytree(
+            template,
+            dest,
+            dirs_exist_ok=True,
+            ignore=_ignore_generated,
+        )
+    finally:
+        if cleanup is not None:
+            cleanup.cleanup()
     today = date.today().isoformat()
     dlef_root = Path(__file__).resolve().parents[1]
     dlef_ref = git_version(dlef_root)
@@ -179,13 +207,17 @@ def init_command(args: argparse.Namespace) -> int:
             git_status = f"failed ({exc})"
 
     print(f"project: {dest.resolve()}")
-    print(f"template: {template}")
+    print(f"template: {template_label}")
     print(f"project id: {project}")
     print(f"git: {git_status}")
     print(f"dlef: {dlef_ref}")
     print()
+    editable = (dlef_root / "templates").is_dir()
     print("next:")
-    print(f"  pip install -e {dlef_root}")
+    if editable:
+        print(f"  pip install -e {dlef_root}")
+    else:
+        print("  # dlef core is already installed; use the same wheel/git URL on other machines")
     print(f"  cd {dest} && pip install -e .")
     print("  edit PROJECT.yaml, STATE.md and DECISIONS.md")
     print("  make audit")

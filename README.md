@@ -7,6 +7,8 @@ reports; training stacks live in adapters.
 
 **Tutorial:** [`docs/TUTORIAL.md`](docs/TUTORIAL.md) (project-local: [`templates/research-project/TUTORIAL.md`](templates/research-project/TUTORIAL.md)). **Final report:** [`REPORT.md`](REPORT.md). **Agent guide:** [`AGENTS.md`](AGENTS.md).
 
+**One-file bootstrap:** [`init_dlef.py`](init_dlef.py) — run `python init_dlef.py` on any machine with Python 3.10+.
+
 > **Hard rule:** the core never contains domain words.
 > image / text / audio / video, bbox / depth / mm, classification / detection /
 > segmentation, RL / LLM, case / lesion — all of these belong in adapters or
@@ -43,11 +45,14 @@ dlef/
   retention.py     # reference-checked retention / gc
   report.py        # comparison table from eval records
   cli.py           # init / doctor / compare / gc
+  _template_data.py # embedded template for wheel installs (generated)
   launcher.py      # local launcher stub
 adapters/torch/    # optional PyTorch adapter (not imported by core)
 examples/toy/      # synthetic linear regression; proves the chain
 examples/torch_regression/  # synthetic tensor example via the adapter
 templates/research-project/ # copyable project skeleton; imports dlef, does not vendor it
+init_dlef.py       # one-file bootstrap (installs dlef, then runs dlef init)
+tools/             # framework maintenance scripts (template embedding)
 tests/             # unittest suite (works with pytest too)
 docs/              # ADR, contract draft
 AGENTS.md          # agent guide: project setup, file placement, experiment rules
@@ -69,6 +74,39 @@ python examples/torch_regression/run.py
 # project template smoke test
 make template-smoke
 ```
+
+## One-file project bootstrap
+
+On a new machine with Python 3.10+:
+
+```bash
+python init_dlef.py
+```
+
+It prompts for the destination and project id, installs the `dlef` core (from
+the local source if run inside the DLEF repo, otherwise from `--repo`), then
+runs `dlef init`.
+
+Non-interactive:
+
+```bash
+python init_dlef.py ~/code/my-project --project my-project
+```
+
+Options: `--source /path/to/DLEF`, `--repo <git-url>`, `--ref main`,
+`--install-project`, `--yes`, `--no-git`.
+
+Package route:
+
+```bash
+pip install git+https://github.com/AceWen-dev/GDLF.git
+dlef init ~/code/my-project --project my-project
+```
+
+The wheel embeds the template, so `dlef init` works without a DLEF checkout.
+Build an offline wheel with `make wheel`; after publishing to PyPI it is just
+`pip install dlef`. If the repository is private, use `git+ssh://...` or
+`--source`.
 
 The toy walks:
 

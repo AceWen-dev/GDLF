@@ -1,6 +1,6 @@
 PYTHON ?= python
 
-.PHONY: test toy sweep gc-dry torch-demo torch-sweep torch-ddp template-smoke doctor clean
+.PHONY: test toy sweep gc-dry torch-demo torch-sweep torch-ddp template-smoke template-data wheel doctor clean
 
 test:
 	$(PYTHON) -m unittest discover -s tests -v
@@ -25,6 +25,12 @@ torch-ddp:
 
 template-smoke:
 	cd templates/research-project && PYTHONPATH=../.. $(PYTHON) -m unittest discover -s core/tests -v
+
+template-data:
+	$(PYTHON) tools/build_template_data.py
+
+wheel:
+	$(PYTHON) -m pip wheel . --no-deps -w dist
 
 doctor:
 	$(PYTHON) -m dlef.cli doctor

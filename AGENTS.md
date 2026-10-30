@@ -14,9 +14,11 @@ retention and reports; training stacks live in adapters.
 
 Do **not** modify `dlef/` for project-specific needs.
 
-1. Initialize with `dlef init <project-dir> --project <name>` (copies the
-   template, runs `git init`, fills `PROJECT.yaml` / `STATE.md` / metadata).
-   Manual fallback: copy `templates/research-project/` and `git init`.
+1. Initialize with `python init_dlef.py <project-dir> --project <name>` (one-file
+   bootstrap; installs core if needed, then copies the template, runs `git init`,
+   fills `PROJECT.yaml` / `STATE.md` / metadata). If core is already installed:
+   `dlef init <project-dir> --project <name>`. Manual fallback: copy
+   `templates/research-project/` and `git init`.
 2. Read `templates/research-project/AGENTS.md` — it is the project-local guide.
 3. Install core: `pip install -e /path/to/DLEF`.
 4. Install project: `pip install -e .`.
@@ -516,6 +518,7 @@ A project task is done when:
 - `docs/TUTORIAL.md` — step-by-step: copy template → train → eval → sweep → report → gc.
 - `REPORT.md` — the big picture and verified results.
 - `README.md` — quickstart and commands.
+- `init_dlef.py` — one-file project bootstrap (installs core, runs `dlef init`).
 - `templates/research-project/AGENTS.md` — project-local rules.
 - `templates/research-project/TUTORIAL.md` — project-local runbook (copied with the template).
 - `templates/research-project/PROJECT.yaml` — stable project brief template (question/data/split/benchmark).

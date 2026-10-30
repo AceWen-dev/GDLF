@@ -12,9 +12,18 @@
 [`STATE.md`](STATE.md)，历史在 [`DECISIONS.md`](DECISIONS.md)
 （append-only）；开工前读，收工前更新。
 
-## 初始化一个新项目（5 步）
+## 初始化一个新项目
 
-把 `<...>` 换成你机器上的真实路径：
+如果手边有 DLEF 仓库，最省事的是单文件脚本：
+
+```bash
+python /path/to/DLEF/init_dlef.py
+```
+
+它会问目录和项目 id，自动装 core 并执行 `dlef init`；非交互用
+`python /path/to/DLEF/init_dlef.py <dir> --project <id>`。
+
+手动 5 步如下，把 `<...>` 换成你机器上的真实路径：
 
 ```bash
 # 1. 安装 DLEF core（只做一次）
