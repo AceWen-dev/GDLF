@@ -6,6 +6,10 @@ Update it at the end of every work session / before handoff.
 History belongs in DECISIONS.md and output/runs/; do not paste run logs here.
 Keep it short enough to read in ~2 minutes. If STATE and the RunStore disagree,
 the RunStore wins; fix STATE.
+
+phase is gated by `make check`: setup/data -> baseline (tagged run) ->
+ablation (non-baseline run) -> benchmark (frozen manifest + benchmark id) ->
+report (claim + report file). Do not advance it early.
 -->
 
 ---
@@ -56,8 +60,17 @@ benchmark: "-"          # benchmark id
 
 ## 4. Experiments
 
-Only the experiments that matter for the current question. The full index is
+One active experiment at a time. Pick the top backlog item, give it a config and
+a run, then update this section before starting the next one. The full index is
 `make runs` / `python core/tools/runs.py`.
+
+### 4.1 Backlog / planned
+
+| priority | hypothesis | change | success criterion | status | run |
+|---|---|---|---|---|---|
+|  |  |  |  | planned |  |
+
+### 4.2 Completed
 
 | experiment | config | status | <primary metric> | run | note |
 |---|---|---|---|---|---|

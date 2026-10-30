@@ -1,7 +1,8 @@
 PYTHON ?= python
 OUTPUT ?= $(if $(DLEF_OUTPUT_ROOT),$(DLEF_OUTPUT_ROOT),output)
+EXPERIMENT ?= baseline
 
-.PHONY: train eval inspect runs runs-all configs sweep report gc-dry check audit test doctor
+.PHONY: train eval inspect runs runs-all configs sweep report gc-dry check audit new-experiment new-benchmark status handoff test doctor
 
 train:
 	$(PYTHON) core/commands/train.py --config input/configs/base.yaml
@@ -22,6 +23,20 @@ runs-all:
 
 configs:
 	$(PYTHON) core/tools/configs.py list
+
+new-experiment:
+	@test -n "$(NAME)" || (echo "usage: make new-experiment NAME=<variant> [EXPERIMENT=<experiment>]"; exit 2)
+	$(PYTHON) core/tools/new_experiment.py --name $(NAME) --experiment $(EXPERIMENT)
+
+new-benchmark:
+	@test -n "$(NAME)" || (echo "usage: make new-benchmark NAME=<benchmark>"; exit 2)
+	$(PYTHON) core/tools/new_benchmark.py --name $(NAME)
+
+status:
+	$(PYTHON) core/tools/status.py
+
+handoff:
+	$(PYTHON) core/tools/status.py --handoff
 
 sweep:
 	$(PYTHON) core/commands/sweep.py --config input/configs/base.yaml

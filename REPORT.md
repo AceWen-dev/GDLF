@@ -15,7 +15,7 @@
 - 支持 **retention / gc**：默认 dry-run，引用检查、血缘保护、artifact TTL。
 - 支持 **Claim / Markdown report**：报告里的数字可以反向解析到 eval record；test split 按 `test_set_id` 计数，重复访问标 `WARN`；跨 benchmark 标为不可比。
 - 项目模板 `templates/research-project/` 可以直接复制，**依赖 core 包，不复制 core**。
-- 测试：主套件 **61 个**；模板 smoke **23 个**（torch 环境全过）。
+- 测试：主套件 **61 个**；模板 smoke **27 个**（torch 环境全过）。
 - 真实跑通：CUDA AMP、2 进程 CPU DDP、subprocess sweep、模板 train/eval/sweep。
 
 ---
@@ -220,6 +220,8 @@ make test
 `STATE.md` 是当前快照，`DECISIONS.md` 是 append-only 决策日志。
 填完 brief 后先跑 `make audit` + `make check`；`make check` 在
 `PROJECT.yaml` / config / benchmark 还有占位符时会失败，这是初始化门禁。
+`make new-experiment` / `make new-benchmark` 生成规范 config/manifest，
+`make status` / `make handoff` 给出一屏状态和交接清单。
 
 配置按 **variant** 组织，不按 run/seed：
 

@@ -103,9 +103,26 @@ make check    # brief + config + benchmark + STATE/DECISIONS + tests
 **它不过，不要开始真实 baseline。** `make audit` 缺 `sample_id` /
 `group_by` 时会警告；真实项目应把这两个 key 放进 batch。
 
+`make check` 还按 `STATE.md.phase` 做阶段门禁：
+
+- `setup` / `data`：brief、config、数据根、benchmark 元数据；
+- `baseline`：至少一个 completed 且带 `baseline` tag 的 run；
+- `ablation`：至少一个 completed、非 baseline/debug 的 run；
+- `benchmark`：冻结 manifest + `STATE.md` 里的 benchmark id；
+- `report`：至少一个 claim + `output/reports/report.md`。
+
+阶段没到就别改 `phase`。
+
 ---
 
-## 3. 看 run：先看 experiment 摘要，再看单个 run
+## 3. 看 run：先看 status 和 experiment 摘要，再看单个 run
+
+每次开工先看一屏状态：
+
+```bash
+make status
+# 收工：make handoff
+```
 
 实验多了不要一上来列所有 run。先看按 experiment 聚合的摘要：
 
@@ -405,7 +422,7 @@ python -m dlef.cli gc \
 
 ```text
 读 AGENTS.md、PROJECT.yaml、STATE.md、DECISIONS.md，按 AGENTS.md 第 0 节执行。
-先给我计划，不要先写代码：
+先跑 make status，再给我计划，不要先写代码：
 任务 / 数据 / split / benchmark / metric / 要改的文件 / smoke test。
 我确认后再实现；先让 make audit / make check 过，结束时更新 STATE.md，
 硬决策追加到 DECISIONS.md。

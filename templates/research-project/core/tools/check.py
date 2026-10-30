@@ -30,6 +30,7 @@ ensure_core()
 
 from dlef.benchmark import BenchmarkSpec  # noqa: E402
 from dlef.config import ConfigError, load_config  # noqa: E402
+from dlef.run import RunStore  # noqa: E402
 from core.config import ProjectConfig  # noqa: E402
 from core.data.build import DATASETS, TRANSFORMS  # noqa: E402
 from core.data.splits import SPLITTERS  # noqa: E402
@@ -191,19 +192,19 @@ def _check_benchmark(
     config: Any,
     errors: list[str],
     warnings: list[str],
-) -> None:
+) -> BenchmarkSpec | None:
     name = _get(brief, ("benchmark", "name"))
     if _placeholder(name):
-        return
+        return None
     path = ROOT / "input" / "benchmarks" / f"{name}.json"
     if not path.is_file():
         errors.append(f"benchmark file not found: {path}")
-        return
+        return None
     try:
         spec = BenchmarkSpec.load(path)
     except (OSError, ValueError, KeyError, TypeError) as exc:
         errors.append(f"benchmark: cannot load {path}: {exc}")
-        return
+        return None
     if spec.name != name:
         errors.append(f"benchmark name {spec.name!r} != PROJECT.yaml {name!r}")
     if config is not None:
@@ -227,6 +228,7 @@ def _check_benchmark(
             f"PROJECT.yaml {label_version!r}"
         )
     print(f"[ok] benchmark: {path} ({spec.benchmark_id[:20]}...)")
+    return spec
 
 
 def _check_data_root(
@@ -248,9 +250,10 @@ def _check_data_root(
 
 def _check_memory(
     brief: dict[str, Any], errors: list[str], warnings: list[str]
-) -> None:
+) -> dict[str, Any] | None:
     state_path = ROOT / "STATE.md"
     decisions_path = ROOT / "DECISIONS.md"
+    front: dict[str, Any] | None = None
     if not state_path.is_file():
         errors.append("STATE.md is missing")
     else:
@@ -285,6 +288,74 @@ def _check_memory(
             errors.append("DECISIONS.md has duplicate decision ids")
         if "D-0001" not in ids:
             warnings.append("DECISIONS.md has no D-0001 entry")
+    return front
+
+
+def _check_phase(
+    config: Any,
+    front: dict[str, Any],
+    benchmark: BenchmarkSpec | None,
+    errors: list[str],
+    warnings: list[str],
+) -> None:
+    phase = front.get("phase")
+    if phase not in PHASES or phase in {"setup", "data"}:
+        return
+
+    output_root = Path(config.schema.output_root).expanduser()
+    if not output_root.is_absolute():
+        output_root = ROOT / output_root
+    runs_root = output_root / "runs"
+    runs = RunStore(runs_root).iter_runs() if runs_root.is_dir() else []
+    completed = [run for run in runs if run.manifest.status == "completed"]
+    baseline = [run for run in completed if "baseline" in run.manifest.tags]
+    others = [
+        run
+        for run in completed
+        if not ({"baseline", "debug", "smoke"} & set(run.manifest.tags))
+    ]
+
+    if phase in {"baseline", "ablation", "benchmark", "report"} and not baseline:
+        errors.append(
+            "STATE.md.phase is beyond setup/data but there is no completed run "
+            "tagged 'baseline'; run train.py --tag baseline"
+        )
+    if phase in {"ablation", "benchmark", "report"} and not others:
+        errors.append(
+            f"STATE.md.phase={phase!r} requires at least one completed non-baseline, "
+            "non-debug run"
+        )
+
+    best_run = front.get("best_run")
+    if best_run not in {None, "", "-"} and not any(
+        run.run_id == best_run for run in runs
+    ):
+        errors.append(f"STATE.md.best_run {best_run!r} is not in the run store")
+    if phase in {"baseline", "ablation", "benchmark", "report"} and best_run in {
+        None,
+        "",
+        "-",
+    }:
+        warnings.append("STATE.md.best_run is not set")
+
+    if phase in {"benchmark", "report"}:
+        if front.get("benchmark") in {None, "", "-"}:
+            errors.append("STATE.md.benchmark must be set for phase benchmark/report")
+        elif benchmark is not None and front["benchmark"] not in {
+            benchmark.benchmark_id,
+            benchmark.name,
+        }:
+            errors.append(
+                f"STATE.md.benchmark {front['benchmark']!r} does not match "
+                f"{benchmark.name!r} / {benchmark.benchmark_id}"
+            )
+    if phase == "report":
+        claims = list((output_root / "claims").glob("*.json"))
+        report = output_root / "reports" / "report.md"
+        if not claims:
+            errors.append("phase=report requires at least one output/claims/*.json")
+        if not report.is_file():
+            errors.append("phase=report requires output/reports/report.md")
 
 
 def main() -> int:
@@ -317,9 +388,11 @@ def main() -> int:
     if brief:
         _check_brief(brief, errors, warnings)
         config = _check_config(brief, config_path, errors, warnings)
-        _check_benchmark(brief, config, errors, warnings)
+        benchmark = _check_benchmark(brief, config, errors, warnings)
         _check_data_root(brief, errors, warnings)
-        _check_memory(brief, errors, warnings)
+        front = _check_memory(brief, errors, warnings)
+        if config is not None and front is not None:
+            _check_phase(config, front, benchmark, errors, warnings)
 
     if args.json:
         print(

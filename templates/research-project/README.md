@@ -278,6 +278,7 @@ python core/tools/runs.py --experiment <name>
 python core/tools/run_info.py --run <run_id>
 python core/tools/configs.py list
 python core/commands/sweep.py --config input/configs/base.yaml
+make status                                 # phase / runs / next actions / git
 make audit                                  # data / split / leakage first pass
 make check                                  # initialization + config gate
 python -m unittest discover -s core/tests -v
@@ -285,9 +286,10 @@ python -m dlef.cli report --runs output/runs --claims output/claims --out output
 tensorboard --logdir output/runs --port 6006
 ```
 
-Or `make train`, `make runs`, `make runs-all`, `make configs`, `make sweep`,
-`make report`, `make gc-dry`, `make audit`, `make check`, `make test`,
-`make doctor`.
+Or `make train`, `make runs`, `make runs-all`, `make configs`,
+`make new-experiment`, `make new-benchmark`, `make sweep`, `make report`,
+`make gc-dry`, `make audit`, `make check`, `make status`, `make handoff`,
+`make test`, `make doctor`.
 `OUTPUT=<path>` overrides the output root for the tools (`make runs OUTPUT=...`).
 `make eval CHECKPOINT=...` needs the checkpoint path explicitly;
 `make inspect RUN=<run_id>` prints the run card. `make gc-dry` is a dry-run;
@@ -396,6 +398,41 @@ TensorBoard is a **mirror**, not the record: `manifest.json`,
 of truth. Set `tensorboard.enabled: false` to disable it, or change `subdir` if
 you do not want `tensorboard/` inside each run.
 
+## New experiment / benchmark
+
+Create variants from a template instead of hand-writing paths:
+
+```bash
+make new-experiment NAME=lr-0.005 EXPERIMENT=ablation-lr
+# or with dotted overrides:
+python core/tools/new_experiment.py --name lr-0.005 --experiment ablation-lr \
+  --set optim.lr=0.005
+```
+
+It writes `input/configs/experiments/<experiment>/<variant>.yaml`, validates it
+with `ProjectConfig`, and refuses to overwrite unless `--force`.
+
+A new benchmark is a new frozen test contract:
+
+```bash
+make new-benchmark NAME=polyp-test-v1
+```
+
+It writes `input/benchmarks/polyp-test-v1.json`, prints `benchmark_id` /
+`test_set_id`, and does not overwrite an existing manifest. Then set the same
+`benchmark.name` in `PROJECT.yaml` and the training config; `make check` verifies
+they agree.
+
+## Session status
+
+```bash
+make status    # project, phase, runs, next actions, git
+make handoff   # status + handoff checklist
+```
+
+Run `make status` at session start and `make handoff` before handing the project
+to another agent or human. Both are read-only.
+
 ## Project brief, audit and check
 
 `PROJECT.yaml` is the stable brief: question, unit, data contract, splits,
@@ -415,6 +452,18 @@ keys or audit the membership manifest manually.
 `make check` is intentionally stricter than `make test`: it fails while
 `PROJECT.yaml`, the config or the benchmark still contain template placeholders.
 The template's tests pass before initialization; `make check` should not.
+
+It also enforces the `STATE.md` phase:
+
+| phase | gate |
+|---|---|
+| `setup` / `data` | brief, config, data root, benchmark metadata |
+| `baseline` | at least one completed run tagged `baseline` |
+| `ablation` | at least one completed non-baseline, non-debug run |
+| `benchmark` | frozen manifest + `STATE.md` benchmark id |
+| `report` | at least one claim and `output/reports/report.md` |
+
+Set `phase:` in `STATE.md` only when the gate is actually met.
 
 ## Inspect a run
 

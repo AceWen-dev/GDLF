@@ -778,9 +778,15 @@ make runs-all
 python core/tools/runs.py --experiment baseline
 python core/tools/run_info.py --run <run_id>
 
-# 初始化门禁 / 数据审计
+# 初始化门禁 / 数据审计 / 会话状态
 make check
 make audit
+make status
+make handoff
+
+# 新变体 / 新 benchmark
+make new-experiment NAME=lr-0.005 EXPERIMENT=ablation-lr
+make new-benchmark NAME=polyp-test-v1
 
 # TensorBoard
 tensorboard --logdir output/runs --port 6006

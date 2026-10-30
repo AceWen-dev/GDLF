@@ -174,9 +174,12 @@ core/                     # layer 2: project source
     sweep.py             # subprocess grid/random sweep
   tools/
     benchmark.py         # freeze / verify a benchmark manifest
-    check.py             # initialization gate: brief + config + benchmark + memory
+    check.py             # initialization + phase gate
     audit_data.py        # data / split / leakage first pass
     configs.py           # list / validate experiment configs
+    new_experiment.py    # create a variant from base.yaml
+    new_benchmark.py     # freeze a named benchmark manifest
+    status.py            # one-screen status / handoff
     runs.py              # experiment summary / run index (filters, --all, --json)
     run_info.py          # run card: config -> benchmark -> source files
     _bootstrap.py        # internal: find the core when running in-repo
@@ -191,6 +194,7 @@ core/                     # layer 2: project source
     test_runs_tool.py
     test_project_memory.py
     test_check_tools.py
+    test_new_tools.py
   README.md
 
 scripts/                 # project-specific scripts, intentionally unstructured
@@ -281,9 +285,13 @@ make inspect RUN=<run_id>
 make runs
 make runs-all
 make configs
+make new-experiment NAME=<variant> EXPERIMENT=<group>
+make new-benchmark NAME=<benchmark>
 make sweep
 make audit
 make check
+make status
+make handoff
 make test
 make report
 make gc-dry
@@ -486,9 +494,11 @@ claim        one reported number/table/figure
 
 Recommended order:
 
-0. Read `PROJECT.yaml`, `STATE.md` and `DECISIONS.md`; if STATE is stale, fix
-   it first. `make check` must pass before a real baseline.
-1. Write the baseline config.
+0. Run `make status`; read `PROJECT.yaml`, `STATE.md` and `DECISIONS.md`; if
+   STATE is stale, fix it first. Pick the top item from the `STATE.md` §4.1
+   backlog; one active experiment at a time. `make check` must pass before a
+   real baseline.
+1. Write the baseline config (`make new-experiment NAME=<variant>`).
 2. Replace `data/` + model/loss/metrics.
 3. Run the smoke test.
 4. Run baseline; inspect `manifest.json` + `config.resolved.json` + checkpoint.
@@ -507,10 +517,24 @@ Recommended order:
     at launch, not after deletion.
 11. Archive manifest/config/report/key checkpoints.
 12. Update `STATE.md` with the run/eval ids and metrics; append a
-    `DECISIONS.md` entry if the choice is hard to reverse.
+    `DECISIONS.md` entry if the choice is hard to reverse; run `make handoff`.
+
+Phase gates (enforced by `make check`):
+
+- `setup` / `data`: brief, config, data root and benchmark metadata are valid.
+- `baseline`: at least one completed run tagged `baseline`.
+- `ablation`: at least one completed non-baseline, non-debug run.
+- `benchmark`: frozen manifest exists and `STATE.md` names its id.
+- `report`: at least one claim and `output/reports/report.md`.
+
+Do not advance `STATE.md.phase` before the gate is met.
 
 Rules:
 
+- One active experiment at a time. Do not start the next backlog item until the
+  current one has a run, an eval (if applicable), and a `STATE.md` entry.
+- Use `make new-experiment` and `make new-benchmark`; do not hand-write their
+  paths/names.
 - One seed per run. Never loop seeds inside a run.
 - Never tune on test.
 - Failed runs are still recorded; do not delete them manually.
@@ -674,10 +698,13 @@ Do not edit the installed `dlef` package in place.
 
 ## 12. Quick recipes
 
-**New decision** → append `D-00X` to `DECISIONS.md` with context, decision,
-alternatives, consequences and evidence (config/run/eval/benchmark ids); never
-edit an old entry. **New run** → update `STATE.md` with the run/eval ids and
-metrics; do not turn STATE into a log.
+**New experiment** → `make new-experiment NAME=<variant> EXPERIMENT=<group>`;
+then add a row to `STATE.md` §4.1 backlog / §4.2 completed. **New benchmark** →
+`make new-benchmark NAME=<name>`; update `PROJECT.yaml` and the training config,
+then run `make check`. **New decision** → append `D-00X` to `DECISIONS.md` with
+context, decision, alternatives, consequences and evidence
+(config/run/eval/benchmark ids); never edit an old entry. **New run** → update
+`STATE.md` with the run/eval ids and metrics; do not turn STATE into a log.
 
 **New dataset** → add `data/datasets/<name>.py` returning
 `DataBundle(dataset=..., spec=DataSpec(...))`; register it in `data/build.py`;
