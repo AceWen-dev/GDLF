@@ -55,6 +55,49 @@ class EarlyStoppingTests(unittest.TestCase):
             log = run.log_path.read_text(encoding="utf-8")
             self.assertIn("Early stopping: triggered", log)
 
+            best = run.best_checkpoint_path
+            self.assertTrue(best.is_file())
+            best_payload = json.loads(best.read_text(encoding="utf-8"))
+            last_payload = json.loads(run.checkpoint_path.read_text(encoding="utf-8"))
+            self.assertEqual(best_payload["epoch"], 1)
+            self.assertEqual(last_payload["epoch"], 2)
+            self.assertIn("checkpoint:best", run.manifest.artifacts)
+            self.assertIn("Checkpoint: best", log)
+
+            task2 = ToyTask(config.schema)
+            optimizer2 = task2.configure_optimizer(task2.get_model())
+            runner.load_checkpoint(best, task2, optimizer2)
+            self.assertEqual(task2.get_model().state_dict(), best_payload["model"])
+
+    def test_no_best_checkpoint_without_early_stopping(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
+            runner = Runner(store, store.artifact_store)
+            config = resolve_config(
+                ToyConfig,
+                {
+                    "seed": 1,
+                    "epochs": 2,
+                    "n_train": 32,
+                    "n_val": 16,
+                    "batch_size": 8,
+                    "log_every": 0,
+                    "early_stopping": {"enabled": False, "monitor": "mae"},
+                },
+            )
+            task = ToyTask(config.schema)
+            run = runner.fit(
+                task,
+                ToyDataset(32, 8, 0.1, 1),
+                ToyDataset(16, 8, 0.1, 2),
+                config,
+            )
+
+            self.assertIsNotNone(run)
+            self.assertFalse(run.best_checkpoint_path.is_file())
+            self.assertNotIn("checkpoint:best", run.manifest.artifacts)
+
     def test_invalid_config(self) -> None:
         with self.assertRaises(ConfigError):
             resolve_config(

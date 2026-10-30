@@ -294,6 +294,7 @@ output/runs/<project>/<experiment>/<run_id>/
   metrics.jsonl
   logs/train.log
   checkpoints/last.pt
+  checkpoints/best.pt   # 早停最佳（启用早停时）
   evals/<eval_id>.json
 ```
 

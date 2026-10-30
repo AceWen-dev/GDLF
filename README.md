@@ -123,6 +123,7 @@ examples/toy/output/
     manifest.json
     metrics.jsonl
     checkpoints/last.*      # .json by default, .pt with the torch codec
+    checkpoints/best.*      # best early-stopping checkpoint, when enabled
     evals/<eval_id>.json
   artifacts/<sha[:2]>/<sha>/<name>
   comparison.md
@@ -144,7 +145,9 @@ examples/toy/output/
 - Checkpoints round-trip model/optimizer/RNG state, including Python, NumPy,
   Torch and CUDA RNGs when those libraries are present.
 - The Runner supports epoch-based or step-limited training (`epochs`, `max_steps`)
-  and configurable early stopping on a validation metric.
+  and configurable early stopping on a validation metric. When early stopping is
+  enabled, the best-scoring checkpoint is kept as `checkpoints/best.*`; `last.*`
+  remains the final epoch.
 - Callbacks and step/epoch schedulers are lifecycle-tested.
 - Grid/random sweeps run one trial per run, with a local GPU-aware queue.
 - A failed trial is recorded as `failed` without killing the sweep.

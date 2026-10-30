@@ -260,7 +260,8 @@ manifest.json          # 身份证：代码版本、config 指纹、数据版本
 config.resolved.json   # 这次实验完整的配置
 metrics.jsonl          # 训练/验证过程（机器可读）
 logs/train.log         # 训练文本日志（epoch/step/eval/checkpoint）
-checkpoints/last.pt    # 模型
+checkpoints/last.pt    # 最后一个 epoch
+checkpoints/best.pt    # 早停最佳（启用早停时）
 evals/xxx.json         # 评测成绩单
 ```
 
@@ -322,7 +323,7 @@ tensorboard --logdir output/runs --port 6006
 ## 7. 做一次独立评测
 
 ```bash
-python core/commands/eval.py --checkpoint "$RUN_DIR/checkpoints/last.pt"
+python core/commands/eval.py --checkpoint "$RUN_DIR/checkpoints/best.pt"
 ```
 
 输出：
@@ -748,7 +749,8 @@ output/runs/<project>/<experiment>/<run_id>/
   manifest.json            # config digest、config_source、code_version、data_versions
   config.resolved.json     # 权威配置：包含 --set / sweep 后的最终值
   evals/<eval_id>.json     # benchmark_id、test_set_id、metrics、test_access
-  checkpoints/last.pt
+  checkpoints/last.pt      # 最后 epoch
+  checkpoints/best.pt      # 早停最佳（启用时）
 ```
 
 ```bash

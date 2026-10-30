@@ -148,6 +148,7 @@ class Runner:
         last_epoch = 0
         best_score: float | None = None
         best_epoch = 0
+        best_path: Path | None = None
         bad_epochs = 0
         early_stopped = False
         try:
@@ -284,6 +285,16 @@ class Runner:
                             best_epoch = epoch
                             bad_epochs = 0
                             if run is not None:
+                                best_path = self._save_checkpoint(
+                                    run,
+                                    task,
+                                    optimizer,
+                                    scheduler,
+                                    epoch,
+                                    global_step,
+                                    "best",
+                                    artifact=False,
+                                )
                                 run.log(
                                     f"Early stopping: best {early.monitor}={score:.6g} "
                                     f"at epoch {epoch}"
@@ -325,6 +336,8 @@ class Runner:
                 self._save_checkpoint(
                     run, task, optimizer, scheduler, last_epoch, global_step, "last"
                 )
+                if best_path is not None and best_path.is_file():
+                    run.save_artifact(best_path, "checkpoint:best")
             policy.on_fit_end(task, optimizer)
             self._call(callbacks, "on_run_end", ctx)
             if run is not None:
@@ -438,6 +451,8 @@ class Runner:
         epoch: int,
         step: int,
         name: str,
+        *,
+        artifact: bool = True,
     ) -> Path:
         checkpoint = Checkpoint(
             model=task.get_model().state_dict(),
@@ -453,7 +468,8 @@ class Runner:
         path = run.dir / "checkpoints" / f"{name}{self.checkpoint_codec.suffix}"
         path.parent.mkdir(parents=True, exist_ok=True)
         self.checkpoint_codec.dump(path, checkpoint)
-        run.save_artifact(path, f"checkpoint:{name}")
+        if artifact:
+            run.save_artifact(path, f"checkpoint:{name}")
         run.log(f"Checkpoint: {name} -> {path.name}")
         return path
 

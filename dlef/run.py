@@ -211,6 +211,14 @@ class Run:
         return candidates[-1] if candidates else self.directory / "checkpoints" / "last.json"
 
     @property
+    def best_checkpoint_path(self) -> Path:
+        candidates = sorted(
+            (self.directory / "checkpoints").glob("best.*"),
+            key=lambda path: path.stat().st_mtime,
+        )
+        return candidates[-1] if candidates else self.directory / "checkpoints" / "best.json"
+
+    @property
     def log_path(self) -> Path:
         return self.directory / "logs" / "train.log"
 
