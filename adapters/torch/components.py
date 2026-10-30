@@ -211,12 +211,21 @@ class TorchTask:
         batch = move_batch(batch, self.device)
         output = self.model(batch)
         loss = self.loss(output, batch)
-        return StepOutput(loss=loss.total, terms=loss.terms, predictions=output.predictions)
+        return StepOutput(
+            loss=loss.total,
+            terms=loss.terms,
+            predictions=output.predictions,
+            meta=dict(output.aux),
+        )
 
     def val_step(self, batch: Batch) -> StepOutput:
         batch = move_batch(batch, self.device)
         output = self.model(batch)
-        return StepOutput(loss=None, predictions=output.predictions)
+        return StepOutput(
+            loss=None,
+            predictions=output.predictions,
+            meta=dict(output.aux),
+        )
 
     def configure_optimizer(self, model: TorchModel) -> Optimizer:
         return self.optimizer_fn(model)

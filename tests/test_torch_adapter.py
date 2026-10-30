@@ -21,6 +21,7 @@ try:
         TorchMetric,
         TorchModel,
         TorchOptimizer,
+        TorchTask,
         TorchTrainingPolicy,
     )
     from examples.torch_regression.config import TorchConfig
@@ -52,6 +53,20 @@ class TorchAdapterTests(unittest.TestCase):
         aux_output = aux_model(batch)
         self.assertIn("features", aux_output.aux)
         self.assertTrue(torch.equal(aux_output.aux["features"], batch["x"]))
+
+        task = TorchTask(
+            model=aux_model,
+            loss=TorchLoss(
+                lambda out, b: LossOutput(total=out.predictions.sum() * 0.0)
+            ),
+            optimizer_fn=lambda model: TorchOptimizer(
+                torch.optim.SGD(model.parameters(), lr=0.1)
+            ),
+            metrics={},
+            device="cpu",
+        )
+        step = task.val_step(batch)
+        self.assertIn("features", step.meta)
 
         loss = TorchLoss(
             lambda out, b: LossOutput(total=((out.predictions - b["y"]) ** 2).mean())
