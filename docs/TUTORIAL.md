@@ -4,6 +4,23 @@
 
 你不需要先读源码。
 
+> **TL;DR（给 coding agent）**
+>
+> ```bash
+> mkdir -p ~/code/my-project
+> git -C /path/to/DLEF archive HEAD templates/project \
+>   | tar -x -C ~/code/my-project --strip-components=2
+> cd ~/code/my-project && git init
+> pip install -e /path/to/DLEF && pip install -e .
+> make test
+> ```
+>
+> 然后让它读 `AGENTS.md` 第 0 节：先出计划，不要先写代码。
+
+> **项目内版本**：复制完成后，项目根目录里会有一份 `TUTORIAL.md`
+> （来自 `templates/project/TUTORIAL.md`），后续步骤可以直接看它。
+> 这份 `docs/TUTORIAL.md` 是 DLEF 仓库的完整版，额外包含 examples / 框架改动 / FAQ。
+
 ---
 
 ## 0. 先选对入口
@@ -40,15 +57,36 @@ pip install -U pip
 
 ## 2. 复制模板
 
+只复制 `templates/project/` 的**内容**，不要复制整个 DLEF 仓库。`dlef/` 和
+`adapters/` 是安装进来的依赖，不是项目文件。
+
+从 DLEF 仓库精确复制（不含 `output/` 里的旧 run、`__pycache__`）：
+
 ```bash
-cd /path/to/DLEF
-mkdir -p ~/dl-projects
-cp -r templates/project ~/dl-projects/demo
+mkdir -p ~/dl-projects/demo
+git -C /path/to/DLEF archive HEAD templates/project \
+  | tar -x -C ~/dl-projects/demo --strip-components=2
 cd ~/dl-projects/demo
 git init
 ```
 
-现在这个 `demo/` 就是你的项目。`core/` 是占位包名；demo 先不用改。
+如果你改了模板工作区、想连未提交修改一起带走，用 rsync：
+
+```bash
+mkdir -p ~/dl-projects/demo
+rsync -a \
+  --exclude '__pycache__' --exclude '*.pyc' \
+  --exclude 'output/runs' --exclude 'output/artifacts' \
+  --exclude 'output/sweeps' --exclude 'output/test_access' \
+  /path/to/DLEF/templates/project/ ~/dl-projects/demo/
+```
+
+现在这个 `demo/` 就是你的项目。`core/` 是项目包名。项目根目录里还有一份
+`TUTORIAL.md`（随模板复制），后续操作可以直接按它走。
+
+> **不要复制**：`dlef/`、`adapters/`、`examples/`、DLEF 根目录的 `tests/`、
+> `docs/`、`.git/`、`output/runs|artifacts|sweeps|test_access`。
+> 数据字节放 `$DLEF_DATA_ROOT`，不进项目。
 
 ---
 
@@ -66,6 +104,21 @@ python -c "import dlef, torch; print('ok')"
 ```
 
 `dlef` 是框架 core；`core` 是你的项目包。
+
+### 让 coding agent 接手
+
+环境装好之后（模板 smoke 见下一节），把项目目录交给 agent，第一段话可以只有：
+
+```text
+读 AGENTS.md，按里面的 0. Start here 执行。
+先给我计划，不要先写代码：
+任务 / 数据 / split / benchmark / metric / 要改的文件 / smoke test。
+我确认后再实现。
+```
+
+`AGENTS.md` 已经写了框架是什么、三层结构、文件放置、配置规则、
+run/eval/claim 生命周期和禁止事项；agent 不需要你再解释 DLEF。
+如果它问“这个框架怎么用”，让它重新读 `AGENTS.md` 第 0 节。
 
 ---
 
@@ -223,7 +276,7 @@ echo "$EVAL_ID"
 ```bash
 python - <<PY
 from dlef.claim import Claim, ClaimStore
-ClaimStore("claims").add(Claim(
+ClaimStore("output/claims").add(Claim(
     claim_id="demo",
     text="Demo baseline MAE",
     eval_ids=("$EVAL_ID",),
@@ -238,8 +291,8 @@ PY
 python -m dlef.cli report \
   --runs output/runs \
   --claims output/claims \
-  --out report.md
-cat report.md
+  --out output/reports/report.md
+cat output/reports/report.md
 ```
 
 报告里的每一行都能追到 eval → checkpoint → run。

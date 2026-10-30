@@ -352,7 +352,7 @@ python core/commands/sweep.py --config input/configs/base.yaml
 ```python
 from dlef.claim import Claim, ClaimStore
 
-ClaimStore("claims").add(
+ClaimStore("output/claims").add(
     Claim(
         claim_id="main-result",
         text="Our method improves the main metric",

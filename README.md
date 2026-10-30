@@ -5,7 +5,7 @@ General deep learning experiment framework. The Python package is `dlef`.
 DLEF is domain-agnostic: it owns contracts, run records, evaluation, sweeps and
 reports; training stacks live in adapters.
 
-**Tutorial:** [`docs/TUTORIAL.md`](docs/TUTORIAL.md). **Final report:** [`REPORT.md`](REPORT.md). **Agent guide:** [`AGENTS.md`](AGENTS.md).
+**Tutorial:** [`docs/TUTORIAL.md`](docs/TUTORIAL.md) (project-local: [`templates/project/TUTORIAL.md`](templates/project/TUTORIAL.md)). **Final report:** [`REPORT.md`](REPORT.md). **Agent guide:** [`AGENTS.md`](AGENTS.md).
 
 > **Hard rule:** the core never contains domain words.
 > image / text / audio / video, bbox / depth / mm, classification / detection /
@@ -255,20 +255,23 @@ DDP evaluation and distributed checkpoint resume are v0 gaps.
 
 ## Project template
 
-`templates/project/` is the copyable skeleton. It imports `dlef`; it does not
-vendor the core. The project is organized into three layers: `input/` (configs
-and benchmarks), `core/` (project source), and `output/` (runs, claims,
-reports).
+`templates/project/` is the copyable skeleton. Copy **only its contents**; do
+not copy the DLEF repository. It imports `dlef`; it does not vendor the core.
+The project is organized into three layers: `input/` (configs and benchmarks),
+`core/` (project source), and `output/` (runs, claims, reports).
 
 ```bash
-cp -r templates/project ~/my-experiment
+mkdir -p ~/my-experiment
+git -C /path/to/DLEF archive HEAD templates/project \
+  | tar -x -C ~/my-experiment --strip-components=2
 cd ~/my-experiment
 git init
 pip install -e /path/to/DLEF
 pip install -e .
-python core/commands/train.py --config input/configs/base.yaml
+make test
 ```
 
+The copied project includes `AGENTS.md` (rules) and `TUTORIAL.md` (runbook).
 See `templates/project/README.md` for the replace points and commands. The
 template contains a synthetic placeholder; replace the data/model/loss/metrics
 modules with your own.
@@ -280,7 +283,7 @@ A `Claim` links a reported number/table to one or more `EvalRecord`s.
 ```python
 from dlef.claim import Claim, ClaimStore
 
-ClaimStore("claims").add(
+ClaimStore("output/claims").add(
     Claim(
         claim_id="main-result",
         text="Our method improves the main metric",

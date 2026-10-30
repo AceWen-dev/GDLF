@@ -6,6 +6,34 @@ vendor or copy the core.
 **Agent guide:** [`AGENTS.md`](AGENTS.md) — read this before editing, or before
 asking a coding agent to edit.
 
+**Tutorial:** [`TUTORIAL.md`](TUTORIAL.md) — copy → install → smoke → first
+claim, written for the project directory (it travels with the template).
+
+## Start a new project
+
+Copy **only this directory's contents** into a new project root; do not copy
+the DLEF repository. From the DLEF repo:
+
+```bash
+mkdir -p ~/code/my-project
+git -C /path/to/DLEF archive HEAD templates/project \
+  | tar -x -C ~/code/my-project --strip-components=2
+cd ~/code/my-project
+git init
+pip install -e /path/to/DLEF   # dlef + adapters
+pip install -e .               # this project
+export DLEF_DATA_ROOT=/path/to/data
+make test
+```
+
+Then read [`AGENTS.md`](AGENTS.md) and [`TUTORIAL.md`](TUTORIAL.md), or give
+them to your coding agent. `AGENTS.md` contains the framework orientation, the
+one-time init/verify steps, the placement matrix, and the "plan before code"
+protocol; `TUTORIAL.md` is the step-by-step runbook.
+
+`dlef/` and `adapters/` are installed, not copied. Data bytes stay outside the
+repo under `$DLEF_DATA_ROOT`.
+
 ## What is here
 
 ```text
@@ -60,6 +88,7 @@ output/                   # layer 3: generated results
   README.md
 
 AGENTS.md                 # project-local agent guide
+TUTORIAL.md               # step-by-step runbook for this project
 README.md
 pyproject.toml
 Makefile

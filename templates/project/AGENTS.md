@@ -7,6 +7,69 @@ This project was copied from `templates/project/`. The placeholder is synthetic
 1-D regression. Replace/extend the component packages; keep `task.py` as the
 composition root.
 
+For the step-by-step runbook, read [`TUTORIAL.md`](TUTORIAL.md); this file is
+the contract.
+
+---
+
+## 0. Start here (agent quickstart)
+
+**DLEF in one paragraph.** DLEF is a thin, domain-agnostic experiment OS. It
+owns config resolution, run manifests, evaluation, sweeps, retention and
+reports; training stacks live in adapters (`adapters/torch` is installed with
+the core). A project has three layers: `input/` (declarative configs and frozen
+benchmarks), `core/` (project code), `output/` (generated evidence). The core
+is installed as the `dlef` package and is never copied into the project.
+
+If `core/` and `input/` already exist next to this file, you are in the
+**existing project** case: skip the init block and go to "Existing project".
+
+**New project from the template.** Copy only the template contents, not the
+DLEF repository. If the human has not named `<project-dir>`, ask once; do not
+invent a path.
+
+```bash
+mkdir -p <project-dir>
+git -C <DLEF-root> archive HEAD templates/project \
+  | tar -x -C <project-dir> --strip-components=2
+cd <project-dir>
+git init
+pip install -e <DLEF-root>   # dlef + adapters
+pip install -e .             # project core
+export DLEF_DATA_ROOT=<data-root>
+```
+
+Do **not** copy `<DLEF-root>/dlef`, `adapters`, `examples`, `docs`, the DLEF
+root `tests`, `.git`, or any `output/runs|artifacts|sweeps|test_access`.
+
+**Existing project.** Do not re-initialize. Verify the wiring:
+
+```bash
+make test
+python core/commands/train.py --config input/configs/base.yaml \
+  --set epochs=1 --set experiment=smoke
+```
+
+Success means `output/runs/<project>/smoke/<run_id>/` contains
+`manifest.json`, `config.resolved.json`, `metrics.jsonl`, `logs/train.log`
+and `checkpoints/last.pt`.
+
+**First response = plan, not code.** Read this file, `TUTORIAL.md`, `README.md`,
+`core/README.md`, `core/data/README.md`, `core/config.py`, `core/task.py` and
+`input/configs/base.yaml`. Then state:
+
+1. the task and the comparison;
+2. where the data lives (`$DLEF_DATA_ROOT`), sample ids, label units;
+3. the train/val/test membership rules and the grouping that prevents leakage;
+4. the frozen benchmark: test membership + label version + eval transform +
+   metric protocol;
+5. which files you will add/change, and which stay untouched;
+6. the 1-2 step smoke test and its expected output.
+
+Ask the human only for data/split/benchmark/metric semantics that cannot be
+inferred from the repo. Do not ask "what is DLEF" — this file is the answer.
+Do not write code until the plan is confirmed.
+
 ---
 
 ## 1. Layout
@@ -70,6 +133,7 @@ core/                     # layer 2: project source
     test_benchmark.py
     test_config_contract.py
     test_command_surface.py
+    test_paths.py
   README.md
 
 scripts/                 # project-specific scripts, intentionally unstructured
@@ -85,6 +149,7 @@ output/                   # layer 3: generated results
   README.md
 
 AGENTS.md                # project-local guide
+TUTORIAL.md              # step-by-step runbook
 README.md
 pyproject.toml
 Makefile
@@ -131,7 +196,7 @@ at the project root.
 pip install -e /path/to/DLEF   # core
 pip install -e .               # project deps (torch, PyYAML)
 
-python -m unittest discover -s tests -v
+python -m unittest discover -s core/tests -v
 python core/commands/train.py --config input/configs/base.yaml
 python core/commands/eval.py \
   --checkpoint output/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
@@ -406,7 +471,7 @@ Rules:
   id it belongs to:
   ```python
   from dlef.claim import Claim, ClaimStore
-  ClaimStore("claims").add(
+  ClaimStore("output/claims").add(
       Claim(
           claim_id="main-result",
           text="...",
@@ -419,7 +484,7 @@ Rules:
 - Generate the report, do not hand-copy numbers:
   ```bash
   make report
-  # or: python -m dlef.cli report --runs output/runs --claims claims --out report.md
+  # or: python -m dlef.cli report --runs output/runs --claims output/claims --out output/reports/report.md
   ```
 
 ---
@@ -460,7 +525,7 @@ Every project should have:
 Run:
 
 ```bash
-python -m unittest discover -s tests -v
+python -m unittest discover -s core/tests -v
 ```
 
 If the change touches the framework itself, stop: make the core change in the
