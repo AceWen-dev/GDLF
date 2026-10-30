@@ -168,6 +168,67 @@ class RetentionTests(unittest.TestCase):
             )
             self.assertEqual({a.action for a in unprotected.runs}, {"delete"})
 
+    def test_gc_prunes_empty_experiment_dirs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = RunStore(Path(tmp) / "runs")
+            run = make_run(store, started="2026-07-01T00:00:00+00:00", seed=1)
+            service = RetentionService(store)
+            plan = service.plan(permissive())
+            result = service.apply(plan, dry_run=False)
+            self.assertEqual(result.deleted_runs, [run.run_id])
+            self.assertFalse(run.dir.exists())
+            self.assertFalse((store.root / "p").exists())
+            self.assertTrue(store.root.exists())
+
+    def test_sweep_gc(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
+            run = make_run(store, started="2026-05-01T00:00:00+00:00", seed=1)
+            sweep_store = SweepStore(root / "sweeps")
+            sweep_store.save(
+                SweepRecord(
+                    sweep_id="sweep-old",
+                    spec={},
+                    status="completed",
+                    created_at="2020-01-01T00:00:00+00:00",
+                )
+            )
+            sweep_store.save(
+                SweepRecord(
+                    sweep_id="sweep-running",
+                    spec={},
+                    status="running",
+                    created_at="2020-01-01T00:00:00+00:00",
+                )
+            )
+            sweep_store.save(
+                SweepRecord(
+                    sweep_id="sweep-kept-run",
+                    spec={},
+                    status="completed",
+                    results=[{"run_id": run.run_id}],
+                    created_at="2020-01-01T00:00:00+00:00",
+                )
+            )
+            service = RetentionService(store, sweep_store=sweep_store)
+            plan = service.plan(
+                permissive(
+                    keep_last=1,
+                    sweep_ttl_days=30.0,
+                    protect_status=frozenset({"running"}),
+                )
+            )
+            self.assertEqual({a.sweep_id for a in plan.delete_sweeps}, {"sweep-old"})
+            kept = {a.sweep_id for a in plan.sweeps if a.action == "keep"}
+            self.assertEqual(kept, {"sweep-running", "sweep-kept-run"})
+
+            result = service.apply(plan, dry_run=False)
+            self.assertEqual(result.deleted_sweeps, ["sweep-old"])
+            self.assertFalse((sweep_store.root / "sweep-old").exists())
+            self.assertTrue((sweep_store.root / "sweep-running").exists())
+            self.assertTrue((sweep_store.root / "sweep-kept-run").exists())
+
     def test_artifact_gc(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -7,7 +7,7 @@ experiment commands and not project-specific scripts.
 core/tools/
   benchmark.py   # create / verify a frozen benchmark manifest
   configs.py     # list / validate experiment configs
-  runs.py        # list runs with config source + latest metric
+  runs.py        # experiment summary / run index (filters, --all, --json)
   run_info.py    # one run: config -> benchmark -> source files
   _bootstrap.py  # internal: find the core when running in-repo
 ```

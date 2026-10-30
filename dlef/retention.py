@@ -21,6 +21,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Mapping
 
 from .run import ArtifactStore, Run, RunStore
@@ -105,9 +106,32 @@ class ArtifactAction:
 
 
 @dataclass(frozen=True)
+class SweepAction:
+    sweep_id: str
+    status: str
+    action: str  # keep | delete
+    reason: str
+    size_bytes: int
+    path: str
+    created_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "sweep_id": self.sweep_id,
+            "status": self.status,
+            "action": self.action,
+            "reason": self.reason,
+            "size_bytes": self.size_bytes,
+            "path": self.path,
+            "created_at": self.created_at,
+        }
+
+
+@dataclass(frozen=True)
 class GcPlan:
     runs: tuple[RunAction, ...] = ()
     artifacts: tuple[ArtifactAction, ...] = ()
+    sweeps: tuple[SweepAction, ...] = ()
 
     @property
     def delete_runs(self) -> tuple[RunAction, ...]:
@@ -118,9 +142,15 @@ class GcPlan:
         return tuple(action for action in self.artifacts if action.action == "delete")
 
     @property
+    def delete_sweeps(self) -> tuple[SweepAction, ...]:
+        return tuple(action for action in self.sweeps if action.action == "delete")
+
+    @property
     def bytes_reclaimable(self) -> int:
-        return sum(action.size_bytes for action in self.delete_runs) + sum(
-            action.size_bytes for action in self.delete_artifacts
+        return (
+            sum(action.size_bytes for action in self.delete_runs)
+            + sum(action.size_bytes for action in self.delete_artifacts)
+            + sum(action.size_bytes for action in self.delete_sweeps)
         )
 
     def summary(self, *, include_kept: bool = False) -> str:
@@ -141,10 +171,25 @@ class GcPlan:
                         _format_bytes(action.size_bytes),
                     )
                 )
+        for action in self.sweeps:
+            if include_kept or action.action == "delete":
+                rows.append(
+                    (
+                        "sweep",
+                        action.sweep_id,
+                        action.action,
+                        action.reason,
+                        _format_bytes(action.size_bytes),
+                    )
+                )
         if not rows:
             kept_runs = len(self.runs) - len(self.delete_runs)
             kept_artifacts = len(self.artifacts) - len(self.delete_artifacts)
-            return f"(no deletions; kept {kept_runs} runs, {kept_artifacts} artifacts)"
+            kept_sweeps = len(self.sweeps) - len(self.delete_sweeps)
+            return (
+                f"(no deletions; kept {kept_runs} runs, {kept_artifacts} artifacts, "
+                f"{kept_sweeps} sweeps)"
+            )
         rows.sort(key=lambda row: (0 if row[2] == "delete" else 1, row[0], row[1]))
         lines = [
             "| kind | id | action | reason | size |",
@@ -155,7 +200,8 @@ class GcPlan:
         lines.append("")
         lines.append(
             f"reclaimable: {_format_bytes(self.bytes_reclaimable)} "
-            f"({len(self.delete_runs)} runs, {len(self.delete_artifacts)} artifacts)"
+            f"({len(self.delete_runs)} runs, {len(self.delete_artifacts)} artifacts, "
+            f"{len(self.delete_sweeps)} sweeps)"
         )
         return "\n".join(lines)
 
@@ -165,23 +211,27 @@ class GcResult:
     dry_run: bool
     deleted_runs: list[str] = field(default_factory=list)
     deleted_artifacts: list[str] = field(default_factory=list)
+    deleted_sweeps: list[str] = field(default_factory=list)
     bytes_freed: int = 0
     bytes_reclaimable: int = 0
     errors: list[str] = field(default_factory=list)
     planned_runs: list[str] = field(default_factory=list)
     planned_artifacts: list[str] = field(default_factory=list)
+    planned_sweeps: list[str] = field(default_factory=list)
 
     def summary(self) -> str:
         if self.dry_run:
             text = (
                 f"dry-run: would delete {len(self.planned_runs)} run(s), "
-                f"{len(self.planned_artifacts)} artifact(s); "
+                f"{len(self.planned_artifacts)} artifact(s), "
+                f"{len(self.planned_sweeps)} sweep(s); "
                 f"reclaimable {_format_bytes(self.bytes_reclaimable)}"
             )
         else:
             text = (
                 f"deleted {len(self.deleted_runs)} run(s), "
-                f"{len(self.deleted_artifacts)} artifact(s); "
+                f"{len(self.deleted_artifacts)} artifact(s), "
+                f"{len(self.deleted_sweeps)} sweep(s); "
                 f"freed {_format_bytes(self.bytes_freed)}"
             )
         if self.errors:
@@ -278,6 +328,44 @@ class RetentionService:
             for run in runs
         )
 
+        sweep_actions: list[SweepAction] = []
+        if self.sweep_store is not None:
+            for sweep in self.sweep_store.list():
+                referenced = {
+                    str(result["run_id"])
+                    for result in sweep.results
+                    if isinstance(result, Mapping) and result.get("run_id")
+                }
+                kept_refs = referenced & set(keep)
+                action = "keep"
+                reason = "ttl not set"
+                if policy.sweep_ttl_days is not None:
+                    if sweep.status in policy.protect_status:
+                        reason = f"status:{sweep.status}"
+                    else:
+                        age = _age_days(sweep.created_at)
+                        if age is None:
+                            reason = "unknown-age"
+                        elif age <= policy.sweep_ttl_days:
+                            reason = "young"
+                        elif kept_refs:
+                            reason = f"runs-kept:{len(kept_refs)}"
+                        else:
+                            action = "delete"
+                            reason = "expired"
+                path = self.sweep_store.root / sweep.sweep_id
+                sweep_actions.append(
+                    SweepAction(
+                        sweep_id=sweep.sweep_id,
+                        status=sweep.status,
+                        action=action,
+                        reason=reason,
+                        size_bytes=_dir_size(path),
+                        path=str(path),
+                        created_at=sweep.created_at,
+                    )
+                )
+
         kept_digests = {
             digest
             for run in runs
@@ -304,7 +392,11 @@ class RetentionService:
                 )
             )
 
-        return GcPlan(runs=run_actions, artifacts=tuple(artifact_actions_list))
+        return GcPlan(
+            runs=run_actions,
+            artifacts=tuple(artifact_actions_list),
+            sweeps=tuple(sweep_actions),
+        )
 
     def apply(self, plan: GcPlan, *, dry_run: bool = True) -> GcResult:
         result = GcResult(
@@ -312,6 +404,7 @@ class RetentionService:
             bytes_reclaimable=plan.bytes_reclaimable,
             planned_runs=[action.run_id for action in plan.delete_runs],
             planned_artifacts=[f"{action.digest}/{action.name}" for action in plan.delete_artifacts],
+            planned_sweeps=[action.sweep_id for action in plan.delete_sweeps],
         )
         if dry_run:
             return result
@@ -321,6 +414,7 @@ class RetentionService:
                 shutil.rmtree(action.path)
                 result.deleted_runs.append(action.run_id)
                 result.bytes_freed += action.size_bytes
+                _prune_empty_dirs(Path(action.path).parent, self.run_store.root)
             except FileNotFoundError:
                 continue
             except OSError as exc:
@@ -333,6 +427,15 @@ class RetentionService:
                     result.bytes_freed += action.size_bytes
             except OSError as exc:
                 result.errors.append(f"{action.digest}/{action.name}: {exc}")
+
+        if self.sweep_store is not None:
+            for action in plan.delete_sweeps:
+                try:
+                    if self.sweep_store.delete(action.sweep_id):
+                        result.deleted_sweeps.append(action.sweep_id)
+                        result.bytes_freed += action.size_bytes
+                except OSError as exc:
+                    result.errors.append(f"sweep {action.sweep_id}: {exc}")
 
         return result
 
@@ -363,6 +466,30 @@ def _age_days(iso: str | None) -> float | None:
 
 def _age_days_from_mtime(mtime: float, now: float) -> float:
     return (now - mtime) / 86400.0
+
+
+def _prune_empty_dirs(path: Path, stop: Path) -> None:
+    """Remove empty experiment/project dirs after their last run is deleted."""
+
+    stop = stop.resolve()
+    current = path
+    while current.resolve() != stop and current.is_dir():
+        try:
+            current.rmdir()
+        except OSError:
+            break
+        current = current.parent
+
+
+def _dir_size(path: Path) -> int:
+    total = 0
+    for item in path.rglob("*"):
+        try:
+            if item.is_file():
+                total += item.stat().st_size
+        except OSError:
+            continue
+    return total
 
 
 def _metric_value(run: Run, key: str, mode: str) -> float | None:

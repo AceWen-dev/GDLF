@@ -77,12 +77,25 @@ output/runs/<project>/smoke/<run_id>/
 
 ---
 
-## 3. 看一次 run
+## 3. 看 run：先看 experiment 摘要，再看单个 run
 
-先看 run 目录，再看 config：
+实验多了不要一上来列所有 run。先看按 experiment 聚合的摘要：
 
 ```bash
-python core/tools/runs.py --runs output/runs
+make runs
+python core/tools/runs.py --limit 20
+python core/tools/runs.py --experiment <name>
+python core/tools/runs.py --status completed --since 2026-10-01
+python core/tools/runs.py --tag baseline
+python core/tools/runs.py --json
+```
+
+`--experiment` 会自动切到 run 视图；`--all` 看所有 run；`--limit 0` 不限。
+摘要列：run 数、最新时间、状态、last/best metric、tags、last config。
+
+然后看一个 run 的详情：
+
+```bash
 python core/tools/run_info.py --runs output/runs --run <run_id>
 ```
 
@@ -171,12 +184,16 @@ python core/tools/configs.py list --check
 
 ```bash
 python core/commands/train.py \
-  --config input/configs/experiments/baseline/<variant>.yaml
+  --config input/configs/experiments/baseline/<variant>.yaml \
+  --tag baseline
 
 python core/commands/eval.py \
   --checkpoint output/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt \
   --split val
 ```
+
+`--tag` 会写进 manifest，`dlef gc --keep-tag` 会保护这些 run。常用 tag：
+`baseline`、`reported`、`debug`。
 
 val 用于模型选择。不要用 test 调参。
 
@@ -288,13 +305,15 @@ python -m dlef.cli report \
 make gc-dry
 ```
 
-确认计划后再 apply：
+启动时用 `--tag baseline` / `--tag reported` 标记必须保留的 run；
+`--keep-tag reported` 会保护它们。确认计划后再 apply：
 
 ```bash
 python -m dlef.cli gc \
   --runs output/runs --sweeps output/sweeps \
   --keep-last 3 --keep-best 1 --metric-key <your-metric> \
-  --keep-tag reported --artifact-ttl-days 30 --apply
+  --keep-tag reported --keep-tag baseline \
+  --artifact-ttl-days 30 --sweep-ttl-days 30 --apply
 ```
 
 不要 `rm -rf output/runs/...`。`reported` / `baseline` tag 的 run 会被保护；
@@ -329,6 +348,10 @@ run/eval/claim 生命周期和禁止事项；agent 不需要你再解释 DLEF。
 - 手动删 run：不要；用 `dlef gc`。
 - 把数据路径写进 config 或提交数据：不要；用 `$DLEF_DATA_ROOT`。
 - 每个 seed 建一个 config：不要；seed 是 sweep 维度。
+- 每个 smoke test 建一个新 experiment：不要；用一个 `debug`/`smoke`
+  experiment，或给 run 打 `--tag debug`，否则 `output/runs` 很快会失控。
+- 直接翻 `output/runs` 目录找实验：不要；用 `runs.py` 的 experiment 摘要，
+  再 `--experiment` / `run_info.py` 钻取。
 - 在 test 上调参，或看完 test 结果再改 benchmark：不要。
 - 从 `train.log` 手抄数字：不要；用 eval + claim + report。
 - 在项目根目录加 `utils.py`：不要；逻辑放 `core/`，一次性脚本放 `scripts/`。

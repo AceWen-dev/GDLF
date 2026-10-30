@@ -101,6 +101,27 @@ class LifecycleTests(unittest.TestCase):
             runner.fit(task, ToyDataset(32, 8, 0.1, 1), None, config)
             self.assertEqual(scheduler.calls, 8)
 
+    def test_run_tags(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
+            runner = Runner(store, store.artifact_store)
+            config = resolve_config(
+                ToyConfig,
+                {"seed": 1, "epochs": 1, "n_train": 8, "batch_size": 8, "log_every": 0},
+            )
+            run = runner.fit(
+                ToyTask(config.schema),
+                ToyDataset(8, 8, 0.1, 1),
+                None,
+                config,
+                tags={"baseline": "true", "debug": "1"},
+            )
+            self.assertIsNotNone(run)
+            self.assertEqual(run.manifest.tags["framework"], "dlef")
+            self.assertEqual(run.manifest.tags["baseline"], "true")
+            self.assertEqual(run.manifest.tags["debug"], "1")
+
     def test_max_steps(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

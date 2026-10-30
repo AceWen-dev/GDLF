@@ -1,6 +1,6 @@
 PYTHON ?= python
 
-.PHONY: train eval inspect runs configs sweep report gc-dry test doctor
+.PHONY: train eval inspect runs runs-all configs sweep report gc-dry test doctor
 
 train:
 	$(PYTHON) core/commands/train.py --config input/configs/base.yaml
@@ -16,6 +16,9 @@ inspect:
 runs:
 	$(PYTHON) core/tools/runs.py --runs output/runs
 
+runs-all:
+	$(PYTHON) core/tools/runs.py --runs output/runs --all
+
 configs:
 	$(PYTHON) core/tools/configs.py list
 
@@ -27,7 +30,7 @@ report:
 
 # Change --metric-key to this project's primary metric before relying on it.
 gc-dry:
-	$(PYTHON) -m dlef.cli gc --runs output/runs --sweeps output/sweeps --keep-last 3 --keep-best 1 --metric-key mae --keep-tag reported --artifact-ttl-days 30
+	$(PYTHON) -m dlef.cli gc --runs output/runs --sweeps output/sweeps --keep-last 3 --keep-best 1 --metric-key mae --keep-tag reported --keep-tag baseline --artifact-ttl-days 30 --sweep-ttl-days 30
 
 test:
 	$(PYTHON) -m unittest discover -s core/tests -v

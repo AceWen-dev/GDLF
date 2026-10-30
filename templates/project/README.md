@@ -243,21 +243,24 @@ core.
 
 ```bash
 python core/commands/train.py --config input/configs/base.yaml
+python core/commands/train.py --config input/configs/base.yaml \
+  --tag baseline --tag reported   # tags protect runs from gc
 python core/commands/eval.py \
   --checkpoint output/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
+python core/tools/runs.py                    # experiment summary
+python core/tools/runs.py --experiment <name>
 python core/tools/run_info.py --run <run_id>
-python core/tools/runs.py
 python core/tools/configs.py list
 python core/commands/sweep.py --config input/configs/base.yaml
 python -m unittest discover -s core/tests -v
 python -m dlef.cli report --runs output/runs --claims output/claims --out output/reports/report.md
 ```
 
-Or `make train`, `make runs`, `make configs`, `make sweep`, `make report`,
-`make gc-dry`, `make test`, `make doctor`. `make eval CHECKPOINT=...` needs the
-checkpoint path explicitly; `make inspect RUN=<run_id>` prints the run card.
-`make gc-dry` is a dry-run; change `--metric-key` to your primary metric before
-using `--apply`.
+Or `make train`, `make runs`, `make runs-all`, `make configs`, `make sweep`,
+`make report`, `make gc-dry`, `make test`, `make doctor`.
+`make eval CHECKPOINT=...` needs the checkpoint path explicitly;
+`make inspect RUN=<run_id>` prints the run card. `make gc-dry` is a dry-run;
+change `--metric-key` to your primary metric before using `--apply`.
 
 ## Command surface
 
@@ -316,7 +319,17 @@ log header prints the same summary.
 
 ## Inspect a run
 
-The run directory is the entry point; the config is the first file to read:
+Start with the experiment-level index; it keeps a long run list readable:
+
+```bash
+make runs                                      # one row per experiment
+python core/tools/runs.py --experiment <name>  # runs inside one experiment
+python core/tools/runs.py --status completed --since 2026-10-01
+python core/tools/runs.py --tag baseline
+```
+
+Then open one run; the run directory is the entry point and the config is the
+first file to read:
 
 ```bash
 python core/tools/run_info.py --run <run_id>

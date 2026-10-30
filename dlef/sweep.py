@@ -14,6 +14,7 @@ import json
 import math
 import os
 import random
+import shutil
 import subprocess
 import threading
 import uuid
@@ -321,6 +322,15 @@ class SweepStore:
             SweepRecord.from_dict(json.loads(path.read_text(encoding="utf-8")))
             for path in sorted(self.root.glob("*/sweep.json"))
         ]
+
+    def delete(self, sweep_id: str) -> bool:
+        """Remove one sweep directory; return False when it is already gone."""
+
+        path = self.root / sweep_id
+        if not path.is_dir():
+            return False
+        shutil.rmtree(path)
+        return True
 
 
 # ---------------------------------------------------------------------------

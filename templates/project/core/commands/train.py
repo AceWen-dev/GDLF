@@ -28,6 +28,17 @@ from core.runtime import (  # noqa: E402
 from core.task import build_task  # noqa: E402
 
 
+def _parse_tags(items: list[str]) -> dict[str, str]:
+    tags: dict[str, str] = {}
+    for item in items:
+        name, separator, value = item.partition("=")
+        name = name.strip()
+        if not name:
+            raise SystemExit(f"invalid --tag: {item!r}")
+        tags[name] = value if separator else "true"
+    return tags
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
@@ -38,6 +49,14 @@ def main() -> int:
         default=[],
         metavar="KEY=VALUE",
         help="typed override, e.g. --set model.name=linear --set loss.name=huber",
+    )
+    parser.add_argument(
+        "--tag",
+        action="append",
+        default=[],
+        metavar="NAME[=VALUE]",
+        help="attach a tag to this run, e.g. --tag baseline --tag debug; "
+        "tags can protect runs from gc",
     )
     args = parser.parse_args()
 
@@ -59,7 +78,13 @@ def main() -> int:
         distributed=ddp,
     )
     task = build_task(config.schema, device=device)
-    run = runner.fit(task, train_loader, val_loader, config)
+    run = runner.fit(
+        task,
+        train_loader,
+        val_loader,
+        config,
+        tags=_parse_tags(args.tag),
+    ) #训练的核心代码
     if run is None:
         print(f"rank {getattr(policy, '_rank', 0)}: training complete (non-main)")
         return 0

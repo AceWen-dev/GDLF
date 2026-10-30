@@ -71,6 +71,8 @@ class Runner:
         train_data: Any,
         val_data: Any | None,
         config: Config,
+        *,
+        tags: Mapping[str, str] | None = None,
     ) -> Run | None:
         validate_task(task)
         schema = config.schema
@@ -86,7 +88,7 @@ class Runner:
                 config_digest=config.digest,
                 seed=schema.seed,
                 data_versions=_data_versions(train_data, val_data),
-                tags={"framework": "dlef"},
+                tags={"framework": "dlef", **dict(tags or {})},
                 config_source=config.source,
             )
             run.save_json("config.resolved.json", config.resolved)

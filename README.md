@@ -117,7 +117,8 @@ examples/toy/output/
   different `benchmark_id`s are reported as not directly comparable.
 - Config is the single declaration of choices; the manifest records config
   digest, original config source and code version. The template's
-  `core/tools/run_info.py` resolves a run's config to its source files.
+  `core/tools/runs.py` is the experiment-level index; `run_info.py` resolves a
+  run's config to its source files.
 
 It does **not** prove a good model, a real dataset pipeline, or distributed
 training. Those are adapter concerns.
@@ -192,11 +193,14 @@ python examples/torch_regression/sweep.py
 python -m dlef.cli gc \
   --runs runs --sweeps sweeps \
   --keep-last 3 --keep-best 1 --metric-key val_loss \
-  --keep-tag reported \
-  --artifact-ttl-days 30
+  --keep-tag reported --keep-tag baseline \
+  --artifact-ttl-days 30 --sweep-ttl-days 30
 ```
 
-Default is a dry-run; pass `--apply` to delete. The plan protects:
+Default is a dry-run; pass `--apply` to delete. Tag runs at launch
+(`train.py ... --tag baseline`) so `--keep-tag` can protect them.
+`--sweep-ttl-days` also removes expired sweep records whose runs are no longer
+kept. The plan protects:
 
 - last N per experiment;
 - best N by an eval metric;

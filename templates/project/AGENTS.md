@@ -134,6 +134,7 @@ core/                     # layer 2: project source
     test_config_contract.py
     test_command_surface.py
     test_paths.py
+    test_runs_tool.py
   README.md
 
 scripts/                 # project-specific scripts, intentionally unstructured
@@ -198,10 +199,13 @@ pip install -e .               # project deps (torch, PyYAML)
 
 python -m unittest discover -s core/tests -v
 python core/commands/train.py --config input/configs/base.yaml
+python core/commands/train.py --config input/configs/base.yaml \
+  --tag baseline --tag reported   # tags protect runs from gc
 python core/commands/eval.py \
   --checkpoint output/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
+python core/tools/runs.py                    # experiment summary
+python core/tools/runs.py --experiment <name>
 python core/tools/run_info.py --run <run_id>
-python core/tools/runs.py
 python core/tools/configs.py list
 python core/commands/sweep.py --config input/configs/base.yaml
 ```
@@ -213,6 +217,7 @@ make train
 make eval CHECKPOINT=output/runs/.../checkpoints/last.pt
 make inspect RUN=<run_id>
 make runs
+make runs-all
 make configs
 make sweep
 make test
@@ -413,16 +418,20 @@ Recommended order:
 2. Replace `data/` + model/loss/metrics.
 3. Run the smoke test.
 4. Run baseline; inspect `manifest.json` + `config.resolved.json` + checkpoint.
+   Tag it at launch (`--tag baseline`) if it must survive cleanup.
 5. Evaluate on val; keep test for the final claim.
-6. For variants, use sweep; do not write nested loops.
-7. For a 3-seed result, add `seed` to the sweep params:
+6. Use `core/tools/runs.py` for the experiment-level index; do not scan
+   `output/runs` by hand. `--experiment <name>` drills into one experiment.
+7. For variants, use sweep; do not write nested loops.
+8. For a 3-seed result, add `seed` to the sweep params:
    ```python
    params={"optim.lr": Choice((...)), "seed": Choice((1, 2, 3))}
    # core/commands/sweep.py maps every param with set_dotted; one seed = one run.
    ```
-8. Create a claim for each reported number.
-9. Run `dlef gc` dry-run; tag runs that must survive (`reported`, `baseline`).
-10. Archive manifest/config/report/key checkpoints.
+9. Create a claim for each reported number.
+10. Run `dlef gc` dry-run; tag runs that must survive (`reported`, `baseline`)
+    at launch, not after deletion.
+11. Archive manifest/config/report/key checkpoints.
 
 Rules:
 
@@ -497,11 +506,14 @@ make gc-dry
 python -m dlef.cli gc \
   --runs output/runs --sweeps output/sweeps \
   --keep-last 3 --keep-best 1 --metric-key <your-metric> \
-  --keep-tag reported --artifact-ttl-days 30 --apply
+  --keep-tag reported --keep-tag baseline \
+  --artifact-ttl-days 30 --sweep-ttl-days 30 --apply
 ```
 
 - Default is dry-run; `--apply` is explicit.
 - Never `rm -rf output/runs/...` manually.
+- Tag at launch (`train.py ... --tag baseline`); `--keep-tag` reads manifest
+  tags and protects those runs.
 - Keep `reported`/`baseline` runs; the plan protects parent lineage and
   sweep-referenced runs.
 - Artifacts are content-addressed; only unreferenced + TTL-expired ones are
@@ -541,6 +553,8 @@ Do not edit the installed `dlef` package in place.
 - Do not write to `output/runs/...` by hand.
 - Do not edit completed manifests/metrics/eval records.
 - Do not delete runs/artifacts manually.
+- Do not create one experiment per smoke test; use a `debug`/`smoke`
+  experiment or `--tag debug`.
 - Do not tune on test; do not report a single lucky seed.
 - Do not edit a frozen benchmark manifest; create a new benchmark version.
 - Do not run `--split test` without `--benchmark`.

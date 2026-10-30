@@ -158,13 +158,38 @@ checkpoint: .../checkpoints/last.pt
 
 ---
 
-## 6. 看一次 run 到底有什么
+## 6. 看 run：先看 experiment 摘要，再看单个 run
+
+`output/runs` 很快就会有很多 run；不要一上来 `find`。先看按 experiment
+聚合的摘要：
 
 ```bash
-RUN_DIR=$(find output/runs -name manifest.json | head -1 | xargs dirname)
-echo "$RUN_DIR"
-find "$RUN_DIR" -maxdepth 2 -type f | sort
+make runs
+python core/tools/runs.py                  # 默认 summary
+python core/tools/runs.py --experiment baseline
+python core/tools/runs.py --status completed --since 2026-10-01
+python core/tools/runs.py --tag baseline
+python core/tools/runs.py --json
 ```
+
+`--experiment` 会自动切到 run 视图；`--all` 看所有 run；`--limit 0` 不限。
+摘要里能看到每个 experiment 的 run 数、最新时间、状态、last/best metric、
+tags 和 last config。
+
+然后看一个 run：
+
+```bash
+python core/tools/runs.py --experiment <experiment>
+python core/tools/run_info.py --run <run_id>
+```
+
+run 目录是：
+
+```text
+output/runs/<project>/<experiment>/<run_id>/
+```
+
+需要逐个文件看时再 `find` 这个目录，不要从 `output/runs` 根目录开始扫。
 
 你会看到：
 
@@ -187,8 +212,12 @@ tail -5 "$RUN_DIR/metrics.jsonl"
 更快的入口：
 
 ```bash
-python core/tools/run_info.py --run <run_id>
+make runs                                      # experiment summary
+make runs-all                                  # one row per run
 python core/tools/runs.py --experiment baseline
+python core/tools/runs.py --status completed --since 2026-10-01
+python core/tools/runs.py --tag baseline
+python core/tools/run_info.py --run <run_id>
 python core/tools/configs.py list
 ```
 
@@ -309,10 +338,14 @@ python -m dlef.cli gc \
   --sweeps output/sweeps \
   --keep-last 2 \
   --keep-best 1 \
-  --metric-key mae
+  --metric-key mae \
+  --keep-tag reported \
+  --keep-tag baseline \
+  --sweep-ttl-days 30
 ```
 
-它只会**打印计划**，不会删。
+它只会**打印计划**，不会删。启动训练时用 `--tag baseline` /
+`--tag reported` 标记要保留的 run；`--keep-tag` 会保护它们。
 
 确认后加：
 
@@ -324,6 +357,7 @@ python -m dlef.cli gc \
 
 - 最近 N 个 run；
 - 最好的 N 个 run；
+- 带 `reported` / `baseline` tag 的 run；
 - 其他 run 的 parent；
 - sweep 引用的 run；
 - 被 kept run 引用的 artifact。
@@ -675,11 +709,14 @@ run dir
 
 ```bash
 # 训练
-python core/commands/train.py --config input/configs/base.yaml
+python core/commands/train.py --config input/configs/base.yaml \
+  --tag baseline --tag reported
 
-# 查看 run 的 config / benchmark / 源码
+# 查看 experiment 摘要 / 单个 run 的 config / benchmark / 源码
+make runs
+make runs-all
+python core/tools/runs.py --experiment baseline
 python core/tools/run_info.py --run <run_id>
-python core/tools/runs.py
 
 # 配置目录
 python core/tools/configs.py list

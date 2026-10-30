@@ -46,9 +46,17 @@ class SmokeTests(unittest.TestCase):
             runner = build_runner(Path(tmp), policy)
             train_loader, val_loader = make_loaders(config.schema.data, config.schema.seed)
             task = build_task(config.schema, device=policy.device)
-            run = runner.fit(task, train_loader, val_loader, config)
+            run = runner.fit(
+                task,
+                train_loader,
+                val_loader,
+                config,
+                tags={"baseline": "true"},
+            )
             self.assertIsNotNone(run)
             self.assertEqual(run.manifest.status, "completed")
+            self.assertEqual(run.manifest.tags["baseline"], "true")
+            self.assertEqual(run.manifest.tags["framework"], "dlef")
             self.assertTrue(run.config_path.is_file())
             self.assertTrue(run.checkpoint_path.is_file())
             self.assertTrue(run.log_path.is_file())
