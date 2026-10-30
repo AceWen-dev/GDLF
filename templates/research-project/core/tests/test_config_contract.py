@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 try:
-    from dlef.config import load_config
+    from dlef.config import ConfigError, load_config, resolve_config
     from core.config import ProjectConfig
     from core.data.build import DATASETS, TRANSFORMS
     from core.data.splits import SPLITTERS
@@ -12,6 +12,7 @@ try:
     from core.metrics.build import BUILDERS as METRICS
     from core.models.build import BUILDERS as MODELS
     from core.optimizers.build import BUILDERS as OPTIMIZERS
+    from core.runtime import resolve_output_root
     from core.schedulers.build import BUILDERS as SCHEDULERS
 
     TORCH_AVAILABLE = True
@@ -38,6 +39,32 @@ class ConfigContractTests(unittest.TestCase):
         for name in config.metrics:
             self.assertIn(name, METRICS)
             self.assertIn(name, config.benchmark.metric_versions)
+
+    def test_output_root_and_tensorboard_validate(self) -> None:
+        with self.assertRaises(ConfigError):
+            resolve_config(ProjectConfig, {"output_root": ""})
+        with self.assertRaises(ConfigError):
+            resolve_config(ProjectConfig, {"tensorboard": {"subdir": ""}})
+        with self.assertRaises(ConfigError):
+            resolve_config(ProjectConfig, {"tensorboard": {"flush_secs": 0}})
+
+    def test_output_root_resolution(self) -> None:
+        relative = resolve_config(
+            ProjectConfig,
+            {"output_root": "artifacts"},
+        )
+        self.assertEqual(
+            resolve_output_root(relative.schema, "/tmp/project"),
+            Path("/tmp/project/artifacts"),
+        )
+        absolute = resolve_config(
+            ProjectConfig,
+            {"output_root": "/tmp/absolute"},
+        )
+        self.assertEqual(
+            resolve_output_root(absolute.schema, "/tmp/project"),
+            Path("/tmp/absolute"),
+        )
 
 
 if __name__ == "__main__":

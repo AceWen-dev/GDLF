@@ -12,7 +12,7 @@
 
 ## Decision
 
-`templates/project/` 是一个可复制的项目骨架，**依赖 `dlef` 包**，不 vendor core。
+`templates/research-project/` 是一个可复制的项目骨架，**依赖 `dlef` 包**，不 vendor core。
 
 模板只包含项目特定内容：
 

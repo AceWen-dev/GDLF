@@ -27,7 +27,12 @@ from dlef.config import load_config, resolve_config  # noqa: E402
 from dlef.eval import EvalSpec  # noqa: E402
 from core.config import ProjectConfig  # noqa: E402
 from core.data import build_benchmark, make_loader  # noqa: E402
-from core.runtime import build_policy, build_runner, parse_overrides  # noqa: E402
+from core.runtime import (  # noqa: E402
+    build_policy,
+    build_runner,
+    parse_overrides,
+    resolve_output_root,
+)
 from core.task import build_task  # noqa: E402
 
 
@@ -64,19 +69,12 @@ def main() -> int:
     overrides = parse_overrides(args.overrides)
     checkpoint_payload = TorchCheckpointCodec().load(checkpoint)
     manifest = getattr(checkpoint_payload, "manifest", {}) or {}
-    train_project = str(manifest.get("project", ""))
     train_experiment = str(manifest.get("experiment", ""))
     train_run_id = str(manifest.get("run_id", ""))
 
-    resolved_path = (
-        ROOT
-        / "output"
-        / "runs"
-        / train_project
-        / train_experiment
-        / train_run_id
-        / "config.resolved.json"
-    )
+    # The checkpoint lives at <run_dir>/checkpoints/last.pt; prefer the run
+    # directory next to it so a custom output_root does not break evaluation.
+    resolved_path = checkpoint.parent.parent / "config.resolved.json"
     if resolved_path.is_file():
         base_resolved = json.loads(resolved_path.read_text(encoding="utf-8"))
         config = resolve_config(
@@ -139,7 +137,7 @@ def main() -> int:
     else:
         eval_loader = make_loader(config.schema.data, "val", config.schema.seed)
 
-    runner = build_runner(ROOT / "output", policy)
+    runner = build_runner(resolve_output_root(config.schema, ROOT), policy)
     task = build_task(config.schema, device=device)
     optimizer = task.configure_optimizer(task.get_model())
     policy.on_fit_start(task, optimizer, config.schema)

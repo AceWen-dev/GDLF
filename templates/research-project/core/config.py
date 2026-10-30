@@ -102,6 +102,19 @@ class SchedulerConfig(ConfigSchema):
 
 
 @dataclass
+class TensorBoardConfig(ConfigSchema):
+    enabled: bool = True
+    subdir: str = "tensorboard"
+    flush_secs: int = 10
+
+    def validate(self) -> None:
+        if not self.subdir.strip():
+            raise ConfigError("tensorboard.subdir must not be empty")
+        if self.flush_secs < 1:
+            raise ConfigError("tensorboard.flush_secs must be >= 1")
+
+
+@dataclass
 class BenchmarkConfig(ConfigSchema):
     name: str = "synthetic-test-v1"
     label_version: str = "v1"
@@ -127,12 +140,16 @@ class BenchmarkConfig(ConfigSchema):
 
 @dataclass
 class ProjectConfig(TrainConfig):
+    # Workspace path: where runs/artifacts/sweeps are written. Relative paths
+    # resolve against the project root, not the current working directory.
+    output_root: str = "output"
     data: DataConfig = field(default_factory=DataConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     loss: LossConfig = field(default_factory=LossConfig)
     optim: OptimConfig = field(default_factory=OptimConfig)
     scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
     benchmark: BenchmarkConfig = field(default_factory=BenchmarkConfig)
+    tensorboard: TensorBoardConfig = field(default_factory=TensorBoardConfig)
     metrics: list[str] = field(default_factory=lambda: ["mae"])
     amp: bool = False
     grad_accum_steps: int = 1
@@ -140,6 +157,8 @@ class ProjectConfig(TrainConfig):
 
     def validate(self) -> None:
         super().validate()
+        if not self.output_root.strip():
+            raise ConfigError("output_root must not be empty")
         if not self.metrics:
             raise ConfigError("metrics must not be empty")
         missing = [name for name in self.metrics if name not in self.benchmark.metric_versions]

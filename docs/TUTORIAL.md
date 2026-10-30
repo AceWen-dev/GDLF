@@ -8,7 +8,7 @@
 >
 > ```bash
 > mkdir -p ~/code/my-project
-> git -C /path/to/DLEF archive HEAD templates/project \
+> git -C /path/to/DLEF archive HEAD templates/research-project \
 >   | tar -x -C ~/code/my-project --strip-components=2
 > cd ~/code/my-project && git init
 > pip install -e /path/to/DLEF && pip install -e .
@@ -18,7 +18,7 @@
 > 然后让它读 `AGENTS.md` 第 0 节：先出计划，不要先写代码。
 
 > **项目内版本**：复制完成后，项目根目录里会有一份 `TUTORIAL.md`
-> （来自 `templates/project/TUTORIAL.md`），后续步骤可以直接看它。
+> （来自 `templates/research-project/TUTORIAL.md`），后续步骤可以直接看它。
 > 这份 `docs/TUTORIAL.md` 是 DLEF 仓库的完整版，额外包含 examples / 框架改动 / FAQ。
 
 ---
@@ -27,7 +27,7 @@
 
 | 你想做什么 | 用哪里 |
 |---|---|
-| 开始一个新实验项目 | 复制 `templates/project/` |
+| 开始一个新实验项目 | 复制 `templates/research-project/` |
 | 学习框架怎么跑 | `examples/toy/` 或 `examples/torch_regression/` |
 | 改框架本身 | `dlef/` + `adapters/`，并跑测试 |
 
@@ -57,14 +57,14 @@ pip install -U pip
 
 ## 2. 复制模板
 
-只复制 `templates/project/` 的**内容**，不要复制整个 DLEF 仓库。`dlef/` 和
+只复制 `templates/research-project/` 的**内容**，不要复制整个 DLEF 仓库。`dlef/` 和
 `adapters/` 是安装进来的依赖，不是项目文件。
 
 从 DLEF 仓库精确复制（不含 `output/` 里的旧 run、`__pycache__`）：
 
 ```bash
 mkdir -p ~/dl-projects/demo
-git -C /path/to/DLEF archive HEAD templates/project \
+git -C /path/to/DLEF archive HEAD templates/research-project \
   | tar -x -C ~/dl-projects/demo --strip-components=2
 cd ~/dl-projects/demo
 git init
@@ -78,7 +78,7 @@ rsync -a \
   --exclude '__pycache__' --exclude '*.pyc' \
   --exclude 'output/runs' --exclude 'output/artifacts' \
   --exclude 'output/sweeps' --exclude 'output/test_access' \
-  /path/to/DLEF/templates/project/ ~/dl-projects/demo/
+  /path/to/DLEF/templates/research-project/ ~/dl-projects/demo/
 ```
 
 现在这个 `demo/` 就是你的项目。`core/` 是项目包名。项目根目录里还有一份
@@ -232,6 +232,26 @@ input/configs/
 
 一个 seed 是一个 run，不是一份 config。`runs.py` 直接显示每个 run 的
 `config_source`；`run_info.py` 再把 config 映射到源码文件。
+
+### TensorBoard
+
+`tensorboard.enabled: true` 时，每个 run 写：
+
+```text
+output/runs/<project>/<experiment>/<run_id>/tensorboard/
+```
+
+启动：
+
+```bash
+tensorboard --logdir output/runs --port 6006
+# 远程：tensorboard --logdir output/runs --port 6006 --bind_all
+# 本地：ssh -L 6006:localhost:6006 user@host
+```
+
+会看到 `train/loss`、`train/<term>`、`val/<metric>`，以及 `run/config` /
+`run/manifest` 文本。TensorBoard 只是镜像；`manifest.json`、
+`config.resolved.json`、`metrics.jsonl`、`logs/train.log` 才是记录。
 
 建议养成习惯：**每跑完一次，先看 manifest 和 `config.resolved.json`，再看指标。**
 
@@ -579,6 +599,21 @@ early_stopping:
 `monitor` 必须是 val metrics 里的名字；`patience` 是连续多少个 epoch 没有
 改善后停止。日志会记录 best 值、bad epoch 计数和触发原因。
 
+输出根目录和 TensorBoard 也在顶层：
+
+```yaml
+output_root: output
+
+tensorboard:
+  enabled: true
+  subdir: tensorboard
+  flush_secs: 10
+```
+
+`output_root` 是 workspace path（默认 `output`），相对路径相对项目根；
+它不是实验变量。改了就 `make runs OUTPUT=<path>`，或 export
+`DLEF_OUTPUT_ROOT=<path>`。`tensorboard` 只写镜像事件，不替代 RunStore。
+
 ### task.py
 
 通常不用改。它只负责：
@@ -717,6 +752,9 @@ make runs
 make runs-all
 python core/tools/runs.py --experiment baseline
 python core/tools/run_info.py --run <run_id>
+
+# TensorBoard
+tensorboard --logdir output/runs --port 6006
 
 # 配置目录
 python core/tools/configs.py list

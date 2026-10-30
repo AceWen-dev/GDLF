@@ -5,7 +5,7 @@ General deep learning experiment framework. The Python package is `dlef`.
 DLEF is domain-agnostic: it owns contracts, run records, evaluation, sweeps and
 reports; training stacks live in adapters.
 
-**Tutorial:** [`docs/TUTORIAL.md`](docs/TUTORIAL.md) (project-local: [`templates/project/TUTORIAL.md`](templates/project/TUTORIAL.md)). **Final report:** [`REPORT.md`](REPORT.md). **Agent guide:** [`AGENTS.md`](AGENTS.md).
+**Tutorial:** [`docs/TUTORIAL.md`](docs/TUTORIAL.md) (project-local: [`templates/research-project/TUTORIAL.md`](templates/research-project/TUTORIAL.md)). **Final report:** [`REPORT.md`](REPORT.md). **Agent guide:** [`AGENTS.md`](AGENTS.md).
 
 > **Hard rule:** the core never contains domain words.
 > image / text / audio / video, bbox / depth / mm, classification / detection /
@@ -47,7 +47,7 @@ dlef/
 adapters/torch/    # optional PyTorch adapter (not imported by core)
 examples/toy/      # synthetic linear regression; proves the chain
 examples/torch_regression/  # synthetic tensor example via the adapter
-templates/project/ # copyable project skeleton; imports dlef, does not vendor it
+templates/research-project/ # copyable project skeleton; imports dlef, does not vendor it
 tests/             # unittest suite (works with pytest too)
 docs/              # ADR, contract draft
 AGENTS.md          # agent guide: project setup, file placement, experiment rules
@@ -259,14 +259,14 @@ DDP evaluation and distributed checkpoint resume are v0 gaps.
 
 ## Project template
 
-`templates/project/` is the copyable skeleton. Copy **only its contents**; do
+`templates/research-project/` is the copyable skeleton. Copy **only its contents**; do
 not copy the DLEF repository. It imports `dlef`; it does not vendor the core.
 The project is organized into three layers: `input/` (configs and benchmarks),
 `core/` (project source), and `output/` (runs, claims, reports).
 
 ```bash
 mkdir -p ~/my-experiment
-git -C /path/to/DLEF archive HEAD templates/project \
+git -C /path/to/DLEF archive HEAD templates/research-project \
   | tar -x -C ~/my-experiment --strip-components=2
 cd ~/my-experiment
 git init
@@ -275,9 +275,10 @@ pip install -e .
 make test
 ```
 
-The copied project includes `AGENTS.md` (rules) and `TUTORIAL.md` (runbook).
-See `templates/project/README.md` for the replace points and commands. The
-template contains a synthetic placeholder; replace the data/model/loss/metrics
+The copied project includes `AGENTS.md` (rules), `TUTORIAL.md` (runbook), a
+configurable `output_root`, and an optional TensorBoard mirror.
+See `templates/research-project/README.md` for the replace points and commands.
+The template contains a synthetic placeholder; replace the data/model/loss/metrics
 modules with your own.
 
 ## Claims / report
@@ -312,7 +313,8 @@ Markdown; there is no web UI.
 
 - Lightning / Accelerate adapters (the torch adapter is the reference).
 - YAML configs — JSON works; YAML is optional via PyYAML.
-- Tracker integrations (W&B / MLflow / TensorBoard) — the Run Store is canonical.
+- W&B / MLflow tracker adapters. The project template includes an optional
+  TensorBoard mirror; the Run Store remains canonical.
 - HPO adapters (Optuna / Ray Tune).
 - Multi-rank DDP evaluation and distributed checkpoint resume.
 - A full kill-resume test (checkpoint round-trip is covered).

@@ -27,6 +27,10 @@ Rules:
   `output/sweeps/<sweep_id>/configs/`, not in the repo.
 - Keep one variant per file; do not mutate `base.yaml` for every experiment.
 - The file path and the `experiment` field should agree.
+- `output_root` (default `output`) and `tensorboard` (`enabled`, `subdir`,
+  `flush_secs`) are workspace/output settings, not comparison dimensions.
+  Keep them in `base.yaml` or a shared variant; changing them does not create a
+  new experiment, but it moves the generated run directory.
 - The run manifest records `config_source` and `config_digest`; use
   `core/tools/runs.py` to list runs with their config, and `core/tools/run_info.py`
   to inspect one run.

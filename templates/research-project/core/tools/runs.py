@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime
@@ -36,6 +37,7 @@ from dlef.eval import EvalRecord  # noqa: E402
 from dlef.run import Run, RunStore  # noqa: E402
 
 _HIDDEN_TAGS = {"framework"}
+_DEFAULT_OUTPUT = Path(os.environ.get("DLEF_OUTPUT_ROOT", str(ROOT / "output")))
 
 
 def _evals(run: Run) -> list[EvalRecord]:
@@ -216,7 +218,7 @@ def _print_table(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--runs", default=str(ROOT / "output" / "runs"))
+    parser.add_argument("--runs", default=str(_DEFAULT_OUTPUT / "runs"))
     parser.add_argument("--project", default=None)
     parser.add_argument("--experiment", default=None)
     parser.add_argument("--config", default=None, help="substring of config_source")

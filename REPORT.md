@@ -14,7 +14,7 @@
 - 支持 **AMP、梯度累积、梯度裁剪、可选 DDP**。
 - 支持 **retention / gc**：默认 dry-run，引用检查、血缘保护、artifact TTL。
 - 支持 **Claim / Markdown report**：报告里的数字可以反向解析到 eval record；test split 按 `test_set_id` 计数，重复访问标 `WARN`；跨 benchmark 标为不可比。
-- 项目模板 `templates/project/` 可以直接复制，**依赖 core 包，不复制 core**。
+- 项目模板 `templates/research-project/` 可以直接复制，**依赖 core 包，不复制 core**。
 - 测试：主套件 **48 个**（无 torch 环境 4 个 skip；torch 环境全过）；模板 smoke **1 个**。
 - 真实跑通：CUDA AMP、2 进程 CPU DDP、subprocess sweep、模板 train/eval/sweep。
 
@@ -74,7 +74,7 @@ Config ──► Run ──► Eval ──► Claim
 | 5 | 配置 | `Config` + dataclass schema | 类型化；unknown key 报错；resolved + digest | `dlef/config.py` |
 | 6 | 指标/评测 | `Metric` + `EvalSpec` + `EvalRecord` | eval 独立 run；split 命名空间；test access 计数 | `dlef/eval.py`、`dlef/claim.py` |
 | 7 | 运行/输出 | `RunManifest` + `RunStore` + `ArtifactStore` | one run = config × seed；artifact 内容寻址；tracker 只是索引 | `dlef/run.py` |
-| 8 | 脚本 | `CLI` + `Launcher` + 项目模板 | 薄入口；一条命令一个工作流；preflight + smoke | `dlef/cli.py`、`templates/project/` |
+| 8 | 脚本 | `CLI` + `Launcher` + 项目模板 | 薄入口；一条命令一个工作流；preflight + smoke | `dlef/cli.py`、`templates/research-project/` |
 
 补上的两个横切层：
 
@@ -109,7 +109,7 @@ adapters/torch/   # optional PyTorch adapter
 
 examples/toy/               # stdlib linear regression
 examples/torch_regression/  # CUDA toy + subprocess sweep
-templates/project/          # copyable project skeleton (imports core, no vendoring)
+templates/research-project/          # copyable project skeleton (imports core, no vendoring)
 ```
 
 依赖方向：
@@ -135,6 +135,8 @@ core ← adapters ← examples / templates
 - manifest 记录 `config_source` 和 `code_version`；`run_info.py` 从 config 反查源码。
 - 支持 `early_stopping`：`monitor` / `mode` / `patience` / `min_delta` /
   `min_epochs`；默认关闭，触发原因写进训练日志。
+- `output_root` 控制 workspace 输出路径（默认 `output`，相对项目根）；
+  `tensorboard` 是可选镜像（`enabled` / `subdir` / `flush_secs`）。
 - JSON 永远可用；YAML 在安装 PyYAML 后可用。
 
 ### 5.2 Run / Artifact
@@ -143,7 +145,8 @@ core ← adapters ← examples / templates
 - `RunStore`：`runs/<project>/<experiment>/<run_id>/`。
 - `ArtifactStore`：内容寻址 `<sha[:2]>/<sha>/<name>`。
 - checkpoint 默认 JSON；torch adapter 用 `.pt`（`torch.save`）。
-- run 目录同时有 `metrics.jsonl`（机器可读）和 `logs/train.log`（epoch/step/eval/checkpoint 文本日志）。
+- run 目录同时有 `metrics.jsonl`（机器可读）和 `logs/train.log`（epoch/step/eval/checkpoint 文本日志）；
+  `tensorboard.enabled=true` 时还有 `tensorboard/` 事件文件（可选镜像）。
 - manifest 在第一个 step 之前写；失败/中断也保留。
 
 ### 5.3 Eval / benchmark
@@ -203,16 +206,19 @@ python -m dlef.cli report --runs output/runs --claims output/claims --out output
 ### 6.1 从模板开始
 
 ```bash
-cp -r templates/project ~/my-experiment
+mkdir -p ~/my-experiment
+git -C /path/to/DLEF archive HEAD templates/research-project \
+  | tar -x -C ~/my-experiment --strip-components=2
 cd ~/my-experiment
 git init
 pip install -e /path/to/DLEF
 pip install -e .
+make test
 python core/commands/train.py --config input/configs/base.yaml
 ```
 
 模板按三层组织：`input/`（配置 + benchmark）、`core/`（项目源码）、`output/`
-（run / claim / report）。
+（run / claim / report）。只复制模板内容，不要复制整个 DLEF 仓库。
 
 配置按 **variant** 组织，不按 run/seed：
 
@@ -526,7 +532,8 @@ core 不出现任何领域词。领域代码只在 adapter / template。
 
 ### 8.3 本地优先，tracker 只是索引
 
-RunStore 是事实来源；W&B / MLflow / TensorBoard 将来只是可选索引。
+RunStore 是事实来源；W&B / MLflow 将来只是可选索引。项目模板已包含可选的
+TensorBoard 镜像（`tensorboard.enabled`），但事件文件不替代 RunStore。
 
 原因很现实：Neptune 在 2025-12 被 OpenAI 收购，SaaS 在 2026-03 关停。把实验记录绑在某个 SaaS 上是危险的。
 
@@ -550,7 +557,7 @@ RunStore 是事实来源；W&B / MLflow / TensorBoard 将来只是可选索引�
 
 早期想过“纯模板复制”，但项目一多就会 drift。现在：
 
-- `templates/project/` 只放项目代码；
+- `templates/research-project/` 只放项目代码；
 - core 通过安装引入；
 - 修 bug / 加能力通过升级 core 传播；
 - 每个项目仍可在 adapter 层自由分叉。
@@ -581,7 +588,7 @@ DLEF/
   adapters/torch/           # 可选 PyTorch adapter
   examples/toy/             # stdlib 线性回归
   examples/torch_regression/# torch 玩具 + sweep
-  templates/project/        # 项目模板
+  templates/research-project/        # 项目模板
   tests/                    # 主测试套件
   docs/
     adr/                    # 架构决策
@@ -594,9 +601,9 @@ DLEF/
 2. `README.md` — 先跑起来。
 3. 本报告 — 理解整体设计。
 4. `AGENTS.md` — 建新项目时 agent 必须读的规则（文件放哪、实验怎么组织）。
-5. `templates/project/AGENTS.md` — 项目复制后的本地规则。
+5. `templates/research-project/AGENTS.md` — 项目复制后的本地规则。
 6. `docs/design/contracts-v0.md` — 看 18 个 contract。
-7. `templates/project/` — 看一个真实项目怎么接。
+7. `templates/research-project/` — 看一个真实项目怎么接。
 8. `dlef/runner.py` / `dlef/policy.py` — 看训练循环和 AMP/DDP。
 9. `dlef/sweep.py` / `dlef/retention.py` — 看大量实验和清理。
 
@@ -607,7 +614,8 @@ DLEF/
 这些不是 bug，是 v0 明确没做的：
 
 - **HPO**：只有 grid / random；没有 Optuna / Ray Tune adapter。
-- **Tracker**：没有 W&B / MLflow / TensorBoard adapter；RunStore 是唯一的真相。
+- **Tracker**：没有 W&B / MLflow adapter；模板有可选 TensorBoard 镜像，
+  RunStore 仍是唯一的真相。
 - **远程执行**：只有本地 thread / subprocess；没有 Slurm / K8s launcher。
 - **DDP 完整性**：训练已跑通；多 rank eval、分布式 checkpoint resume 没做。
 - **Claim 强制**：test access > 1、跨 benchmark 只标 `WARN`，不阻塞；没有 claim/report UI。
@@ -622,7 +630,7 @@ DLEF/
 
 ## 11. 开始一个新实验的 checklist
 
-1. 复制 `templates/project/`，`git init`。
+1. 复制 `templates/research-project/`，`git init`。
 2. 安装 core 和项目依赖。
 3. 写 `input/configs/base.yaml`：project / experiment / seed / epochs / 数据 / 模型 / 优化器。
 4. 设置 `DLEF_DATA_ROOT`，替换 `data/` 下的数据集/transform/split，并按需扩展 `models/`、`losses/`、`metrics/`、`optimizers/`、`schedulers/`。
@@ -679,4 +687,4 @@ DLEF/
 4. **多 rank eval / 分布式 checkpoint resume**；
 5. **Claim 强制策略和报告 UI**。
 
-但即使停在这里，`templates/project/` + `dlef` core + torch adapter 已经可以支撑一个真实项目的完整实验闭环。
+但即使停在这里，`templates/research-project/` + `dlef` core + torch adapter 已经可以支撑一个真实项目的完整实验闭环。

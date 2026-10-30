@@ -137,6 +137,7 @@ class Runner:
             run_id=run.run_id if run is not None else "nonmain",
             config=schema,
             manifest=run.manifest if run is not None else None,
+            run_dir=str(run.directory) if run is not None else "",
         )
 
         global_step = 0

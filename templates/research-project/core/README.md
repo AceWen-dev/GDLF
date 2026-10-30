@@ -11,7 +11,8 @@ optimizers/
 schedulers/
 metrics/
 task.py       # composition root
-runtime.py    # policy / runner wiring
+runtime.py    # policy / runner / output-root wiring
+tensorboard.py # optional TensorBoard mirror callback
 commands/     # train / eval / sweep (core entries only)
 tools/        # generic maintenance utilities
 tests/        # tests for this project

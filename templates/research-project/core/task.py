@@ -19,6 +19,7 @@ from .losses import build_loss
 from .optimizers import build_optimizer
 from .schedulers import build_scheduler
 from .metrics import build_metrics
+from .tensorboard import TensorBoardCallback
 
 
 def build_task(config: ProjectConfig, device: Any = "cpu") -> TorchTask:
@@ -33,11 +34,21 @@ def build_task(config: ProjectConfig, device: Any = "cpu") -> TorchTask:
 
     metrics = build_metrics(config.metrics)
 
+    callbacks = []
+    if config.tensorboard.enabled:
+        callbacks.append(
+            TensorBoardCallback(
+                subdir=config.tensorboard.subdir,
+                flush_secs=config.tensorboard.flush_secs,
+            )
+        )
+
     return TorchTask(
         model=model,
         loss=loss,
         optimizer_fn=optimizer_fn,
         scheduler_fn=scheduler_fn,
         metrics=metrics,
+        callbacks=callbacks,
         device=device,
     )

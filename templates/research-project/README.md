@@ -16,7 +16,7 @@ the DLEF repository. From the DLEF repo:
 
 ```bash
 mkdir -p ~/code/my-project
-git -C /path/to/DLEF archive HEAD templates/project \
+git -C /path/to/DLEF archive HEAD templates/research-project \
   | tar -x -C ~/code/my-project --strip-components=2
 cd ~/code/my-project
 git init
@@ -62,6 +62,7 @@ core/                     # layer 2: project source
   metrics/
   task.py                 # composition root
   runtime.py              # policy / runner / sweep result helper
+  tensorboard.py          # optional TensorBoard mirror callback
   commands/
     train.py
     eval.py
@@ -229,7 +230,7 @@ pip install -e .               # this project
 ```
 
 Special case: if you are running the template **in place** inside the DLEF repo
-(`DLEF/templates/project`), the relative core path is `../..`:
+(`DLEF/templates/research-project`), the relative core path is `../..`:
 
 ```bash
 pip install -e ../..
@@ -254,10 +255,12 @@ python core/tools/configs.py list
 python core/commands/sweep.py --config input/configs/base.yaml
 python -m unittest discover -s core/tests -v
 python -m dlef.cli report --runs output/runs --claims output/claims --out output/reports/report.md
+tensorboard --logdir output/runs --port 6006
 ```
 
 Or `make train`, `make runs`, `make runs-all`, `make configs`, `make sweep`,
 `make report`, `make gc-dry`, `make test`, `make doctor`.
+`OUTPUT=<path>` overrides the output root for the tools (`make runs OUTPUT=...`).
 `make eval CHECKPOINT=...` needs the checkpoint path explicitly;
 `make inspect RUN=<run_id>` prints the run card. `make gc-dry` is a dry-run;
 change `--metric-key` to your primary metric before using `--apply`.
@@ -310,12 +313,60 @@ early_stopping:
   min_delta: 0.0
   min_epochs: 0
 
+# Workspace path: where runs/artifacts/sweeps are written.
+# Relative paths resolve against the project root.
+output_root: output
+
+tensorboard:
+  enabled: true
+  subdir: tensorboard
+  flush_secs: 10
+
 data:
   batch_size: 32
 ```
 
 The resolved run config is `output/runs/.../config.resolved.json`; the training
 log header prints the same summary.
+
+`output_root` is a workspace path, not an experiment variable. It defaults to
+`output`; a relative value resolves against the project root. If you change it,
+set `OUTPUT=<path>` for `make runs`/`make gc-dry` or export
+`DLEF_OUTPUT_ROOT=<path>` for the tools' defaults.
+
+## TensorBoard
+
+When `tensorboard.enabled` is true, each run writes an event file under:
+
+```text
+output/runs/<project>/<experiment>/<run_id>/tensorboard/
+```
+
+Start TensorBoard:
+
+```bash
+tensorboard --logdir output/runs --port 6006
+# open http://localhost:6006
+```
+
+Remote machine:
+
+```bash
+tensorboard --logdir output/runs --port 6006 --bind_all
+# on your laptop:
+ssh -L 6006:localhost:6006 user@host
+```
+
+The callback logs:
+
+- `train/loss` and `train/<term>` per step;
+- `val/<metric>` per epoch;
+- `run/config` and `run/manifest` as text.
+
+TensorBoard is a **mirror**, not the record: `manifest.json`,
+`config.resolved.json`, `metrics.jsonl` and `logs/train.log` remain the source
+of truth. Set `tensorboard.enabled: false` to disable it, or change `subdir` if
+you do not want `tensorboard/` inside each run.
 
 ## Inspect a run
 

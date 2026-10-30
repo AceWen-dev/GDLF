@@ -14,9 +14,9 @@ retention and reports; training stacks live in adapters.
 
 Do **not** modify `dlef/` for project-specific needs.
 
-1. Copy `templates/project/` to the new project directory.
+1. Copy `templates/research-project/` to the new project directory.
 2. `cd` into it and `git init`.
-3. Read `templates/project/AGENTS.md` — it is the project-local guide.
+3. Read `templates/research-project/AGENTS.md` — it is the project-local guide.
 4. Install core: `pip install -e /path/to/DLEF`.
 5. Install project: `pip install -e .`.
 6. Replace/extend the component packages:
@@ -91,7 +91,7 @@ Do **not** modify `dlef/` for project-specific needs.
 | `adapters/torch/` | optional PyTorch adapter | change only for reusable torch behavior |
 | `examples/toy/` | stdlib linear regression | use for contract smoke tests |
 | `examples/torch_regression/` | torch example + subprocess sweep | use as a reference, not as project code |
-| `templates/project/` | copyable project skeleton | copy for new experiments |
+| `templates/research-project/` | copyable project skeleton | copy for new experiments |
 | `tests/` | core + adapter tests | keep green; add tests with changes |
 | `docs/design/contracts-v0.md` | contract map / invariants | read before changing interfaces |
 | `docs/adr/` | architecture decisions | read; add one for hard-to-reverse choices |
@@ -120,7 +120,7 @@ python examples/torch_regression/sweep.py
 
 ## 3. Starting a project: exact file placement
 
-A project has this shape (from `templates/project/`):
+A project has this shape (from `templates/research-project/`):
 
 ```text
 <project>/
@@ -310,7 +310,9 @@ Changing data/model/loss mid-experiment:
   eval records. `core/tools/run_info.py --run <id>` prints the config-to-source
   map.
 - Secrets go through environment variables, never config files.
-- Do not put paths to outputs in config; run directories are derived.
+- `output_root` is a workspace path (where runs/artifacts/sweeps live), not an
+  experiment choice; the per-run directory is still derived. Do not put
+  individual run/artifact paths in config.
 - Do not use `if debug` branches inside model/task code; use a separate debug
   config with tiny data and few steps.
 - YAML is optional; JSON always works. The template uses YAML.
@@ -513,8 +515,8 @@ A project task is done when:
 - `docs/TUTORIAL.md` — step-by-step: copy template → train → eval → sweep → report → gc.
 - `REPORT.md` — the big picture and verified results.
 - `README.md` — quickstart and commands.
-- `templates/project/AGENTS.md` — project-local rules.
-- `templates/project/TUTORIAL.md` — project-local runbook (copied with the template).
+- `templates/research-project/AGENTS.md` — project-local rules.
+- `templates/research-project/TUTORIAL.md` — project-local runbook (copied with the template).
 - `docs/design/contracts-v0.md` — contract map and invariants.
 - `docs/adr/0001-thin-experiment-os.md` — why thin, domain-agnostic core.
 - `docs/adr/0002-template-imports-core.md` — why the template does not vendor core.

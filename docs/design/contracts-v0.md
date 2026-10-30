@@ -604,7 +604,7 @@ templates/
 ```
 
 依赖方向：`core ← adapters ← examples`。core 不许 import adapters 或 examples。
-项目模板 `templates/project/` 依赖 core 包，不复制 core（见 ADR 0002）。
+项目模板 `templates/research-project/` 依赖 core 包，不复制 core（见 ADR 0002）。
 
 **Reference adapter:** `adapters/torch/` 实现 `TorchDataLoader` / `TorchModel` / `TorchLoss` / `TorchOptimizer` / `TorchScheduler` / `TorchMetric` / `TorchTask` / `TorchTrainingPolicy` 和 `TorchCheckpointCodec`。它 import `dlef`；`dlef` 从不 import 它。
 
@@ -632,7 +632,7 @@ templates/
 5. **Sweep**：core 包含 `SweepSpec` + grid/random + `LocalQueue`/`GpuPool` + `SubprocessQueue`/`SubprocessSweep`；trial 内部由 `trial_fn` / `command_fn` 构建。
 6. **Retention**：`RetentionPolicy` + `RetentionService.plan/apply`；默认 dry-run；引用检查、血缘闭包、sweep 保护。
 7. **TrainingPolicy**：backward/step 走 policy seam；torch adapter 提供 AMP + accumulation + clipping + optional DDP；默认 NoOp 保持单进程行为。
-8. **Delivery**：项目模板 `templates/project/` 依赖版本化 core，不 vendor core（ADR 0002）。
+8. **Delivery**：项目模板 `templates/research-project/` 依赖版本化 core，不 vendor core（ADR 0002）。
 9. **Claim / TestAccess**：Claim 对象 + Markdown report；test-split access 按 `test_set_id` 计数，report 标记 WARN；跨 benchmark 显示不可比。
 
 **待定：**

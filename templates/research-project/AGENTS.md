@@ -3,7 +3,7 @@
 You are in a **DLEF project**. The framework is installed as the `dlef` package;
 it is not part of this repository. Read this file before editing.
 
-This project was copied from `templates/project/`. The placeholder is synthetic
+This project was copied from `templates/research-project/`. The placeholder is synthetic
 1-D regression. Replace/extend the component packages; keep `task.py` as the
 composition root.
 
@@ -30,7 +30,7 @@ invent a path.
 
 ```bash
 mkdir -p <project-dir>
-git -C <DLEF-root> archive HEAD templates/project \
+git -C <DLEF-root> archive HEAD templates/research-project \
   | tar -x -C <project-dir> --strip-components=2
 cd <project-dir>
 git init
@@ -116,6 +116,7 @@ core/                     # layer 2: project source
     mae.py
   task.py                # composition root only
   runtime.py             # policy/runner/sweep result helper
+  tensorboard.py         # optional TensorBoard mirror callback
   commands/
     train.py             # thin entry: train + eval
     eval.py              # thin entry: separate eval run (val or sealed test)
@@ -123,7 +124,7 @@ core/                     # layer 2: project source
   tools/
     benchmark.py         # freeze / verify a benchmark manifest
     configs.py           # list / validate experiment configs
-    runs.py              # list runs with config source + latest metric
+    runs.py              # experiment summary / run index (filters, --all, --json)
     run_info.py          # run card: config -> benchmark -> source files
     _bootstrap.py        # internal: find the core when running in-repo
     README.md
@@ -140,8 +141,8 @@ core/                     # layer 2: project source
 scripts/                 # project-specific scripts, intentionally unstructured
   README.md
 
-output/                   # layer 3: generated results
-  runs/                   # includes logs/train.log per run
+output/                   # layer 3: generated results (default output_root)
+  runs/                   # logs/train.log + tensorboard/ per run
   artifacts/
   sweeps/
   test_access/
@@ -208,6 +209,7 @@ python core/tools/runs.py --experiment <name>
 python core/tools/run_info.py --run <run_id>
 python core/tools/configs.py list
 python core/commands/sweep.py --config input/configs/base.yaml
+tensorboard --logdir output/runs --port 6006
 ```
 
 Or:
@@ -387,7 +389,15 @@ only. Report the comparison through `dlef compare` / `dlef report`.
 - Do not edit `base.yaml` for every experiment; copy/create a variant.
 - Discover configs with `python core/tools/configs.py list`; map runs to configs
   with `python core/tools/runs.py`.
-- Never put output paths in config; run directories are derived.
+- `output_root` (default `output`) is a **workspace path**, not an experiment
+  variable: it controls where runs/artifacts/sweeps are written. Relative values
+  resolve against the project root. It does not change what is compared. Tools
+  default to `DLEF_OUTPUT_ROOT` or `output`; pass `--runs` / `OUTPUT=` when the
+  root differs.
+- `tensorboard` (`enabled`, `subdir`, `flush_secs`) is an optional **mirror**:
+  events go under `<run_dir>/<subdir>/`. RunStore, `metrics.jsonl` and
+  `logs/train.log` remain the source of truth; never make TensorBoard the only
+  record.
 - Dataset bytes live under `$DLEF_DATA_ROOT`; config selects logical names and
   versions, not absolute data paths.
 - Secrets go through environment variables; never config or logs.
@@ -559,7 +569,7 @@ Do not edit the installed `dlef` package in place.
 - Do not edit a frozen benchmark manifest; create a new benchmark version.
 - Do not run `--split test` without `--benchmark`.
 - Do not compare numbers from different `benchmark_id`s as if they were one result.
-- Do not make a tracker the only record.
+- Do not make TensorBoard / W&B / MLflow the only record.
 - Do not put secrets in config/logs.
 - Do not commit dataset bytes or absolute data paths.
 - Do not add ad-hoc scripts to `core/commands/`; `core/commands/` is only train/eval/sweep.

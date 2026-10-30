@@ -20,6 +20,13 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
+try:
+    import tensorboard  # noqa: F401
+
+    TENSORBOARD_AVAILABLE = True
+except ImportError:
+    TENSORBOARD_AVAILABLE = False
+
 
 @unittest.skipUnless(TORCH_AVAILABLE, "torch is not installed")
 class SmokeTests(unittest.TestCase):
@@ -61,6 +68,9 @@ class SmokeTests(unittest.TestCase):
             self.assertTrue(run.checkpoint_path.is_file())
             self.assertTrue(run.log_path.is_file())
             self.assertIn("Status: completed", run.log_path.read_text(encoding="utf-8"))
+            if TENSORBOARD_AVAILABLE:
+                events = list((run.dir / "tensorboard").glob("events.out.tfevents.*"))
+                self.assertTrue(events, "TensorBoard event file was not written")
 
             record = runner.evaluate(
                 task,

@@ -19,7 +19,7 @@ Tensor = Any
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True) #使用这个装饰器省去写__init__表示纯数据定义类，同属类的属性不可变
 class DataSpec:
     """Immutable description of a dataset.
 
@@ -27,9 +27,9 @@ class DataSpec:
     to a manifest path or digest. ``transform`` is the transform version.
     """
 
-    name: str
-    version: str
-    schema: Mapping[str, Any] = field(default_factory=dict)
+    name: str  #必须填
+    version: str #必须填
+    schema: Mapping[str, Any] = field(default_factory=dict) #maping 就是高度抽象的字典（只读）field表示每次创建DataSpec对象时都重新创建一个空字典
     splits: Mapping[str, str] = field(default_factory=dict)
     transform: str = ""
     stats: Mapping[str, Any] = field(default_factory=dict)
@@ -150,6 +150,7 @@ class RunContext:
     epoch: int = 0
     step: int = 0
     device: str = "cpu"
+    run_dir: str = ""
     metrics: Mapping[str, float] = field(default_factory=dict)
 
 

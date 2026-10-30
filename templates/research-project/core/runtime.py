@@ -17,7 +17,7 @@ from dlef.sweep import TrialResult
 from .config import ProjectConfig
 
 
-def parse_overrides(items: list[str]) -> dict[str, Any]:
+def parse_overrides(items: list[str]) -> dict[str, Any]: #允许你在命令行输入参数这样就能覆盖原来的config
     """Parse ``--set model.name=linear`` into a nested override mapping."""
     overrides: dict[str, Any] = {}
     for item in items:
@@ -37,11 +37,18 @@ def parse_overrides(items: list[str]) -> dict[str, Any]:
 
 def build_policy(config: ProjectConfig, *, ddp: bool = False) -> TorchTrainingPolicy:
     return TorchTrainingPolicy(
-        amp=config.amp,
-        grad_accum_steps=config.grad_accum_steps,
-        grad_clip=config.grad_clip,
-        ddp=ddp,
+        amp=config.amp, #混合精度训练
+        grad_accum_steps=config.grad_accum_steps, #梯度累加
+        grad_clip=config.grad_clip, #梯度裁减
+        ddp=ddp,     #分布式数据并行
     )
+
+
+def resolve_output_root(config: ProjectConfig, base: str | Path) -> Path:
+    """Resolve ``config.output_root`` against the project root."""
+
+    root = Path(config.output_root).expanduser()
+    return root if root.is_absolute() else Path(base) / root
 
 
 def build_runner(outputs: str | Path, policy: TorchTrainingPolicy) -> Runner:
@@ -49,7 +56,7 @@ def build_runner(outputs: str | Path, policy: TorchTrainingPolicy) -> Runner:
     run_store = RunStore(outputs / "runs")
     artifact_store = ArtifactStore(outputs / "artifacts")
     return Runner(
-        run_store,
+        run_store, #数据记录
         artifact_store,
         checkpoint_codec=TorchCheckpointCodec(),
         training_policy=policy,

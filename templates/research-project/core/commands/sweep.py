@@ -28,6 +28,7 @@ from dlef.sweep import (  # noqa: E402
     TrialCommand,
 )
 from core.config import ProjectConfig  # noqa: E402
+from core.runtime import resolve_output_root  # noqa: E402
 
 
 def set_dotted(payload: dict, key: str, value) -> None:
@@ -63,14 +64,15 @@ def main() -> int:
         max_trials=4,
         seed=base.schema.seed,
     )
-    store = SweepStore(ROOT / "output" / "sweeps")
+    outputs = resolve_output_root(base.schema, ROOT)
+    store = SweepStore(outputs / "sweeps")
 
     def command_fn(trial, context):
         trial_raw = json.loads(json.dumps(base_raw))
         for key, value in trial.params.items():
             set_dotted(trial_raw, key, value)
         trial_raw["experiment"] = f"{base.schema.experiment}-t{trial.index:02d}"
-        config_dir = ROOT / "output" / "sweeps" / context.sweep_id / "configs"
+        config_dir = outputs / "sweeps" / context.sweep_id / "configs"
         config_dir.mkdir(parents=True, exist_ok=True)
         config_path = config_dir / f"{trial.trial_id}.json"
         config_path.write_text(json.dumps(trial_raw, indent=2), encoding="utf-8")

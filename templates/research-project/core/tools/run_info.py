@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -66,7 +67,10 @@ def _print_source(label: str, relative: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--runs", default=str(ROOT / "output" / "runs"))
+    parser.add_argument(
+        "--runs",
+        default=str(Path(os.environ.get("DLEF_OUTPUT_ROOT", str(ROOT / "output"))) / "runs"),
+    )
     parser.add_argument("--run", required=True, help="run id or run directory")
     args = parser.parse_args()
 

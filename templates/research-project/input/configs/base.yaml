@@ -15,6 +15,15 @@ early_stopping:
   min_delta: 0.0
   min_epochs: 0
 
+# Workspace path: where runs/artifacts/sweeps are written.
+# Relative paths resolve against the project root.
+output_root: output
+
+tensorboard:
+  enabled: true
+  subdir: tensorboard
+  flush_secs: 10
+
 # ---- data ----
 # Dataset bytes live outside this repo under $DLEF_DATA_ROOT.
 # Config selects logical names/versions, never absolute paths.

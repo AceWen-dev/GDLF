@@ -1,6 +1,6 @@
 # 从零跑通这个 DLEF 项目（项目内教程）
 
-这份文件随 `templates/project/` 一起复制，目的是让你在**项目目录内**完成：
+这份文件随 `templates/research-project/` 一起复制，目的是让你在**项目目录内**完成：
 
 ```text
 装依赖 → 跑通模板 → 换成自己的数据/模型/loss/metric
@@ -168,8 +168,25 @@ input/configs/
 - 正式 run 用 config 文件，不要靠一长串 `--set`；
 - `--set` 只适合 smoke / 临时排查；
 - 所有影响行为的选项都进 typed config，unknown key 报错；
-- 不要在 config 里写输出路径，run 目录是派生的；
+- `output_root` 是 **workspace path**（默认 `output`），控制
+  runs/artifacts/sweeps 写到哪里；相对路径相对项目根。它不是实验变量，
+  不要用它区分 run；
+- `tensorboard` 是可选镜像；事件写 `<run_dir>/tensorboard/`，
+  RunStore / `metrics.jsonl` / `logs/train.log` 仍是记录；
 - 秘密走环境变量，不进 config/log。
+
+```yaml
+output_root: output
+
+tensorboard:
+  enabled: true
+  subdir: tensorboard
+  flush_secs: 10
+```
+
+如果改了 `output_root`，`make runs` / `make gc-dry` 用
+`OUTPUT=<path>`，工具也可以 export `DLEF_OUTPUT_ROOT=<path>` 或传
+`--runs <path>/runs`。
 
 查看/校验配置：
 
@@ -199,6 +216,39 @@ val 用于模型选择。不要用 test 调参。
 
 如果训练中断，先看 `logs/train.log` 的 traceback 和 `manifest.json` 的 status；
 失败 run 也是记录，不要手工删。
+
+### TensorBoard 可视化
+
+`tensorboard.enabled: true` 时，每个 run 会写：
+
+```text
+output/runs/<project>/<experiment>/<run_id>/tensorboard/
+```
+
+启动：
+
+```bash
+tensorboard --logdir output/runs --port 6006
+# 浏览器打开 http://localhost:6006
+```
+
+远程机器：
+
+```bash
+tensorboard --logdir output/runs --port 6006 --bind_all
+# 本地终端：
+ssh -L 6006:localhost:6006 user@host
+```
+
+会看到：
+
+- `train/loss`、`train/<loss_term>`（每 step）；
+- `val/<metric>`（每 epoch）；
+- `run/config`、`run/manifest`（文本）。
+
+TensorBoard 只是**镜像**：真正记录仍是 `manifest.json`、
+`config.resolved.json`、`metrics.jsonl`、`logs/train.log`。不想用就设
+`tensorboard.enabled: false`；想换目录就改 `tensorboard.subdir`。
 
 ---
 
@@ -299,7 +349,7 @@ python -m dlef.cli report \
 
 ## 10. 清理
 
-先 dry-run：
+先 dry-run（如果改了 `output_root`，加 `OUTPUT=<path>`）：
 
 ```bash
 make gc-dry

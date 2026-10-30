@@ -23,6 +23,7 @@ from core.runtime import (  # noqa: E402
     build_policy,
     build_runner,
     parse_overrides,
+    resolve_output_root,
     write_trial_result,
 )
 from core.task import build_task  # noqa: E402
@@ -71,7 +72,7 @@ def main() -> int:
     policy.setup()
     device = policy.device
 
-    runner = build_runner(ROOT / "output", policy)
+    runner = build_runner(resolve_output_root(config.schema, ROOT), policy)
     train_loader, val_loader = make_loaders(
         config.schema.data,
         config.schema.seed,
