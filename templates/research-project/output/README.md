@@ -34,8 +34,8 @@ output/runs/<project>/<experiment>/<run_id>/
 ```
 
 The `output_root` config field controls the top-level path (default
-`output`); relative values resolve against the project root. For tools/Makefile
-use `OUTPUT=<path>` or export `DLEF_OUTPUT_ROOT=<path>`.
+`output`); relative values resolve against the project root. For `tools/` and
+the Makefile, use `OUTPUT=<path>` or export `DLEF_OUTPUT_ROOT=<path>`.
 
 ## Finding a run
 
@@ -50,11 +50,11 @@ Start with the experiment summary, then drill down:
 ```bash
 make runs                                              # one row per experiment
 make runs-all                                          # one row per run
-python tools/runs.py --experiment baseline
-python tools/runs.py --status completed --since 2026-10-01
-python tools/runs.py --tag baseline
-python tools/runs.py --json
-python tools/run_info.py --run <run_id>
+python core/tools/runs.py --experiment baseline
+python core/tools/runs.py --status completed --since 2026-10-01
+python core/tools/runs.py --tag baseline
+python core/tools/runs.py --json
+python core/tools/run_info.py --run <run_id>
 ```
 
 The summary shows, per experiment: run count, latest run, status, last metric,

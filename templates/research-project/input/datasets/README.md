@@ -39,6 +39,6 @@ Rules:
 - The full membership manifest stays on `$DLEF_DATA_ROOT`; record its path and
   SHA-256 here.
 - `name` / `version` must match `data.name` / `data.version` in the run config.
-- Split counts are a quick audit; they do not replace `tools/audit_data.py`.
+- Split counts are a quick audit; they do not replace `core/tools/audit_data.py`.
 - If the manifest changes, create a new dataset version/card; do not edit an old
   card in place.

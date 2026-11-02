@@ -4,7 +4,7 @@ Generic project maintenance utilities shipped with the template. They are not
 experiment commands and not project-specific scripts.
 
 ```text
-tools/
+core/tools/
   benchmark.py   # create / verify a frozen benchmark manifest
   check.py       # initialization + phase gate
   audit_data.py  # data/split/leakage first pass
@@ -19,6 +19,6 @@ tools/
 
 Rules:
 
-- `core/commands/` is only train/eval/sweep; `tools/` is only generic maintenance.
+- `core/commands/` is only train/eval/sweep; `core/tools/` is only generic maintenance.
 - Project-specific automation goes under `scripts/`, not here.
 - Tools do not write run manifests, metrics or checkpoints.

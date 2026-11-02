@@ -20,11 +20,11 @@ from typing import Any
 
 import yaml
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools._bootstrap import ensure_core  # noqa: E402
+from core.tools._bootstrap import ensure_core  # noqa: E402
 
 ensure_core()
 

@@ -78,11 +78,11 @@ Do **not** modify `dlef/` for project-specific needs.
     branching on names. The run manifest records config digest, config source
     and code version; `run_info` resolves config → source.
 15. **One command surface; scripts are project-specific.** `core/commands/` contains
-    only the core experiment entries: train, eval, sweep. `tools/` contains only
+    only the core experiment entries: train, eval, sweep. `core/tools/` contains only
     generic template maintenance utilities. `scripts/` is intentionally
     unstructured for project-specific automation; promote reusable logic to
     the project `core/` package or DLEF core/adapters. Do not use
-    `core/commands/` or `tools/` as a dump.
+    `core/commands/` or `core/tools/` as a dump.
 
 ---
 
@@ -157,12 +157,12 @@ A project has this shape (from `templates/research-project/`):
       train.py             # thin entry: train + eval
       eval.py              # thin entry: separate eval run (val or sealed test)
       sweep.py             # subprocess grid/random sweep
-  tools/                   # generic maintenance: benchmark/config/run inspection
-    benchmark.py
-    configs.py
-    runs.py
-    run_info.py
-    _bootstrap.py
+    tools/                 # generic maintenance: benchmark/config/run inspection
+      benchmark.py
+      configs.py
+      runs.py
+      run_info.py
+      _bootstrap.py
   tests/                   # project tests
     test_smoke.py
     test_components.py
@@ -209,7 +209,7 @@ Placement rules:
 - **Core experiment entries** → `core/commands/` only: `train`, `eval`, `sweep`.
 - **Project-specific automation** → `scripts/` (intentionally unstructured;
   no task-specific subdirectory assumptions).
-- **Generic maintenance utilities** → `tools/` (template-provided only).
+- **Generic maintenance utilities** → `core/tools/` (template-provided only).
 - **Reusable script logic** → `core/` or core/adapters; keep the script a
   thin CLI. No `utils.py` at project root.
 - **Project tests** → `tests/`.
@@ -241,8 +241,8 @@ Rules:
 - Sweeps describe a parameter space; generated per-trial configs live under
   `output/sweeps/<sweep_id>/configs/`, not in the repo.
 - The run manifest records `config_source` and `config_digest`; use
-  `tools/runs.py` to see which config produced each run and
-  `tools/run_info.py` for one run's config → source map.
+  `core/tools/runs.py` to see which config produced each run and
+  `core/tools/run_info.py` for one run's config → source map.
 - One seed per run. For a 3-seed result, add `seed` to the sweep params and
   compare the resulting runs; do not loop seeds inside a run.
 - Never tune on the test split. Use val for model selection; test belongs to a
@@ -314,7 +314,7 @@ Changing data/model/loss mid-experiment:
 - Every run dumps `config.resolved.json`; its SHA-256 and original
   `config_source` go into the manifest.
 - Inspect a run from its directory: `manifest.json` + `config.resolved.json` +
-  eval records. `tools/run_info.py --run <id>` prints the config-to-source
+  eval records. `core/tools/run_info.py --run <id>` prints the config-to-source
   map.
 - Secrets go through environment variables, never config files.
 - `output_root` is a workspace path (where runs/artifacts/sweeps live), not an

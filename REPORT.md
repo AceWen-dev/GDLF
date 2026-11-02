@@ -236,10 +236,10 @@ input/configs/
   sweeps/<sweep>.yaml
 ```
 
-一个 seed 是一个 run，不是一份 config。`tools/configs.py list` 检查配置目录，
-`tools/runs.py` 默认按 experiment 汇总（run 数、最新、状态、last/best
+一个 seed 是一个 run，不是一份 config。`core/tools/configs.py list` 检查配置目录，
+`core/tools/runs.py` 默认按 experiment 汇总（run 数、最新、状态、last/best
 metric、tags、config source），`--experiment` 看单个实验、`--tag` 过滤标签；
-细节看 `tools/run_info.py --run <id>`。
+细节看 `core/tools/run_info.py --run <id>`。
 
 模板里需要替换/扩展的是数据 + 组件包：
 
@@ -308,7 +308,7 @@ python core/commands/eval.py \
 查一个 run 的全部信息：
 
 ```bash
-python tools/run_info.py --run <run_id>
+python core/tools/run_info.py --run <run_id>
 ```
 
 它从 run 目录读取 `manifest.json` + `config.resolved.json` + eval records，打印
@@ -644,7 +644,7 @@ DLEF/
 4. 设置 `DLEF_DATA_ROOT`，替换 `data/` 下的数据集/transform/split，并按需扩展 `models/`、`losses/`、`metrics/`、`optimizers/`、`schedulers/`。
 5. 冻结 benchmark 并提交 manifest：
    ```bash
-   python tools/benchmark.py create --config input/configs/base.yaml --out input/benchmarks/<name>.json
+   python core/tools/benchmark.py create --config input/configs/base.yaml --out input/benchmarks/<name>.json
    ```
 6. 跑 smoke test：
    ```bash

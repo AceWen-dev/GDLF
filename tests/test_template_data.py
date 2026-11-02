@@ -19,7 +19,7 @@ KEYS = (
     "Makefile",
     "input/configs/base.yaml",
     "input/datasets/README.md",
-    "tools/check.py",
+    "core/tools/check.py",
     "tests/test_smoke.py",
 )
 
@@ -46,8 +46,8 @@ class EmbeddedTemplateTests(unittest.TestCase):
                 "embedded template contains generated test_access files",
             )
             self.assertFalse(
-                any(name.startswith("research-project/core/tools/") for name in names),
-                "template still contains core/tools/",
+                any(name.startswith("research-project/tools/") for name in names),
+                "template still contains root tools/",
             )
             self.assertFalse(
                 any(name.startswith("research-project/core/tests/") for name in names),

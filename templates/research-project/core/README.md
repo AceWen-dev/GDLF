@@ -14,12 +14,12 @@ task.py       # composition root
 runtime.py    # policy / runner / output-root wiring
 tensorboard.py # optional TensorBoard mirror callback
 commands/     # train / eval / sweep (core entries only)
+tools/        # generic maintenance utilities
 ```
 
 Project-root siblings:
 
 ```text
-tools/        # generic maintenance utilities
 tests/        # project tests
 scripts/      # project-specific automation
 ```

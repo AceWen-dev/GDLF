@@ -8,10 +8,10 @@ Views:
   runs     one row per run (default when --experiment is set)
 
 Examples:
-  python tools/runs.py
-  python tools/runs.py --experiment baseline
-  python tools/runs.py --all --limit 100
-  python tools/runs.py --json
+  python core/tools/runs.py
+  python core/tools/runs.py --experiment baseline
+  python core/tools/runs.py --all --limit 100
+  python core/tools/runs.py --json
 """
 
 from __future__ import annotations
@@ -25,11 +25,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools._bootstrap import ensure_core  # noqa: E402
+from core.tools._bootstrap import ensure_core  # noqa: E402
 
 ensure_core()
 

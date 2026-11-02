@@ -163,7 +163,7 @@ examples/toy/output/
   different `benchmark_id`s are reported as not directly comparable.
 - Config is the single declaration of choices; the manifest records config
   digest, original config source and code version. The template's
-  `tools/runs.py` is the experiment-level index; `run_info.py` resolves a
+  `core/tools/runs.py` is the experiment-level index; `run_info.py` resolves a
   run's config to its source files.
 
 It does **not** prove a good model, a real dataset pipeline, or distributed

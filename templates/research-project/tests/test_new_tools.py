@@ -11,7 +11,7 @@ from dlef.benchmark import BenchmarkSpec
 from dlef.config import load_config
 
 from core.config import ProjectConfig
-from tools import new_benchmark, new_experiment, status
+from core.tools import new_benchmark, new_experiment, status
 
 ROOT = Path(__file__).resolve().parents[1]
 

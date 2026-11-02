@@ -15,4 +15,4 @@ Guidelines:
 - Generated data belongs under `$DLEF_DATA_ROOT`; generated outputs under
   `output/`.
 
-The template's own generic maintenance utilities live in `tools/`, not here.
+The template's own generic maintenance utilities live in `core/tools/`, not here.

@@ -7,7 +7,7 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 
-from tools import audit_data, check
+from core.tools import audit_data, check
 
 ROOT = Path(__file__).resolve().parents[1]
 

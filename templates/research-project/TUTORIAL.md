@@ -162,11 +162,11 @@ make status
 
 ```bash
 make runs
-python tools/runs.py --limit 20
-python tools/runs.py --experiment <name>
-python tools/runs.py --status completed --since 2026-10-01
-python tools/runs.py --tag baseline
-python tools/runs.py --json
+python core/tools/runs.py --limit 20
+python core/tools/runs.py --experiment <name>
+python core/tools/runs.py --status completed --since 2026-10-01
+python core/tools/runs.py --tag baseline
+python core/tools/runs.py --json
 ```
 
 `--experiment` 会自动切到 run 视图；`--all` 看所有 run；`--limit 0` 不限。
@@ -175,7 +175,7 @@ python tools/runs.py --json
 然后看一个 run 的详情：
 
 ```bash
-python tools/run_info.py --runs output/runs --run <run_id>
+python core/tools/run_info.py --runs output/runs --run <run_id>
 ```
 
 关键文件：
@@ -273,8 +273,8 @@ tensorboard:
 查看/校验配置：
 
 ```bash
-python tools/configs.py list
-python tools/configs.py list --check
+python core/tools/configs.py list
+python core/tools/configs.py list --check
 ```
 
 ---
@@ -352,11 +352,11 @@ test membership + labels + eval transform + metric protocol
 冻结一次并提交小 manifest：
 
 ```bash
-python tools/benchmark.py create \
+python core/tools/benchmark.py create \
   --config input/configs/base.yaml \
   --out input/benchmarks/<name>.json
 
-python tools/benchmark.py verify \
+python core/tools/benchmark.py verify \
   --config input/configs/base.yaml \
   --benchmark input/benchmarks/<name>.json
 ```

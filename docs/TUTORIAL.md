@@ -228,11 +228,11 @@ checkpoint: .../checkpoints/last.pt
 
 ```bash
 make runs
-python tools/runs.py                  # 默认 summary
-python tools/runs.py --experiment baseline
-python tools/runs.py --status completed --since 2026-10-01
-python tools/runs.py --tag baseline
-python tools/runs.py --json
+python core/tools/runs.py                  # 默认 summary
+python core/tools/runs.py --experiment baseline
+python core/tools/runs.py --status completed --since 2026-10-01
+python core/tools/runs.py --tag baseline
+python core/tools/runs.py --json
 ```
 
 `--experiment` 会自动切到 run 视图；`--all` 看所有 run；`--limit 0` 不限。
@@ -242,8 +242,8 @@ tags 和 last config。
 然后看一个 run：
 
 ```bash
-python tools/runs.py --experiment <experiment>
-python tools/run_info.py --run <run_id>
+python core/tools/runs.py --experiment <experiment>
+python core/tools/run_info.py --run <run_id>
 ```
 
 run 目录是：
@@ -278,11 +278,11 @@ tail -5 "$RUN_DIR/metrics.jsonl"
 ```bash
 make runs                                      # experiment summary
 make runs-all                                  # one row per run
-python tools/runs.py --experiment baseline
-python tools/runs.py --status completed --since 2026-10-01
-python tools/runs.py --tag baseline
-python tools/run_info.py --run <run_id>
-python tools/configs.py list
+python core/tools/runs.py --experiment baseline
+python core/tools/runs.py --status completed --since 2026-10-01
+python core/tools/runs.py --tag baseline
+python core/tools/run_info.py --run <run_id>
+python core/tools/configs.py list
 ```
 
 `input/configs/` 按 variant 组织，不按 run/seed：
@@ -570,11 +570,11 @@ benchmark = 测试集 membership + 标签版本 + eval transform + 指标实现/
 阈值。把这份 manifest 冻结并提交：
 
 ```bash
-python tools/benchmark.py create \
+python core/tools/benchmark.py create \
   --config input/configs/base.yaml \
   --out input/benchmarks/synthetic-test-v1.json
 
-python tools/benchmark.py verify \
+python core/tools/benchmark.py verify \
   --config input/configs/base.yaml \
   --benchmark input/benchmarks/synthetic-test-v1.json
 ```
@@ -769,7 +769,7 @@ output/runs/<project>/<experiment>/<run_id>/
 ```
 
 ```bash
-python tools/run_info.py --run <run_id>
+python core/tools/run_info.py --run <run_id>
 # 或 make inspect RUN=<run_id>
 ```
 
@@ -829,8 +829,8 @@ python core/commands/train.py --config input/configs/base.yaml \
 # 查看 experiment 摘要 / 单个 run 的 config / benchmark / 源码
 make runs
 make runs-all
-python tools/runs.py --experiment baseline
-python tools/run_info.py --run <run_id>
+python core/tools/runs.py --experiment baseline
+python core/tools/run_info.py --run <run_id>
 
 # 初始化门禁 / 数据审计 / 会话状态
 make check
@@ -846,7 +846,7 @@ make new-benchmark NAME=polyp-test-v1
 tensorboard --logdir output/runs --port 6006
 
 # 配置目录
-python tools/configs.py list
+python core/tools/configs.py list
 
 # 换模型/loss
 python core/commands/train.py --config input/configs/base.yaml \
@@ -856,7 +856,7 @@ python core/commands/train.py --config input/configs/base.yaml \
 python core/commands/eval.py --checkpoint output/runs/.../checkpoints/last.pt
 
 # 冻结 benchmark
-python tools/benchmark.py create \
+python core/tools/benchmark.py create \
   --config input/configs/base.yaml \
   --out input/benchmarks/synthetic-test-v1.json
 

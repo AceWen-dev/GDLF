@@ -62,7 +62,7 @@ benchmark: "-"          # benchmark id
 
 One active experiment at a time. Pick the top backlog item, give it a config and
 a run, then update this section before starting the next one. The full index is
-`make runs` / `python tools/runs.py`.
+`make runs` / `python core/tools/runs.py`.
 
 ### 4.1 Backlog / planned
 
