@@ -133,6 +133,7 @@ A project has this shape (from `templates/research-project/`):
       experiments/<experiment>/<variant>.yaml
       sweeps/<sweep>.yaml  # optional parameter space
     benchmarks/            # one frozen JSON per benchmark
+    datasets/              # dataset cards: version, manifest path/hash, split counts
     README.md
   core/                    # layer 2: project source
     config.py              # typed dataclass schema
@@ -189,6 +190,9 @@ Placement rules:
   `datasets/<name>.py`, `transforms/<name>.py`, `splits.py`, `loaders.py`.
   Always produce a `DataSpec`; materialize splits, never `random_split` at
   runtime.
+- **Dataset card** → `input/datasets/<name>/<version>.yaml`; record the
+  manifest path/hash, split counts and provenance. Bytes stay under
+  `$DLEF_DATA_ROOT`.
 - **Architecture** → `core/models/<name>.py`; register in
   `models/build.py`.
 - **Loss / named terms** → `core/losses/<name>.py`; register in

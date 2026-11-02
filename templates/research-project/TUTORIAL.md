@@ -246,6 +246,9 @@ input/configs/
 - 不要为了每个实验改 `base.yaml`，复制成 variant；
 - 正式 run 用 config 文件，不要靠一长串 `--set`；
 - `--set` 只适合 smoke / 临时排查；
+- 训练数据用 `input/datasets/<name>/<version>.yaml` 的 dataset card 记录：
+  manifest 路径、SHA-256、split 行数和 provenance；数据字节仍在
+  `$DLEF_DATA_ROOT`，不复制进 repo；
 - 所有影响行为的选项都进 typed config，unknown key 报错；
 - `output_root` 是 **workspace path**（默认 `output`），控制
   runs/artifacts/sweeps 写到哪里；相对路径相对项目根。它不是实验变量，

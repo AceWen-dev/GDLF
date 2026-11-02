@@ -132,6 +132,7 @@ input/                    # layer 1: immutable inputs
     experiments/<experiment>/<variant>.yaml
     sweeps/<sweep>.yaml  # optional parameter space
   benchmarks/            # one frozen JSON per benchmark
+  datasets/              # dataset cards: version, manifest path/hash, split counts
   README.md
 
 core/                     # layer 2: project source
@@ -232,6 +233,7 @@ If you rename `core`, update:
 | You are adding... | Put it here | Also update |
 |---|---|---|
 | dataset reader / acquisition library code | `core/data/` | `data/build.py` if selectable |
+| dataset card (name/version/manifest hash/counts) | `input/datasets/<name>/<version>.yaml` | match `data.name` / `data.version`; run `tools/audit_data.py` |
 | project-specific automation (acquisition, cleaning, query, export) | `scripts/` | no fixed structure; promote reusable logic |
 | transform | `core/data/transforms/<name>.py` | `data/build.py`, `DataConfig.validate` |
 | split strategy | `core/data/splits.py` | `SPLITTERS`, `DataConfig.validate` |

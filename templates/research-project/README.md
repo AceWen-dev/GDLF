@@ -65,6 +65,7 @@ input/                    # layer 1: immutable inputs
   configs/experiments/    # one YAML per experiment variant
   configs/sweeps/         # optional parameter-space specs
   benchmarks/             # one frozen JSON per benchmark
+  datasets/               # dataset cards: version, manifest hash, split counts
   README.md
 
 core/                     # layer 2: project source
@@ -210,6 +211,10 @@ $DLEF_DATA_ROOT/
 code and small manifests; the images/tables themselves stay outside git. A
 split manifest stores membership (sample ids or relative paths), not a copied
 `train/` `val/` `test/` tree — one curated copy serves every split.
+
+Add a small dataset card at `input/datasets/<name>/<version>.yaml` with the
+manifest path, its SHA-256, row/split counts and provenance. The card is
+metadata; the full manifest stays on `$DLEF_DATA_ROOT`.
 
 The project `.gitignore` blocks `/data/`, `/datasets/` and `/raw/` at the
 project root, so accidental copies do not get committed. `core/data/`

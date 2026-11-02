@@ -18,6 +18,7 @@ KEYS = (
     "TUTORIAL.md",
     "Makefile",
     "input/configs/base.yaml",
+    "input/datasets/README.md",
     "tools/check.py",
     "tests/test_smoke.py",
 )
