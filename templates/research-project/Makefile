@@ -15,33 +15,33 @@ eval:
 
 inspect:
 	@test -n "$(RUN)" || (echo "usage: make inspect RUN=<run_id>"; exit 2)
-	$(PYTHON) core/tools/run_info.py --runs $(OUTPUT)/runs --run $(RUN)
+	$(PYTHON) tools/run_info.py --runs $(OUTPUT)/runs --run $(RUN)
 
 runs:
-	$(PYTHON) core/tools/runs.py --runs $(OUTPUT)/runs
+	$(PYTHON) tools/runs.py --runs $(OUTPUT)/runs
 
 runs-all:
-	$(PYTHON) core/tools/runs.py --runs $(OUTPUT)/runs --all
+	$(PYTHON) tools/runs.py --runs $(OUTPUT)/runs --all
 
 tensorboard:
 	$(PYTHON) -m tensorboard.main --logdir $(OUTPUT)/runs --port $(TENSORBOARD_PORT) $(TENSORBOARD_ARGS)
 
 configs:
-	$(PYTHON) core/tools/configs.py list
+	$(PYTHON) tools/configs.py list
 
 new-experiment:
 	@test -n "$(NAME)" || (echo "usage: make new-experiment NAME=<variant> [EXPERIMENT=<experiment>]"; exit 2)
-	$(PYTHON) core/tools/new_experiment.py --name $(NAME) --experiment $(EXPERIMENT)
+	$(PYTHON) tools/new_experiment.py --name $(NAME) --experiment $(EXPERIMENT)
 
 new-benchmark:
 	@test -n "$(NAME)" || (echo "usage: make new-benchmark NAME=<benchmark>"; exit 2)
-	$(PYTHON) core/tools/new_benchmark.py --name $(NAME)
+	$(PYTHON) tools/new_benchmark.py --name $(NAME)
 
 status:
-	$(PYTHON) core/tools/status.py
+	$(PYTHON) tools/status.py
 
 handoff:
-	$(PYTHON) core/tools/status.py --handoff
+	$(PYTHON) tools/status.py --handoff
 
 sweep:
 	$(PYTHON) core/commands/sweep.py --config input/configs/base.yaml
@@ -54,14 +54,14 @@ gc-dry:
 	$(PYTHON) -m dlef.cli gc --runs $(OUTPUT)/runs --sweeps $(OUTPUT)/sweeps --keep-last 3 --keep-best 1 --metric-key mae --keep-tag reported --keep-tag baseline --artifact-ttl-days 30 --sweep-ttl-days 30
 
 check:
-	$(PYTHON) core/tools/check.py --project PROJECT.yaml --config input/configs/base.yaml
-	$(PYTHON) -m unittest discover -s core/tests -v
+	$(PYTHON) tools/check.py --project PROJECT.yaml --config input/configs/base.yaml
+	$(PYTHON) -m unittest discover -s tests -v
 
 audit:
-	$(PYTHON) core/tools/audit_data.py --config input/configs/base.yaml --project PROJECT.yaml
+	$(PYTHON) tools/audit_data.py --config input/configs/base.yaml --project PROJECT.yaml
 
 test:
-	$(PYTHON) -m unittest discover -s core/tests -v
+	$(PYTHON) -m unittest discover -s tests -v
 
 doctor:
 	$(PYTHON) -m dlef.cli doctor

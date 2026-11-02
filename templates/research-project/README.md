@@ -90,14 +90,25 @@ core/                     # layer 2: project source
     train.py
     eval.py
     sweep.py
-  tools/                  # generic maintenance utilities
-  tests/
-    test_smoke.py
-    test_components.py
-    test_benchmark.py
-    test_config_contract.py
-    test_command_surface.py
   README.md
+
+tools/                    # generic maintenance utilities
+  check.py
+  audit_data.py
+  runs.py
+  run_info.py
+  configs.py
+  benchmark.py
+  new_experiment.py
+  new_benchmark.py
+  status.py
+
+tests/                    # project tests
+  test_smoke.py
+  test_components.py
+  test_benchmark.py
+  test_config_contract.py
+  test_command_surface.py
 
 scripts/                  # project-specific scripts, intentionally free-form
   README.md
@@ -217,11 +228,11 @@ benchmark = test membership + labels
 Freeze it once and commit the small manifest:
 
 ```bash
-python core/tools/benchmark.py create \
+python tools/benchmark.py create \
   --config input/configs/base.yaml \
   --out input/benchmarks/synthetic-test-v1.json
 
-python core/tools/benchmark.py verify \
+python tools/benchmark.py verify \
   --config input/configs/base.yaml \
   --benchmark input/benchmarks/synthetic-test-v1.json
 ```
@@ -273,15 +284,15 @@ python core/commands/train.py --config input/configs/base.yaml \
   --tag baseline --tag reported   # tags protect runs from gc
 python core/commands/eval.py \
   --checkpoint output/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
-python core/tools/runs.py                    # experiment summary
-python core/tools/runs.py --experiment <name>
-python core/tools/run_info.py --run <run_id>
-python core/tools/configs.py list
+python tools/runs.py                    # experiment summary
+python tools/runs.py --experiment <name>
+python tools/run_info.py --run <run_id>
+python tools/configs.py list
 python core/commands/sweep.py --config input/configs/base.yaml
 make status                                 # phase / runs / next actions / git
 make audit                                  # data / split / leakage first pass
 make check                                  # initialization + config gate
-python -m unittest discover -s core/tests -v
+python -m unittest discover -s tests -v
 python -m dlef.cli report --runs output/runs --claims output/claims --out output/reports/report.md
 tensorboard --logdir output/runs --port 6006
 ```
@@ -301,15 +312,15 @@ Keep the command surface small:
 
 ```text
 core/commands/   train.py / eval.py / sweep.py   # core experiment execution
-core/tools/      benchmark / configs / runs / run_info  # generic project maintenance
+tools/      benchmark / configs / runs / run_info  # generic project maintenance
 scripts/    project-specific scripts        # intentionally unstructured
 ```
 
 `scripts/` is the escape hatch for project-specific automation: organize it
-however the current task needs. `core/tools/` is for the template's generic
+however the current task needs. `tools/` is for the template's generic
 maintenance utilities; don't turn it into a project script dump. If a script's
 logic becomes reusable, move it to `core/` or DLEF core/adapters.
-`core/tests/test_command_surface.py` enforces the small `core/commands/` surface.
+`tests/test_command_surface.py` enforces the small `core/commands/` surface.
 
 ## Config organization
 
@@ -322,8 +333,8 @@ input/configs/
   sweeps/<sweep>.yaml          # optional parameter space
 ```
 
-See [`input/configs/README.md`](input/configs/README.md). Use `core/tools/configs.py list` to
-validate the catalog and `core/tools/runs.py` to see which config produced each
+See [`input/configs/README.md`](input/configs/README.md). Use `tools/configs.py list` to
+validate the catalog and `tools/runs.py` to see which config produced each
 run. Seeds and sweep trials are runs, not extra config files.
 
 Training knobs are in two places:
@@ -407,7 +418,7 @@ Create variants from a template instead of hand-writing paths:
 ```bash
 make new-experiment NAME=lr-0.005 EXPERIMENT=ablation-lr
 # or with dotted overrides:
-python core/tools/new_experiment.py --name lr-0.005 --experiment ablation-lr \
+python tools/new_experiment.py --name lr-0.005 --experiment ablation-lr \
   --set optim.lr=0.005
 ```
 
@@ -473,16 +484,16 @@ Start with the experiment-level index; it keeps a long run list readable:
 
 ```bash
 make runs                                      # one row per experiment
-python core/tools/runs.py --experiment <name>  # runs inside one experiment
-python core/tools/runs.py --status completed --since 2026-10-01
-python core/tools/runs.py --tag baseline
+python tools/runs.py --experiment <name>  # runs inside one experiment
+python tools/runs.py --status completed --since 2026-10-01
+python tools/runs.py --tag baseline
 ```
 
 Then open one run; the run directory is the entry point and the config is the
 first file to read:
 
 ```bash
-python core/tools/run_info.py --run <run_id>
+python tools/run_info.py --run <run_id>
 # or: make inspect RUN=<run_id>
 ```
 

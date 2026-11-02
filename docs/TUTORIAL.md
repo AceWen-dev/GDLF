@@ -188,7 +188,7 @@ agent 不需要你再解释 DLEF。
 ## 4. 先跑 smoke test
 
 ```bash
-python -m unittest discover -s core/tests -v
+python -m unittest discover -s tests -v
 ```
 
 只跑 1 个测试：用很小的数据走一遍 train + eval。
@@ -228,11 +228,11 @@ checkpoint: .../checkpoints/last.pt
 
 ```bash
 make runs
-python core/tools/runs.py                  # 默认 summary
-python core/tools/runs.py --experiment baseline
-python core/tools/runs.py --status completed --since 2026-10-01
-python core/tools/runs.py --tag baseline
-python core/tools/runs.py --json
+python tools/runs.py                  # 默认 summary
+python tools/runs.py --experiment baseline
+python tools/runs.py --status completed --since 2026-10-01
+python tools/runs.py --tag baseline
+python tools/runs.py --json
 ```
 
 `--experiment` 会自动切到 run 视图；`--all` 看所有 run；`--limit 0` 不限。
@@ -242,8 +242,8 @@ tags 和 last config。
 然后看一个 run：
 
 ```bash
-python core/tools/runs.py --experiment <experiment>
-python core/tools/run_info.py --run <run_id>
+python tools/runs.py --experiment <experiment>
+python tools/run_info.py --run <run_id>
 ```
 
 run 目录是：
@@ -278,11 +278,11 @@ tail -5 "$RUN_DIR/metrics.jsonl"
 ```bash
 make runs                                      # experiment summary
 make runs-all                                  # one row per run
-python core/tools/runs.py --experiment baseline
-python core/tools/runs.py --status completed --since 2026-10-01
-python core/tools/runs.py --tag baseline
-python core/tools/run_info.py --run <run_id>
-python core/tools/configs.py list
+python tools/runs.py --experiment baseline
+python tools/runs.py --status completed --since 2026-10-01
+python tools/runs.py --tag baseline
+python tools/run_info.py --run <run_id>
+python tools/configs.py list
 ```
 
 `input/configs/` 按 variant 组织，不按 run/seed：
@@ -570,11 +570,11 @@ benchmark = 测试集 membership + 标签版本 + eval transform + 指标实现/
 阈值。把这份 manifest 冻结并提交：
 
 ```bash
-python core/tools/benchmark.py create \
+python tools/benchmark.py create \
   --config input/configs/base.yaml \
   --out input/benchmarks/synthetic-test-v1.json
 
-python core/tools/benchmark.py verify \
+python tools/benchmark.py verify \
   --config input/configs/base.yaml \
   --benchmark input/benchmarks/synthetic-test-v1.json
 ```
@@ -658,10 +658,24 @@ early_stopping:
   patience: 5
   min_delta: 0.0
   min_epochs: 0
+  smooth_window: 1
 ```
 
 `monitor` 必须是 val metrics 里的名字；`patience` 是连续多少个 epoch 没有
 改善后停止。日志会记录 best 值、bad epoch 计数和触发原因。
+`smooth_window` 大于 1 时，判据取最近 N 轮 monitor 的均值，用来压住小验证集上
+的单轮抖动（`best` 保存的仍是当轮权重，日志会同时打印原始值与平滑值）。
+
+模型权重 EMA 也在顶层，`0` 表示关闭：
+
+```yaml
+ema_decay: 0.999
+```
+
+开启后每步更新一份权重滑动平均，每轮额外用 EMA 权重跑一遍验证，指标名带
+`ema/` 前缀（例如 `ema/mae`），因此 `monitor` 可以显式写成 `ema/mae`。
+被选中的 `best.pt` 保存的是 EMA 权重；`last.pt` 同时保留原始权重与 EMA 状态。
+EMA 实现位于 `adapters/torch/ema.py`，Runner 通过 `ema_factory` 注入，核心不依赖 torch。
 
 输出根目录和 TensorBoard 也在顶层：
 
@@ -755,7 +769,7 @@ output/runs/<project>/<experiment>/<run_id>/
 ```
 
 ```bash
-python core/tools/run_info.py --run <run_id>
+python tools/run_info.py --run <run_id>
 # 或 make inspect RUN=<run_id>
 ```
 
@@ -815,8 +829,8 @@ python core/commands/train.py --config input/configs/base.yaml \
 # 查看 experiment 摘要 / 单个 run 的 config / benchmark / 源码
 make runs
 make runs-all
-python core/tools/runs.py --experiment baseline
-python core/tools/run_info.py --run <run_id>
+python tools/runs.py --experiment baseline
+python tools/run_info.py --run <run_id>
 
 # 初始化门禁 / 数据审计 / 会话状态
 make check
@@ -832,7 +846,7 @@ make new-benchmark NAME=polyp-test-v1
 tensorboard --logdir output/runs --port 6006
 
 # 配置目录
-python core/tools/configs.py list
+python tools/configs.py list
 
 # 换模型/loss
 python core/commands/train.py --config input/configs/base.yaml \
@@ -842,7 +856,7 @@ python core/commands/train.py --config input/configs/base.yaml \
 python core/commands/eval.py --checkpoint output/runs/.../checkpoints/last.pt
 
 # 冻结 benchmark
-python core/tools/benchmark.py create \
+python tools/benchmark.py create \
   --config input/configs/base.yaml \
   --out input/benchmarks/synthetic-test-v1.json
 

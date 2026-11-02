@@ -65,5 +65,5 @@ IDs are sequential (`D-0001`, `D-0002`, ...) and are never reused.
   running or reporting a real experiment.
 - Alternatives: treat the placeholder as a baseline.
 - Consequences: synthetic runs are tagged `smoke`/`debug` and never reported.
-- Evidence: `input/configs/base.yaml`, `core/tests/test_smoke.py`
+- Evidence: `input/configs/base.yaml`, `tests/test_smoke.py`
 - Owner: <name>

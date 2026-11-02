@@ -11,7 +11,7 @@ class CommandSurfaceTests(unittest.TestCase):
     def test_commands_only_contains_core_entries(self) -> None:
         actual = {
             path.name
-            for path in (ROOT / "commands").glob("*.py")
+            for path in (ROOT / "core" / "commands").glob("*.py")
             if path.is_file() and path.name != "__init__.py"
         }
         self.assertEqual(

@@ -3,7 +3,7 @@
 One JSON file per frozen benchmark. Create it with:
 
 ```bash
-python core/tools/benchmark.py create \
+python tools/benchmark.py create \
   --config input/configs/base.yaml \
   --out input/benchmarks/synthetic-test-v1.json
 ```

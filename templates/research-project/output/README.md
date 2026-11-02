@@ -50,11 +50,11 @@ Start with the experiment summary, then drill down:
 ```bash
 make runs                                              # one row per experiment
 make runs-all                                          # one row per run
-python core/tools/runs.py --experiment baseline
-python core/tools/runs.py --status completed --since 2026-10-01
-python core/tools/runs.py --tag baseline
-python core/tools/runs.py --json
-python core/tools/run_info.py --run <run_id>
+python tools/runs.py --experiment baseline
+python tools/runs.py --status completed --since 2026-10-01
+python tools/runs.py --tag baseline
+python tools/runs.py --json
+python tools/run_info.py --run <run_id>
 ```
 
 The summary shows, per experiment: run count, latest run, status, last metric,

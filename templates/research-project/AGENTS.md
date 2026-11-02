@@ -110,14 +110,14 @@ steps 1–4.
     test evaluation.
 11. Only then open the component files the task actually changes:
     `core/data/...`, `core/models/...`, `core/losses/...`, `core/metrics/...`,
-    `core/commands/...`, or `core/tools/...`.
+    `core/commands/...`, or `tools/...`.
 
 As needed, not upfront:
 
 - `input/configs/README.md` — variant/sweep layout;
-- `core/tools/README.md` — maintenance utilities;
+- `tools/README.md` — maintenance utilities;
 - `core/commands/train.py` / `eval.py` / `sweep.py` — entry wiring;
-- `core/tests/` — the contract tests you must keep green.
+- `tests/` — the contract tests you must keep green.
 
 If a referenced file is missing, report it; do not invent framework behavior.
 
@@ -172,30 +172,32 @@ core/                     # layer 2: project source
     train.py             # thin entry: train + eval
     eval.py              # thin entry: separate eval run (val or sealed test)
     sweep.py             # subprocess grid/random sweep
-  tools/
-    benchmark.py         # freeze / verify a benchmark manifest
-    check.py             # initialization + phase gate
-    audit_data.py        # data / split / leakage first pass
-    configs.py           # list / validate experiment configs
-    new_experiment.py    # create a variant from base.yaml
-    new_benchmark.py     # freeze a named benchmark manifest
-    status.py            # one-screen status / handoff
-    runs.py              # experiment summary / run index (filters, --all, --json)
-    run_info.py          # run card: config -> benchmark -> source files
-    _bootstrap.py        # internal: find the core when running in-repo
-    README.md
-  tests/
-    test_smoke.py
-    test_components.py
-    test_benchmark.py
-    test_config_contract.py
-    test_command_surface.py
-    test_paths.py
-    test_runs_tool.py
-    test_project_memory.py
-    test_check_tools.py
-    test_new_tools.py
   README.md
+
+tools/                   # generic maintenance utilities
+  benchmark.py           # freeze / verify a benchmark manifest
+  check.py               # initialization + phase gate
+  audit_data.py          # data / split / leakage first pass
+  configs.py             # list / validate experiment configs
+  new_experiment.py      # create a variant from base.yaml
+  new_benchmark.py       # freeze a named benchmark manifest
+  status.py              # one-screen status / handoff
+  runs.py                # experiment summary / run index (filters, --all, --json)
+  run_info.py            # run card: config -> benchmark -> source files
+  _bootstrap.py          # internal: find the core when running in-repo
+  README.md
+
+tests/                   # project tests
+  test_smoke.py
+  test_components.py
+  test_benchmark.py
+  test_config_contract.py
+  test_command_surface.py
+  test_paths.py
+  test_runs_tool.py
+  test_project_memory.py
+  test_check_tools.py
+  test_new_tools.py
 
 scripts/                 # project-specific scripts, intentionally unstructured
   README.md
@@ -221,8 +223,8 @@ Makefile
 If you rename `core`, update:
 
 - `pyproject.toml` → `[tool.setuptools.packages.find] include`;
-- imports in `core/commands/*.py`, `core/tools/*.py` and `core/tests/*.py`;
-- source-path prefixes in `core/tools/run_info.py`;
+- imports in `core/commands/*.py`, `tools/*.py` and `tests/*.py`;
+- source-path prefixes in `tools/run_info.py`;
 - any project docs.
 
 ### 1.1 Placement matrix
@@ -237,16 +239,16 @@ If you rename `core`, update:
 | loss | `core/losses/<name>.py` | `losses/build.py`, `LossConfig.validate` |
 | optimizer / scheduler | `core/optimizers/<name>.py`, `core/schedulers/<name>.py` | matching `build.py` + config |
 | metric | `core/metrics/<name>.py` | `metrics/build.py` + `metrics` list |
-| benchmark manifest | `input/benchmarks/` | create via `core/tools/benchmark.py` |
-| experiment config | `input/configs/experiments/<experiment>/<variant>.yaml` | `core/tools/configs.py list --check` |
-| generic maintenance utility (provided by template) | `core/tools/` | keep generic; do not dump project scripts |
-| test | `core/tests/test_*.py` | run `python -m unittest discover -s core/tests` |
+| benchmark manifest | `input/benchmarks/` | create via `tools/benchmark.py` |
+| experiment config | `input/configs/experiments/<experiment>/<variant>.yaml` | `tools/configs.py list --check` |
+| generic maintenance utility (provided by template) | `tools/` | keep generic; do not dump project scripts |
+| test | `tests/test_*.py` | run `python -m unittest discover -s tests` |
 | claim | `output/claims/` | `ClaimStore` |
 | reusable cross-project code | DLEF core or `adapters/` | not in `core/` |
 | generated run output | `output/` | never edit by hand |
 
 **Rules:** no ad-hoc scripts in `core/commands/`; `scripts/` is intentionally
-unstructured and project-specific (no video/data assumptions); `core/tools/` holds
+unstructured and project-specific (no video/data assumptions); `tools/` holds
 only generic maintenance utilities. If a script grows reusable logic, move the
 logic into `core/` (or core/adapters) and leave a thin CLI. No `utils.py`
 at the project root.
@@ -259,16 +261,16 @@ at the project root.
 pip install -e /path/to/DLEF   # core
 pip install -e .               # project deps (torch, PyYAML)
 
-python -m unittest discover -s core/tests -v
+python -m unittest discover -s tests -v
 python core/commands/train.py --config input/configs/base.yaml
 python core/commands/train.py --config input/configs/base.yaml \
   --tag baseline --tag reported   # tags protect runs from gc
 python core/commands/eval.py \
   --checkpoint output/runs/<project>/<experiment>/<run_id>/checkpoints/last.pt
-python core/tools/runs.py                    # experiment summary
-python core/tools/runs.py --experiment <name>
-python core/tools/run_info.py --run <run_id>
-python core/tools/configs.py list
+python tools/runs.py                    # experiment summary
+python tools/runs.py --experiment <name>
+python tools/run_info.py --run <run_id>
+python tools/configs.py list
 python core/commands/sweep.py --config input/configs/base.yaml
 tensorboard --logdir output/runs --port 6006
 make audit                                  # data / split / leakage first pass
@@ -456,8 +458,8 @@ only. Report the comparison through `dlef compare` / `dlef report`.
   a parameter space; generated trial configs stay under
   `output/sweeps/<sweep_id>/configs/`, not in the repo.
 - Do not edit `base.yaml` for every experiment; copy/create a variant.
-- Discover configs with `python core/tools/configs.py list`; map runs to configs
-  with `python core/tools/runs.py`.
+- Discover configs with `python tools/configs.py list`; map runs to configs
+  with `python tools/runs.py`.
 - `output_root` (default `output`) is a **workspace path**, not an experiment
   variable: it controls where runs/artifacts/sweeps are written. Relative values
   resolve against the project root. It does not change what is compared. Tools
@@ -473,7 +475,7 @@ only. Report the comparison through `dlef compare` / `dlef report`.
 - For a debug run, create a separate debug config (tiny data, 1–2 steps); do not
   add `if debug` branches in model/task code.
 - A run is inspected from its run directory: `manifest.json` +
-  `config.resolved.json` + eval records. `core/tools/run_info.py --run <id>` prints
+  `config.resolved.json` + eval records. `tools/run_info.py --run <id>` prints
   the config-to-source map. The manifest records the original config source and
   code version, so a name cannot silently drift to different source.
 
@@ -503,7 +505,7 @@ Recommended order:
 4. Run baseline; inspect `manifest.json` + `config.resolved.json` + checkpoint.
    Tag it at launch (`--tag baseline`) if it must survive cleanup.
 5. Evaluate on val; keep test for the final claim.
-6. Use `core/tools/runs.py` for the experiment-level index; do not scan
+6. Use `tools/runs.py` for the experiment-level index; do not scan
    `output/runs` by hand. `--experiment <name>` drills into one experiment.
 7. For variants, use sweep; do not write nested loops.
 8. For a 3-seed result, add `seed` to the sweep params:
@@ -627,19 +629,19 @@ python -m dlef.cli gc \
 
 Every project should have:
 
-- `core/tests/test_smoke.py`: 1–2 steps on tiny data, asserts a manifest/checkpoint;
+- `tests/test_smoke.py`: 1–2 steps on tiny data, asserts a manifest/checkpoint;
 - a shape/contract test for data/model/loss;
-- `core/tests/test_benchmark.py`: test membership stable across train changes;
+- `tests/test_benchmark.py`: test membership stable across train changes;
   benchmark id changes with membership/metric protocol;
-- `core/tests/test_config_contract.py`: every config selector resolves to a builder;
-- `core/tests/test_command_surface.py`: `core/commands/` stays train/eval/sweep only;
+- `tests/test_config_contract.py`: every config selector resolves to a builder;
+- `tests/test_command_surface.py`: `core/commands/` stays train/eval/sweep only;
 - a golden test for each metric;
 - a checkpoint round-trip test if you touch checkpoints.
 
 Run:
 
 ```bash
-python -m unittest discover -s core/tests -v
+python -m unittest discover -s tests -v
 ```
 
 If the change touches the framework itself, stop: make the core change in the
@@ -666,7 +668,7 @@ Do not edit the installed `dlef` package in place.
 - Do not commit dataset bytes or absolute data paths.
 - Do not add ad-hoc scripts to `core/commands/`; `core/commands/` is only train/eval/sweep.
 - Project-specific automation goes under `scripts/` (intentionally unstructured).
-  `core/tools/` is only for the template's generic maintenance utilities.
+  `tools/` is only for the template's generic maintenance utilities.
   Promote reusable logic to `core/` or core/adapters.
 - Do not add project-specific code to the installed core.
 - Do not rewrite or delete an entry in `DECISIONS.md`; supersede it with a new
@@ -726,7 +728,7 @@ test that the same split name + seed yields the same membership.
 **New benchmark** → change the test membership, label version, eval transform
 or metric protocol, then create a new manifest:
 ```bash
-python core/tools/benchmark.py create \
+python tools/benchmark.py create \
   --config input/configs/base.yaml \
   --out input/benchmarks/my-benchmark-v2.json
 ```

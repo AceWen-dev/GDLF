@@ -32,11 +32,11 @@ Rules:
   Keep them in `base.yaml` or a shared variant; changing them does not create a
   new experiment, but it moves the generated run directory.
 - The run manifest records `config_source` and `config_digest`; use
-  `core/tools/runs.py` to list runs with their config, and `core/tools/run_info.py`
+  `tools/runs.py` to list runs with their config, and `tools/run_info.py`
   to inspect one run.
 
 ```bash
-python core/tools/configs.py list
-python core/tools/runs.py --experiment ablation-lr
-python core/tools/run_info.py --run <run_id>
+python tools/configs.py list
+python tools/runs.py --experiment ablation-lr
+python tools/run_info.py --run <run_id>
 ```

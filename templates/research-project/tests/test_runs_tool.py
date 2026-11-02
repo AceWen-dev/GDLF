@@ -11,7 +11,7 @@ from pathlib import Path
 from dlef.eval import EvalRecord
 from dlef.run import ArtifactStore, RunStore
 
-from core.tools import runs as runs_tool
+from tools import runs as runs_tool
 
 
 class RunsToolTests(unittest.TestCase):

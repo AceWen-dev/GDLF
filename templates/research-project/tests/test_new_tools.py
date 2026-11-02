@@ -11,9 +11,9 @@ from dlef.benchmark import BenchmarkSpec
 from dlef.config import load_config
 
 from core.config import ProjectConfig
-from core.tools import new_benchmark, new_experiment, status
+from tools import new_benchmark, new_experiment, status
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 
 try:
     import torch  # noqa: F401
