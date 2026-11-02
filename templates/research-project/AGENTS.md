@@ -567,6 +567,93 @@ Rules:
 - DDP training: `torchrun --nproc_per_node=N core/commands/train.py ...`; rank 0 writes
   the run. Multi-rank eval/resume is not built into this template.
 
+### 6.1 TensorBoard contract
+
+TensorBoard is the **human-readable view** of a run. RunStore remains the
+source of truth. A completed run should be understandable from TensorBoard
+without opening `metrics.jsonl` or JSON files.
+
+**Framework-owned tags (do not rename; extend only):**
+
+```text
+train/loss
+train/loss/<loss_term>
+train/lr
+train/grad_norm
+train/step_time_ms
+train/samples_per_s
+train/step/<task_metric>
+train/meta/<task_scalar>
+train/epoch/<epoch_stat>
+
+val/<metric>
+val/ema/<metric>
+
+select/<selection_key>
+run/config
+run/manifest
+hparams/*
+```
+
+The eval entry point writes its own eval run:
+
+```text
+eval/<split>/<metric>
+eval/test_access
+eval/eval_id
+eval/split
+eval/benchmark_id
+eval/test_set_id
+eval/checkpoint_digest
+eval/record
+```
+
+**Project-owned additions:**
+
+The project must add the domain-specific signals that matter for its own
+research question. At minimum, define and log:
+
+- the primary validation metric and its comparison groups;
+- per-benchmark or per-cohort test metrics (in eval runs, never train runs);
+- the chosen checkpoint and selection score;
+- any domain-specific bins, groups or error slices;
+- optional prediction/error previews and input/augmentation samples;
+- system/resource scalars available in the project.
+
+Use stable hierarchical names:
+
+```text
+val/<metric>
+eval/<split>/<metric>
+project/<domain_group>/<name>
+system/<resource>/<name>
+```
+
+Do not rename framework tags. Do not put task-specific logic in
+`dlef/`; put it in a project callback, `core/tensorboard.py` extension, or
+`core/visuals/`.
+
+**Frequency:**
+
+- every step: loss, loss terms, LR, gradient norm, step time, throughput;
+- every N steps: histograms, images, prediction/error samples;
+- every epoch: validation metrics, best/early-stop/selection state;
+- each eval run: test metrics, benchmark/test-access/checkpoint metadata;
+- once per run: config, manifest, HParams, dataset/model summary.
+
+Do not log full tensors, full datasets or every image every step. Sample them.
+
+**Definition of done for visualization:**
+
+After one training run, a human can see status, config, loss, LR, gradient
+health, validation primary metric, best epoch, selected checkpoint, early-stop
+state and throughput. After test eval, they can see benchmark metrics, benchmark
+id, test access and checkpoint digest. If any of these requires opening a JSON
+file, the project's TensorBoard integration is incomplete.
+
+TensorBoard is a mirror, not a new record source. Never edit event files by
+hand, never make TensorBoard the only record, and never tune on test metrics.
+
 ---
 
 ## 7. Eval / claim rules
