@@ -38,6 +38,8 @@ class TorchTrainingPolicy:
         self.grad_accum_steps = int(grad_accum_steps)
         self.grad_clip = grad_clip
         self.ddp = bool(ddp)
+        # clip_grad_norm_ 的返回值（clip 前的全局范数），供 runner 记录梯度尺度。
+        self.last_grad_norm: float | None = None
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._rank = 0
@@ -95,6 +97,10 @@ class TorchTrainingPolicy:
     def forward_context(self):
         return self._autocast or contextlib.nullcontext()
 
+    def eval_context(self):
+        # 验证/评估推理：无梯度（内存与速度），与训练的 autocast 上下文无关
+        return torch.inference_mode()
+
     def scale_loss(self, loss: Any) -> Any:
         return loss / self.grad_accum_steps if self.grad_accum_steps > 1 else loss
 
@@ -117,7 +123,11 @@ class TorchTrainingPolicy:
         if self._scaler is not None:
             self._scaler.unscale_(torch_optimizer)
         if self.grad_clip is not None:
-            torch.nn.utils.clip_grad_norm_(task.get_model().parameters(), self.grad_clip)
+            self.last_grad_norm = float(
+                torch.nn.utils.clip_grad_norm_(
+                    task.get_model().parameters(), self.grad_clip
+                )
+            )
         if self._scaler is not None:
             self._scaler.step(torch_optimizer)
             self._scaler.update()

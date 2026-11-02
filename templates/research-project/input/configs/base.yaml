@@ -7,6 +7,12 @@ experiment: baseline
 log_every: 10
 checkpoint_every: 0
 
+selection:
+  monitor: mae
+  mode: min
+  smooth_window: 1
+  checkpoint: best_raw
+
 early_stopping:
   enabled: false
   monitor: mae

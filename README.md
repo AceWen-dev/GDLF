@@ -398,3 +398,4 @@ Markdown; there is no web UI.
 - `docs/adr/0001-thin-experiment-os.md` — why a thin, domain-agnostic core.
 - `docs/adr/0002-template-imports-core.md` — template imports the versioned core; no vendoring.
 - `docs/adr/0003-benchmark-identity.md` — frozen benchmark: test set + metric protocol.
+- `docs/adr/0004-selection-vs-early-stopping.md` — selection and early stopping are independent.

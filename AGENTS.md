@@ -532,6 +532,7 @@ A project task is done when:
 - `docs/adr/0001-thin-experiment-os.md` — why thin, domain-agnostic core.
 - `docs/adr/0002-template-imports-core.md` — why the template does not vendor core.
 - `docs/adr/0003-benchmark-identity.md` — why test set + metric protocol are a frozen benchmark.
+- `docs/adr/0004-selection-vs-early-stopping.md` — why selection and early stopping are separate.
 - `examples/torch_regression/` — a complete torch + sweep example.
 
 If a requirement is genuinely ambiguous, ask the human once, then follow the

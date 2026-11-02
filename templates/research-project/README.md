@@ -350,8 +350,14 @@ max_steps: null
 log_every: 10
 checkpoint_every: 0
 
+selection:
+  monitor: mae      # empty -> fall back to early_stopping.monitor
+  mode: min
+  smooth_window: 1
+  checkpoint: best_raw   # best_raw | best_ema | final_ema | last
+
 early_stopping:
-  enabled: false  # set true to stop on plateau
+  enabled: false  # stopping policy; independent of selection
   monitor: mae
   mode: min
   patience: 5
@@ -370,6 +376,11 @@ tensorboard:
 data:
   batch_size: 32
 ```
+
+`selection` chooses the best validation checkpoint and is independent of early
+stopping. Even with `early_stopping.enabled: false`, the runner still tracks
+`best.pt` when a selection monitor is available. The training entry point loads
+the checkpoint named by `selection.checkpoint` for its final val eval.
 
 The resolved run config is `output/runs/.../config.resolved.json`; the training
 log header prints the same summary.
@@ -406,9 +417,16 @@ ssh -L 6006:localhost:6006 user@host
 
 The callback logs:
 
-- `train/loss` and `train/<term>` per step;
-- `val/<metric>` per epoch;
-- `run/config` and `run/manifest` as text.
+- `train/loss` and `train/loss/<term>` per step;
+- `train/lr`, `train/grad_norm`, `train/step_time_ms`,
+  `train/samples_per_s`;
+- `train/epoch/train_loss`, `train/epoch/duration_s`,
+  `train/epoch/grad_norm_median`, `train/epoch/grad_norm_max`;
+- `val/<metric>` and `val/ema/<metric>` per epoch;
+- `select/best_raw_epoch`, `select/best_raw_score`, `select/bad_epochs`,
+  `select/checkpoint`;
+- `run/config`, `run/manifest` and HParams;
+- eval runs add `eval/<split>/<metric>` plus benchmark/checkpoint text.
 
 TensorBoard is a **mirror**, not the record: `manifest.json`,
 `config.resolved.json`, `metrics.jsonl` and `logs/train.log` remain the source

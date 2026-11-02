@@ -51,6 +51,7 @@ class EarlyStoppingConfig(ConfigSchema):
     patience: int = 5
     min_delta: float = 0.0
     min_epochs: int = 0
+    smooth_window: int = 1
 
     def validate(self) -> None:
         if self.enabled and not self.monitor.strip():
@@ -63,6 +64,39 @@ class EarlyStoppingConfig(ConfigSchema):
             raise ConfigError("early_stopping.min_delta must be >= 0")
         if self.min_epochs < 0:
             raise ConfigError("early_stopping.min_epochs must be >= 0")
+        if self.smooth_window < 1:
+            raise ConfigError("early_stopping.smooth_window must be >= 1")
+
+
+@dataclass
+class SelectionConfig(ConfigSchema):
+    """Checkpoint selection, independent of early stopping.
+
+    An empty ``monitor`` falls back to ``early_stopping.monitor`` for backward
+    compatibility.  ``checkpoint`` chooses which saved checkpoint the training
+    entry point should load for the final validation run.
+    """
+
+    monitor: str = ""
+    mode: str = "min"
+    smooth_window: int = 1
+    checkpoint: str = "best_raw"
+
+    def validate(self) -> None:
+        if self.mode not in {"min", "max"}:
+            raise ConfigError("selection.mode must be 'min' or 'max'")
+        if self.smooth_window < 1:
+            raise ConfigError("selection.smooth_window must be >= 1")
+        if self.checkpoint not in {
+            "best_raw",
+            "best_ema",
+            "final_ema",
+            "last",
+        }:
+            raise ConfigError(
+                "selection.checkpoint must be one of "
+                "best_raw, best_ema, final_ema, last"
+            )
 
 
 @dataclass
@@ -76,6 +110,14 @@ class TrainConfig(ConfigSchema):
     experiment: str = "default"
     log_every: int = 1
     checkpoint_every: int = 0
+    # D-0028：每个 run 只保留三个 checkpoint —— best.pt（raw 选模）、
+    # final_ema.pt（末轮 EMA）、last.pt（末轮 + 恢复用）。
+    # save_best_ema=False 时不再写 best_ema.pt；checkpoint_keep 兜底限制周期性点。
+    save_best_ema: bool = False
+    # 周期性 checkpoint 保留个数（0 = 全留）。超出时删除最旧的 epoch-* 文件。
+    checkpoint_keep: int = 3
+    ema_decay: float = 0.0
+    selection: SelectionConfig = field(default_factory=SelectionConfig)
     early_stopping: EarlyStoppingConfig = field(default_factory=EarlyStoppingConfig)
 
     def validate(self) -> None:
@@ -87,7 +129,21 @@ class TrainConfig(ConfigSchema):
             raise ConfigError("log_every must be >= 0")
         if self.checkpoint_every < 0:
             raise ConfigError("checkpoint_every must be >= 0")
+        if self.checkpoint_keep < 0:
+            raise ConfigError("checkpoint_keep must be >= 0")
+        if not 0.0 <= self.ema_decay < 1.0:
+            raise ConfigError("ema_decay must be in [0, 1)")
+        self.selection.validate()
         self.early_stopping.validate()
+        if self.selection.monitor.startswith("ema/") and self.ema_decay <= 0:
+            raise ConfigError("selection.monitor uses ema/ but ema_decay is 0")
+        if self.early_stopping.monitor.startswith("ema/") and self.ema_decay <= 0:
+            raise ConfigError("early_stopping.monitor uses ema/ but ema_decay is 0")
+        if self.selection.checkpoint in {"best_ema", "final_ema"} and self.ema_decay <= 0:
+            raise ConfigError(
+                f"selection.checkpoint={self.selection.checkpoint!r} "
+                "requires ema_decay > 0"
+            )
 
 
 @dataclass(frozen=True)

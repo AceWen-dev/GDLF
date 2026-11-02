@@ -212,11 +212,44 @@ class Run:
 
     @property
     def best_checkpoint_path(self) -> Path:
+        """首选 checkpoint，**EMA 优先**（D-0024）。
+
+        顺序：final_ema（训练末轮 EMA）→ best_ema（按 ema/ 指标选）→ best（原始权重）。
+        没有 EMA 产物的实验自动回落到 best.pt，对旧 run 完全兼容。
+        """
+        root = self.directory / "checkpoints"
+        for stem in ("final_ema", "best_ema", "best"):
+            candidates = sorted(
+                (p for p in root.glob(f"{stem}.*") if p.stem == stem),
+                key=lambda p: p.stat().st_mtime,
+            )
+            if candidates:
+                return candidates[-1]
+        return root / "best.json"
+
+    def checkpoint_path_for(self, policy: str) -> Path:
+        """Return the checkpoint path requested by ``selection.checkpoint``.
+
+        The path may not exist if the policy was not produced by this run; the
+        caller should fall back to another available checkpoint.
+        """
+        stems = {
+            "best_raw": "best",
+            "best_ema": "best_ema",
+            "final_ema": "final_ema",
+            "last": "last",
+        }
+        if policy not in stems:
+            raise ValueError(
+                f"unknown checkpoint policy {policy!r}; "
+                f"expected one of {sorted(stems)}"
+            )
+        stem = stems[policy]
         candidates = sorted(
-            (self.directory / "checkpoints").glob("best.*"),
+            (p for p in (self.directory / "checkpoints").glob(f"{stem}.*") if p.stem == stem),
             key=lambda path: path.stat().st_mtime,
         )
-        return candidates[-1] if candidates else self.directory / "checkpoints" / "best.json"
+        return candidates[-1] if candidates else self.directory / "checkpoints" / f"{stem}.json"
 
     @property
     def log_path(self) -> Path:

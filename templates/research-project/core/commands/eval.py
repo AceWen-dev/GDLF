@@ -28,6 +28,7 @@ from dlef.eval import EvalSpec  # noqa: E402
 from dlef.seed import seed_everything  # noqa: E402
 from core.config import ProjectConfig  # noqa: E402
 from core.data import build_benchmark, make_loader  # noqa: E402
+from core.tensorboard import log_eval_record  # noqa: E402
 from core.runtime import (  # noqa: E402
     build_policy,
     build_runner,
@@ -171,6 +172,7 @@ def main() -> int:
             ),
             run,
         )
+        log_eval_record(config.schema, run, record)
         run.finalize("completed")
     except BaseException as exc:  # noqa: BLE001
         run.finalize("failed", error=repr(exc))

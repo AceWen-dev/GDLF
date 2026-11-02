@@ -92,17 +92,28 @@ def main() -> int:
         print(f"rank {getattr(policy, '_rank', 0)}: training complete (non-main)")
         return 0
 
+    selection = getattr(config.schema, "selection", None)
+    checkpoint_policy = getattr(selection, "checkpoint", "best_raw")
+    checkpoint = run.checkpoint_path_for(checkpoint_policy)
+    if not checkpoint.is_file():
+        fallback = run.best_checkpoint_path
+        checkpoint = fallback if fallback.is_file() else run.checkpoint_path
+    if checkpoint.is_file():
+        optimizer = task.configure_optimizer(task.get_model())
+        runner.load_checkpoint(checkpoint, task, optimizer)
+
     record = runner.evaluate(
         task,
         val_loader,
-        EvalSpec(checkpoint=str(run.checkpoint_path), split="val"),
+        EvalSpec(checkpoint=str(checkpoint), split="val"),
         run,
     )
     write_trial_result(run, record.metrics)
     print(f"run: {run.run_id}")
+    print(f"selection checkpoint: {checkpoint_policy} -> {checkpoint}")
     print(f"metrics: {record.metrics}")
     print(f"manifest: {run.manifest_path}")
-    print(f"checkpoint: {run.checkpoint_path}")
+    print(f"checkpoint: {checkpoint}")
     return 0
 
 

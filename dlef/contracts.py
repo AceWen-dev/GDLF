@@ -152,6 +152,9 @@ class RunContext:
     device: str = "cpu"
     run_dir: str = ""
     metrics: Mapping[str, float] = field(default_factory=dict)
+    step_metrics: Mapping[str, float] = field(default_factory=dict)
+    epoch_metrics: Mapping[str, float] = field(default_factory=dict)
+    selection: Mapping[str, Any] = field(default_factory=dict)
 
 
 class CallbackBase:
@@ -249,6 +252,7 @@ class Checkpoint:
     manifest: Mapping[str, Any]
     data_position: Mapping[str, Any] | None = None
     policy: Mapping[str, Any] | None = None
+    ema: Mapping[str, Any] | None = None
 
 
 # ---------------------------------------------------------------------------

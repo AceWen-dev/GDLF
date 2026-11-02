@@ -331,9 +331,13 @@ ssh -L 6006:localhost:6006 user@host
 
 会看到：
 
-- `train/loss`、`train/<loss_term>`（每 step）；
-- `val/<metric>`（每 epoch）；
-- `run/config`、`run/manifest`（文本）。
+- `train/loss`、`train/loss/<loss_term>`（每 step）；
+- `train/lr`、`train/grad_norm`、`train/step_time_ms`、`train/samples_per_s`；
+- `train/epoch/train_loss`、`train/epoch/duration_s`；
+- `val/<metric>`、`val/ema/<metric>`（每 epoch）；
+- `select/*`：best epoch/score、bad epochs、checkpoint 策略；
+- `run/config`、`run/manifest`、HParams（文本/面板）；
+- eval run 的 `eval/<split>/<metric>` 和 benchmark/checkpoint 文本。
 
 TensorBoard 只是**镜像**：真正记录仍是 `manifest.json`、
 `config.resolved.json`、`metrics.jsonl`、`logs/train.log`。不想用就设

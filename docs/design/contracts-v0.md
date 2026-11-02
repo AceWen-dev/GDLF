@@ -331,6 +331,31 @@ class Config:
 - secrets 只从 env 读；dump 时 redact。
 - 不允许 config 里写任意 Python 表达式或 import；`class_path` 是唯一受控逃生口。
 
+### 4.1.1 Selection / early stopping
+
+`selection` 和 `early_stopping` 是两个独立契约：
+
+- `selection` 决定“哪个 checkpoint 最好”：`monitor`、`mode`、
+  `smooth_window`、`checkpoint`；
+- `early_stopping` 决定“什么时候停止”：`monitor`、`patience`、`min_delta`、
+  `min_epochs`。
+
+`selection.monitor` 为空时回退到 `early_stopping.monitor`，用于兼容旧 config。
+即使 `early_stopping.enabled=false`，只要 selection monitor 在 val metrics 中，
+Runner 仍然按 epoch 比较并保存 `best.pt`。
+
+`selection.checkpoint` 取值：
+
+```text
+best_raw   -> best.pt      原始权重，按 selection monitor 的 raw 指标
+best_ema   -> best_ema.pt   EMA 权重，按 ema/ 指标
+final_ema  -> final_ema.pt  训练末轮 EMA 权重
+last       -> last.pt       末轮权重
+```
+
+`best_raw` / `best_ema` 的保存不依赖 early stopping。训练入口按
+`selection.checkpoint` 选择 checkpoint 做最终 val eval；test eval 仍然是独立 run。
+
 ### 4.2 Run / Artifact
 
 ```python

@@ -24,6 +24,10 @@ class TrainingPolicy(Protocol):
 
     def forward_context(self): ...
 
+    def eval_context(self):
+        """验证/评估时的上下文（无梯度）；默认无操作。"""
+        return nullcontext()
+
     def scale_loss(self, loss: Any) -> Any: ...
 
     def backward(self, loss: Any) -> None: ...
@@ -55,6 +59,9 @@ class NoOpTrainingPolicy:
         pass
 
     def forward_context(self):
+        return nullcontext()
+
+    def eval_context(self):
         return nullcontext()
 
     def scale_loss(self, loss: Any) -> Any:

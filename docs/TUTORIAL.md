@@ -313,9 +313,16 @@ tensorboard --logdir output/runs --port 6006
 # 本地：ssh -L 6006:localhost:6006 user@host
 ```
 
-会看到 `train/loss`、`train/<term>`、`val/<metric>`，以及 `run/config` /
-`run/manifest` 文本。TensorBoard 只是镜像；`manifest.json`、
-`config.resolved.json`、`metrics.jsonl`、`logs/train.log` 才是记录。
+会看到：
+
+- `train/loss`、`train/loss/<term>`；
+- `train/lr`、`train/grad_norm`、`train/step_time_ms`、`train/samples_per_s`；
+- `train/epoch/*`、`val/*`、`select/*`；
+- `run/config`、`run/manifest`、HParams；
+- eval run 的 `eval/<split>/<metric>` 和 benchmark/checkpoint 文本。
+
+TensorBoard 只是镜像；`manifest.json`、`config.resolved.json`、
+`metrics.jsonl`、`logs/train.log` 才是记录。
 
 建议养成习惯：**每跑完一次，先看 manifest 和 `config.resolved.json`，再看指标。**
 
@@ -648,9 +655,15 @@ def build_my_metric() -> Metric:
 `data.name` / `data.version` / `data.split` / `data.*_transform` 和
 `model.name` / `loss.name` 都是同一类选择器。unknown key 会报错；这是故意的。
 
-早停配置在顶层：
+选模和早停是两个独立配置。选模决定“哪个 checkpoint 最好”，早停决定“什么时候停”：
 
 ```yaml
+selection:
+  monitor: mae          # 空字符串 -> 回退到 early_stopping.monitor
+  mode: min
+  smooth_window: 1
+  checkpoint: best_raw  # best_raw | best_ema | final_ema | last
+
 early_stopping:
   enabled: true
   monitor: mae
@@ -661,10 +674,13 @@ early_stopping:
   smooth_window: 1
 ```
 
-`monitor` 必须是 val metrics 里的名字；`patience` 是连续多少个 epoch 没有
-改善后停止。日志会记录 best 值、bad epoch 计数和触发原因。
-`smooth_window` 大于 1 时，判据取最近 N 轮 monitor 的均值，用来压住小验证集上
-的单轮抖动（`best` 保存的仍是当轮权重，日志会同时打印原始值与平滑值）。
+`selection` 每个 epoch 都会按 val metric 比较并保存 `best.pt`，即使
+`early_stopping.enabled=false` 也一样。训练入口最后按
+`selection.checkpoint` 选择要加载和评估的 checkpoint。
+
+`early_stopping.monitor` 必须是 val metrics 里的名字；`patience` 是连续多少个
+epoch 没有改善后停止。`smooth_window` 大于 1 时，判据取最近 N 轮 monitor 的
+均值，用来压住小验证集上的单轮抖动。
 
 模型权重 EMA 也在顶层，`0` 表示关闭：
 
@@ -673,9 +689,10 @@ ema_decay: 0.999
 ```
 
 开启后每步更新一份权重滑动平均，每轮额外用 EMA 权重跑一遍验证，指标名带
-`ema/` 前缀（例如 `ema/mae`），因此 `monitor` 可以显式写成 `ema/mae`。
-被选中的 `best.pt` 保存的是 EMA 权重；`last.pt` 同时保留原始权重与 EMA 状态。
-EMA 实现位于 `adapters/torch/ema.py`，Runner 通过 `ema_factory` 注入，核心不依赖 torch。
+`ema/` 前缀（例如 `ema/mae`）。原始权重写入 `best.pt`，EMA 权重写入
+`best_ema.pt`（当 `selection.checkpoint=best_ema` 或 `save_best_ema=true` 时）
+和 `final_ema.pt`。EMA 实现位于 `adapters/torch/ema.py`，Runner 通过
+`ema_factory` 注入，核心不依赖 torch。
 
 输出根目录和 TensorBoard 也在顶层：
 
