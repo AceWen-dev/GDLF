@@ -30,6 +30,7 @@
 | 16 | TrainingPolicy | runtime | 可选（默认 NoOp） | hook 生命周期 | AMP / accum / clip / DDP | backward/step 必须走 policy |
 | 17 | Claim | service | 是 | Claim / ClaimStore / report | 无 | claim → eval → run；test access 可见 |
 | 18 | TestAccess | service | 是 | append-only log + count | 无 | 每个 test set 的 test 访问计数 |
+| 19 | Candidate | service | 可选 | Candidate / CandidateStore / shortlist | 无 | candidate → runs；promoted → claim；active 受 gc 保护 |
 
 **runtime contract**：每次实验都会实例化的对象。
 **service**：框架提供的运行时设施，不是用户实现的算法组件。
@@ -204,7 +205,7 @@ class Callback(Protocol):
 - callback 只做副作用；不修改 batch / model 参数。需要修改的，走 Runner 的显式 hook。
 - 顺序确定；注册顺序就是执行顺序。
 - 单个 callback 失败默认记录并继续；`fail_fast` 可配置。
-- 典型用途：early stopping、EMA、profiling、gradient 监控、外部通知。
+- 典型用途：early stopping、EMA、profiling、gradient 监控、外部通知、结构指纹（`model_structure.json`）。
 - 不是 loop 机制的替代品：grad clip、AMP、accumulation 仍在 Runner。
 
 ### 3.7 Metric
@@ -561,7 +562,7 @@ class RetentionPolicy:
 约束：
 
 - `plan` 先于任何删除；默认 `apply(dry_run=True)`。
-- 保护：per-experiment last/best/every-N；protected tags/status；young；parent lineage closure；sweep-referenced runs。
+- 保护：per-experiment last/best/every-N；protected tags/status；young；parent lineage closure；sweep-referenced runs；active candidate（`candidate`/`promoted`）引用的 runs；claim 的 eval id 所在的 runs。
 - Artifact 保护：被 kept run 引用的 digest；或 age < TTL。只有无引用且超过 TTL 的 artifact 才 delete。
 - 删除 run 是 `shutil.rmtree`；删除 artifact 是内容寻址 store 的 `delete`。
 - 所有 action 带 reason 和 size；plan 可审计。
@@ -589,6 +590,36 @@ class Claim:
 - 报告里 `test_access > 1` 标记 `WARN`；v0 只警告，不阻塞。
 - Claim/report 是本地 JSON / Markdown；没有 Web UI。
 - `ClaimStore` 一个 claim 一个 JSON 文件；`dlef report` 生成 Markdown。
+
+### 4.9 Candidate（备选）
+
+```python
+@dataclass
+class Candidate:
+    candidate_id: str
+    title: str
+    run_ids: tuple[str, ...]       # 证据：一个配置 × 多个 seed
+    status: str = "candidate"      # candidate | promoted | rejected | archived
+    reason: str = ""               # 为什么留 / 为什么否
+    next: str = ""                 # 下一步看什么
+    metric: str = ""               # shortlist 里展示的 val metric
+    experiment: str = ""
+    claim_ids: tuple[str, ...] = ()
+    priority: int = 0
+    tags: Mapping[str, str] = field(default_factory=dict)
+```
+
+约束：
+
+- 一个 candidate 至少引用一个 run id；`run_ids` 是创建时的快照，新 run 不会自动加入。
+- `status=candidate|rejected` 必须有 `reason`；`status=promoted` 必须有至少一个 `claim_ids`。
+- candidate 在 val 上比较；test eval 只在 promotion 之后发生，避免提前消耗 test access。
+- `candidate`/`promoted` 的 run 默认被 retention 保护；`rejected`/`archived` 不保护。
+- `candidate` 是判断层，不是指标排行榜：工具不按 metric 自动创建备选。
+- 存放：`output/candidates/<candidate_id>.json`，一个 candidate 一个 JSON；人工/agent 通过
+  `CandidateStore` 或项目 `core/tools/candidates.py` 写入。
+- report 先渲染 shortlist，再渲染 claims：`run → candidate → claim → report`。
+- Claim 不要求来自 candidate；candidate 是推荐路径，不是强制外键。
 
 ---
 
@@ -621,6 +652,7 @@ core/
   policy/         # TrainingPolicy: AMP / accumulation / clipping / DDP seam
   sweep/          # SweepSpec, trials, thread/subprocess GPU-aware queues
   run/            # manifest, run store, artifact store
+  candidates/     # shortlist between runs and claims
   claim/          # claims + test-access log
   retention/      # plan / apply / reference checks
   benchmark/      # test set + metric protocol -> benchmark id
@@ -629,7 +661,7 @@ core/
   cli/            # train, eval, sweep, compare, report, doctor
 
 adapters/
-  torch/          # reference adapter: DataLoader/Model/Loss/Optimizer/Scheduler/Metric/Task + codec
+  torch/          # reference adapter: DataLoader/Model/Loss/Optimizer/Scheduler/Metric/Task + codec + structure
   data/ model/ loss/ optimizer/ scheduler/ callback/ metric/ tracker/ launcher/
 
 examples/
@@ -671,6 +703,7 @@ templates/
 7. **TrainingPolicy**：backward/step 走 policy seam；torch adapter 提供 AMP + accumulation + clipping + optional DDP；默认 NoOp 保持单进程行为。
 8. **Delivery**：项目模板 `templates/research-project/` 依赖版本化 core，不 vendor core（ADR 0002）。
 9. **Claim / TestAccess**：Claim 对象 + Markdown report；test-split access 按 `test_set_id` 计数，report 标记 WARN；跨 benchmark 显示不可比。
+10. **Candidate**：run 与 claim 之间的备选层；一个 candidate = 一组 run + 判断（reason/next）+ 生命周期；active candidate 受 gc 保护，promotion 才进入 test/claim。
 
 **待定：**
 

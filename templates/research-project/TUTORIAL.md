@@ -5,7 +5,8 @@
 
 ```text
 装依赖 → 跑通模板 → 换成自己的数据/模型/loss/metric
-→ train → eval val → 冻结 benchmark → eval test → sweep → claim → report
+→ train → eval val → sweep → candidate（备选） → 冻结 benchmark
+→ eval test → claim → report
 ```
 
 框架规则以 [`AGENTS.md`](AGENTS.md) 为准；这份教程只讲操作顺序。
@@ -407,7 +408,30 @@ params={
 
 ---
 
-## 9. Claim + report
+## 9. Candidate + Claim + report
+
+实验多了以后，先用 candidate 把“值得继续看”的 run 抽出来；candidate 用 val
+指标比较，不消耗 test access：
+
+```bash
+python core/tools/candidates.py add \
+  --id ranksim-g20 \
+  --title "RankSim + log target, 3 seeds" \
+  --run <run1> --run <run2> --run <run3> \
+  --metric <val-metric> \
+  --reason "worst_bin 最好；D 集略差，需要确认" \
+  --next "看 per-bin MAE，确认后再跑 test"
+
+python core/tools/candidates.py            # 只看备选
+python core/tools/candidates.py show ranksim-g20
+python core/tools/candidates.py reject ranksim-g20 --reason "D 集退化，放弃"
+```
+
+确认后才跑 test eval、建 claim，然后把候选标记为 promoted：
+
+```bash
+python core/tools/candidates.py promote ranksim-g20 --claim best-d-worst
+```
 
 一个 claim 引用至少一个 eval id，并建议 pin 住 `benchmark_id`：
 
@@ -433,10 +457,12 @@ make report
 python -m dlef.cli report \
   --runs output/runs \
   --claims output/claims \
+  --candidates output/candidates \
   --out output/reports/report.md
 ```
 
-不要手抄数字；让 claim/report 从 eval → checkpoint → run 解析。
+报告先列 shortlist，再列 claims。不要手抄数字；让 claim/report 从
+eval → checkpoint → run 解析。
 
 ---
 
@@ -454,13 +480,15 @@ make gc-dry
 ```bash
 python -m dlef.cli gc \
   --runs output/runs --sweeps output/sweeps \
+  --candidates output/candidates --claims output/claims \
   --keep-last 3 --keep-best 1 --metric-key <your-metric> \
   --keep-tag reported --keep-tag baseline \
   --artifact-ttl-days 30 --sweep-ttl-days 30 --apply
 ```
 
 不要 `rm -rf output/runs/...`。`reported` / `baseline` tag 的 run 会被保护；
-被 sweep 引用、被 claim 引用的 run 也会被保护。
+被 sweep 引用、被 active candidate 引用、被 claim 引用的 run 也会被保护。
+`rejected` / `archived` candidate 不再保护它的 run。
 
 ---
 

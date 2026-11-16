@@ -183,6 +183,7 @@ core/                     # layer 2: project source
     status.py            # one-screen status / handoff
     runs.py              # experiment summary / run index (filters, --all, --json)
     run_info.py          # run card: config -> benchmark -> source files
+    variants.py          # variant count: declared (configs) / observed (runs) + drift
     _bootstrap.py        # internal: find the core when running in-repo
     README.md
   README.md
@@ -198,6 +199,7 @@ tests/                   # project tests
   test_project_memory.py
   test_check_tools.py
   test_new_tools.py
+  test_variants_tool.py
 
 scripts/                 # project-specific scripts, intentionally unstructured
   README.md
@@ -244,6 +246,7 @@ If you rename `core`, update:
 | experiment config | `input/configs/experiments/<experiment>/<variant>.yaml` | `core/tools/configs.py list --check` |
 | generic maintenance utility (provided by template) | `core/tools/` | keep generic; do not dump project scripts |
 | test | `tests/test_*.py` | run `python -m unittest discover -s tests` |
+| candidate | `output/candidates/` | `core/tools/candidates.py`, `CandidateStore` |
 | claim | `output/claims/` | `ClaimStore` |
 | reusable cross-project code | DLEF core or `adapters/` | not in `core/` |
 | generated run output | `output/` | never edit by hand |
@@ -272,6 +275,8 @@ python core/tools/runs.py                    # experiment summary
 python core/tools/runs.py --experiment <name>
 python core/tools/run_info.py --run <run_id>
 python core/tools/configs.py list
+python core/tools/variants.py configs      # declared variants per model.name
+python core/tools/variants.py runs         # observed structures + drift
 python core/commands/sweep.py --config input/configs/base.yaml
 tensorboard --logdir output/runs --port 6006
 make audit                                  # data / split / leakage first pass
@@ -330,6 +335,26 @@ Replace or extend these component packages:
    - Each builder returns `TorchModel(module, forward_fn, device=...)`.
    - The model does no I/O, does not read config, does not move devices, does
      not compute loss.
+   - **A topology change is a new `model.name` and a new file, never a new
+     boolean flag.** Adding a head, a branch, a bypass or a different fusion
+     changes which modules exist; give it a name. N booleans describe 2**N
+     structures but only N names, and the run record cannot tell them apart.
+     See `docs/adr/0005-model-variants-over-flags.md`.
+   - A size knob (`width`, `depth`, `hidden`) may stay in one variant, but a new
+     field's default must reproduce the old behavior. Changing structure must
+     never be the default value of a new field.
+   - Declare the fields that make two runs *different models* in
+     `ModelConfig.structural_signature()`, and keep size knobs, calibration
+     constants and checkpoint paths out of it.
+   - Split shared layers into a plain module (e.g. `_trunk.py`); each variant
+     file should contain only what differs.
+   - Freezing belongs to the optimizer / `TorchTrainingPolicy`, not to the
+     model. Do not control the same thing from two config fields.
+   - `StructureCallback` writes `<run_dir>/model_structure.json` on every run;
+     `core/tools/variants.py runs` reads it to count structures and detect
+     in-place edits. Use its digests to prove a refactor did not change the
+     network:
+     `assert structure_fingerprint(old)["digest"] == structure_fingerprint(new)["digest"]`.
 
 3. `core/losses/`
    - One file per loss; `losses/build.py` maps `loss.name` → builder.
@@ -494,6 +519,7 @@ project      research line / repo
 experiment   one question or comparison group
 run          one resolved config × one seed
 eval         one checkpoint × one eval spec × one split
+candidate    one shortlisted run set worth studying
 claim        one reported number/table/figure
 ```
 
@@ -688,8 +714,53 @@ hand, never make TensorBoard the only record, and never tune on test metrics.
 - Generate the report, do not hand-copy numbers:
   ```bash
   make report
-  # or: python -m dlef.cli report --runs output/runs --claims output/claims --out output/reports/report.md
+  # or: python -m dlef.cli report --runs output/runs --claims output/claims \
+  #     --candidates output/candidates --out output/reports/report.md
   ```
+
+### 7.1 Candidate / shortlist rules
+
+A `Candidate` is the triage layer between runs and claims. It points at one or
+more runs and records **why** they are worth studying and **what to do next**.
+It is not a claim: claims require eval ids and report numbers; candidates are
+evaluated on val and may never reach test.
+
+Use it whenever a batch or sweep produces more runs than you can hold in your
+head:
+
+```bash
+python core/tools/candidates.py add \
+  --id <candidate-id> \
+  --title "<one line>" \
+  --run <run1> --run <run2> \
+  --metric <val-metric> \
+  --reason "<why this is worth keeping>" \
+  --next "<what to inspect next>"
+
+python core/tools/candidates.py            # active shortlist
+python core/tools/candidates.py show <id>  # runs + claims
+python core/tools/candidates.py reject <id> --reason "<why not>"
+python core/tools/candidates.py promote <id> --claim <claim-id>
+```
+
+Rules:
+
+- Shortlist after reading results; never auto-create candidates from a metric
+  ranking. A candidate is a judgment, not a leaderboard position.
+- `run_ids` is a snapshot: one configuration across seeds. Do not silently add
+  runs to an existing candidate; create a new one.
+- Evaluate candidates on val. Spend test eval only after a candidate is chosen.
+  Promotions should be rare; repeated test access is reported as `WARN`.
+- Promotion order is fixed: test eval → `Claim` → `promote` with the claim ids.
+  `promote` refuses claim ids that do not exist.
+- Every `candidate` and `rejected` record needs a real `reason`. "good" is not
+  a reason.
+- Keep rejected candidates: their reason is the memory of a dead end.
+- `candidate` and `promoted` runs are protected by `dlef gc`; `rejected` and
+  `archived` are not.
+- Never edit run directories or claims from the candidate store; candidates only
+  point at them.
+- `make report` renders the shortlist above the claims.
 
 ---
 
@@ -699,7 +770,7 @@ hand, never make TensorBoard the only record, and never tune on test metrics.
 make gc-dry
 # inspect the plan; then:
 python -m dlef.cli gc \
-  --runs output/runs --sweeps output/sweeps \
+  --runs output/runs --sweeps output/sweeps --candidates output/candidates \
   --keep-last 3 --keep-best 1 --metric-key <your-metric> \
   --keep-tag reported --keep-tag baseline \
   --artifact-ttl-days 30 --sweep-ttl-days 30 --apply
@@ -709,8 +780,10 @@ python -m dlef.cli gc \
 - Never `rm -rf output/runs/...` manually.
 - Tag at launch (`train.py ... --tag baseline`); `--keep-tag` reads manifest
   tags and protects those runs.
-- Keep `reported`/`baseline` runs; the plan protects parent lineage and
-  sweep-referenced runs.
+- Keep `reported`/`baseline` runs; the plan protects parent lineage,
+  sweep-referenced runs and active candidates.
+- Reject/archive a candidate to release its runs to normal retention; do not
+  bypass `gc`.
 - Artifacts are content-addressed; only unreferenced + TTL-expired ones are
   deleted.
 
@@ -847,8 +920,13 @@ config test.
 2. map it into `trial_raw` in `command_fn`;
 3. ensure `train.py` sees it in the trial config.
 
+**New candidate** → after a batch/sweep, shortlist the runs worth studying:
+`python core/tools/candidates.py add --id <id> --title ... --run <run> ...
+--reason ...`; compare on val.
+
 **New claim** → create `output/claims/<id>.json` via `ClaimStore`; reference eval id(s);
-run `dlef report`.
+run `dlef report`. If the claim came from a candidate, promote it with
+`candidates.py promote <id> --claim <claim-id>`.
 
 **New adapter** → if reusable, add it to the DLEF repo under `adapters/<stack>/`;
 if project-specific, keep it under `core/`.

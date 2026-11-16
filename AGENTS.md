@@ -91,7 +91,7 @@ Do **not** modify `dlef/` for project-specific needs.
 | Path | What it is | Agent should |
 |---|---|---|
 | `dlef/` | domain-agnostic core | change only for framework work, with tests |
-| `adapters/torch/` | optional PyTorch adapter | change only for reusable torch behavior |
+| `adapters/torch/` | optional PyTorch adapter (includes the structure fingerprint) | change only for reusable torch behavior |
 | `examples/toy/` | stdlib linear regression | use for contract smoke tests |
 | `examples/torch_regression/` | torch example + subprocess sweep | use as a reference, not as project code |
 | `templates/research-project/` | copyable project skeleton | copy for new experiments |
@@ -162,6 +162,7 @@ A project has this shape (from `templates/research-project/`):
       configs.py
       runs.py
       run_info.py
+      variants.py
       _bootstrap.py
   tests/                   # project tests
     test_smoke.py
@@ -175,6 +176,7 @@ A project has this shape (from `templates/research-project/`):
     artifacts/
     sweeps/
     test_access/
+    candidates/            # one JSON per shortlisted run set
     claims/                # one JSON per reported claim
     reports/
     README.md
@@ -213,8 +215,11 @@ Placement rules:
 - **Reusable script logic** → `core/` or core/adapters; keep the script a
   thin CLI. No `utils.py` at project root.
 - **Project tests** → `tests/`.
+- **Candidates** → `output/candidates/<candidate_id>.json` via `CandidateStore`
+  or `core/tools/candidates.py`; one candidate = one run set + reason/next.
 - **Claims** → `output/claims/<claim_id>.json` via `ClaimStore`.
-- **Generated artifacts** → `output/`; never edit by hand.
+- **Generated artifacts** → `output/`; never edit by hand. Candidates and
+  claims are the small, human-authored exceptions.
 - **Reusable adapter** → `adapters/<stack>/` in the DLEF repo, not in a project.
 - **Project-specific adapter** → project `core/`; do not force it into the DLEF core.
 
@@ -222,7 +227,7 @@ Placement rules:
 
 ## 4. Experiment organization
 
-Use the four IDs consistently:
+Use the six IDs consistently:
 
 | ID | Meaning | Example |
 |---|---|---|
@@ -230,6 +235,7 @@ Use the four IDs consistently:
 | `experiment` | one question or comparison group | `baseline`, `ablation-lr` |
 | `run` | one resolved config × one seed | generated run_id |
 | `eval` | one checkpoint × one eval spec × one split | generated eval_id |
+| `candidate` | one shortlisted run set worth studying | `ranksim-g20` |
 | `claim` | one reported number/table/figure | `main-result` |
 
 Rules:
@@ -251,9 +257,12 @@ Rules:
 - A failed run/trial is still recorded (`failed` / `partial`); do not delete it.
 - To compare variants, use `core/commands/sweep.py` (subprocess) or `LocalSweep`
   (thread/in-process for lightweight cases); one trial = one run.
+- When runs outnumber what you can inspect, shortlist the promising ones as
+  `Candidate`s (run ids + reason + next); compare candidates on val, not test.
 - To report a number, create a `Claim` with the eval id(s), then run
-  `dlef report`.
-- To clean up, run `dlef gc` (dry-run first); keep `reported` tagged runs.
+  `dlef report`. Promotion order: test eval → claim → `candidates.py promote`.
+- To clean up, run `dlef gc` (dry-run first); active candidates, claims and
+  `reported` tagged runs are protected.
 
 Multi-seed sweep example (edit the template’s `core/commands/sweep.py`):
 
@@ -365,6 +374,19 @@ Model:
 - Models do no I/O, do not read config, do not move devices, do not compute loss.
 - Device placement belongs to `TorchTask` / `TorchModel`.
 - Initialization must be reproducible; record the scheme if non-standard.
+- **A topology change is a new `model.name` and a new file, never a new boolean
+  flag.** N booleans describe 2**N structures but only N names, and the run
+  record cannot tell them apart. Size knobs (width/depth/hidden) may stay in one
+  variant; a new field's default must reproduce the old behavior. See
+  `docs/adr/0005-model-variants-over-flags.md`.
+- Declare the fields that make two runs *different models* in
+  `ModelConfig.structural_signature()`; leave size knobs, calibration constants
+  and checkpoint paths out. Freezing belongs to the optimizer / policy, not the
+  model, and must not be controlled from two config fields.
+- `adapters/torch/structure.py` records `<run_dir>/model_structure.json` on
+  every run (`digest` = full structure, `topology_digest` = names+types only).
+  Use it to prove a refactor is structure-preserving, and
+  `core/tools/variants.py` to count variants and detect in-place model edits.
 
 Loss:
 
@@ -409,12 +431,16 @@ Metric:
   the count.
 - A `Claim` must reference at least one eval id and should pin its
   `benchmark_id`. Compare only records with the same `benchmark_id`.
-- Report generation:
+- A `Candidate` is the triage layer before claims: it references run ids, keeps
+  a `reason`/`next`, and is compared on val. Promote it only after test eval and
+  claim creation; see `docs/adr/0006-candidates-between-runs-and-claims.md`.
+- Report generation (shortlist first, then claims):
 
 ```bash
 python -m dlef.cli report \
   --runs output/runs \
-  --claims claims \
+  --claims output/claims \
+  --candidates output/candidates \
   --out report.md
 ```
 
@@ -436,8 +462,11 @@ python -m dlef.cli report \
 - Do not run nested loops in a single process for variants.
 - RunStore is canonical; do not rely on logs alone.
 - Retention: `dlef gc` (dry-run default). Protect `reported`/`baseline` tags,
-  parents of kept runs, sweep references, referenced artifacts.
+  parents of kept runs, sweep references, active candidate runs, claim evidence,
+  referenced artifacts.
 - Never `rm -rf runs/...` manually.
+- Reject/archive a candidate to release its runs to normal retention; do not
+  delete the candidate JSON to bypass `gc`.
 
 ---
 
@@ -533,6 +562,8 @@ A project task is done when:
 - `docs/adr/0002-template-imports-core.md` — why the template does not vendor core.
 - `docs/adr/0003-benchmark-identity.md` — why test set + metric protocol are a frozen benchmark.
 - `docs/adr/0004-selection-vs-early-stopping.md` — why selection and early stopping are separate.
+- `docs/adr/0005-model-variants-over-flags.md` — why a topology change needs a new model name, and why structure is fingerprinted.
+- `docs/adr/0006-candidates-between-runs-and-claims.md` — why the shortlist is a separate layer, and why it is gc-protected.
 - `examples/torch_regression/` — a complete torch + sweep example.
 
 If a requirement is genuinely ambiguous, ask the human once, then follow the

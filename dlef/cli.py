@@ -17,9 +17,10 @@ import zipfile
 from datetime import date
 from pathlib import Path
 
+from .candidates import CandidateStore
 from .claim import ClaimStore
 from .eval import EvalRecord
-from .report import format_claim_report, format_comparison
+from .report import format_comparison, format_report
 from .retention import RetentionPolicy, RetentionService
 from .run import RunStore, git_version
 from .sweep import SweepStore
@@ -41,9 +42,14 @@ def main(argv: list[str] | None = None) -> int:
     compare = sub.add_parser("compare", help="print a comparison table from eval records")
     compare.add_argument("paths", nargs="+", help="eval JSON files or run directories")
 
-    report = sub.add_parser("report", help="render claims from eval records")
+    report = sub.add_parser("report", help="render the shortlist and claims")
     report.add_argument("--runs", default="runs")
     report.add_argument("--claims", default="claims")
+    report.add_argument(
+        "--candidates",
+        default="",
+        help="candidate store (default: sibling 'candidates' of --runs)",
+    )
     report.add_argument("--out", default="report.md")
 
     gc = sub.add_parser("gc", help="plan or apply retention")
@@ -60,6 +66,26 @@ def main(argv: list[str] | None = None) -> int:
     gc.add_argument("--artifact-ttl-days", type=float, default=30.0)
     gc.add_argument("--no-protect-sweep-runs", action="store_true")
     gc.add_argument("--sweep-ttl-days", type=float, default=None)
+    gc.add_argument(
+        "--candidates",
+        default="",
+        help="candidate store (default: sibling 'candidates' of --runs)",
+    )
+    gc.add_argument(
+        "--no-protect-candidates",
+        action="store_true",
+        help="do not keep runs referenced by active candidates",
+    )
+    gc.add_argument(
+        "--claims",
+        default="",
+        help="claim store (default: sibling 'claims' of --runs)",
+    )
+    gc.add_argument(
+        "--no-protect-claims",
+        action="store_true",
+        help="do not keep runs referenced by claims",
+    )
     gc.add_argument("--verbose", action="store_true", help="show kept runs/artifacts too")
     gc.add_argument("--apply", action="store_true", help="actually delete; default is dry-run")
 
@@ -274,8 +300,19 @@ def report_command(args: argparse.Namespace) -> int:
     run_store = RunStore(args.runs)
     claim_store = ClaimStore(args.claims)
     claims = claim_store.list()
-    if not claims:
-        print(f"no claims in {args.claims}")
+
+    candidates_path = (
+        Path(args.candidates)
+        if args.candidates
+        else Path(args.runs).parent / "candidates"
+    )
+    if args.candidates and not candidates_path.is_dir():
+        print(f"warning: candidate store not found: {candidates_path}")
+    candidates = (
+        CandidateStore(candidates_path).list() if candidates_path.is_dir() else []
+    )
+    if not claims and not candidates:
+        print(f"no claims in {args.claims} and no candidates in {candidates_path}")
         return 1
 
     resolved = {}
@@ -290,11 +327,12 @@ def report_command(args: argparse.Namespace) -> int:
             else:
                 resolved[eval_id] = found
 
-    text = f"# Experiment report\n\n{format_claim_report(claims, resolved)}\n"
+    runs = {run.run_id: run for run in run_store.iter_runs()}
+    text = format_report(claims, resolved, candidates=candidates, runs=runs)
     print(text)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(text, encoding="utf-8")
+    out.write_text(text + "\n", encoding="utf-8")
     print(f"report: {out}")
     if missing:
         print(f"missing eval ids: {', '.join(sorted(set(missing)))}")
@@ -304,7 +342,31 @@ def report_command(args: argparse.Namespace) -> int:
 def gc_command(args: argparse.Namespace) -> int:
     run_store = RunStore(args.runs)
     sweep_store = SweepStore(args.sweeps) if args.sweeps else None
-    service = RetentionService(run_store, sweep_store=sweep_store)
+
+    candidates_path = (
+        Path(args.candidates)
+        if args.candidates
+        else Path(args.runs).parent / "candidates"
+    )
+    if args.candidates and not candidates_path.is_dir():
+        print(f"warning: candidate store not found: {candidates_path}")
+    candidate_store = (
+        CandidateStore(candidates_path) if candidates_path.is_dir() else None
+    )
+
+    claims_path = (
+        Path(args.claims) if args.claims else Path(args.runs).parent / "claims"
+    )
+    if args.claims and not claims_path.is_dir():
+        print(f"warning: claim store not found: {claims_path}")
+    claim_store = ClaimStore(claims_path) if claims_path.is_dir() else None
+
+    service = RetentionService(
+        run_store,
+        sweep_store=sweep_store,
+        candidate_store=candidate_store,
+        claim_store=claim_store,
+    )
 
     keep_tags = frozenset(args.keep_tag) if args.keep_tag else frozenset({"reported"})
     policy = RetentionPolicy(
@@ -319,6 +381,8 @@ def gc_command(args: argparse.Namespace) -> int:
         artifact_ttl_days=args.artifact_ttl_days,
         protect_sweep_runs=not args.no_protect_sweep_runs,
         sweep_ttl_days=args.sweep_ttl_days,
+        protect_candidates=not args.no_protect_candidates,
+        protect_claims=not args.no_protect_claims,
     )
     try:
         plan = service.plan(policy)

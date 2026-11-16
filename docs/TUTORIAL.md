@@ -376,7 +376,29 @@ output/sweeps/<sweep_id>/trials/
 
 ---
 
-## 9. 写一个 claim，生成报告
+## 9. 备选（candidate）、写 claim、生成报告
+
+实验多了以后，先建备选，把要研究的 run 从 run store 里抽出来。candidate 用
+val 指标比较，不消耗 test access：
+
+```bash
+python core/tools/candidates.py add \
+  --id demo-candidate \
+  --title "Demo candidate, 2 seeds" \
+  --run <run1> --run <run2> \
+  --metric mae \
+  --reason "best val MAE; verify before test" \
+  --next "check the error slices"
+
+python core/tools/candidates.py
+python core/tools/candidates.py reject demo-candidate --reason "regressed"
+```
+
+确认后再跑 test eval、建 claim，最后 promote：
+
+```bash
+python core/tools/candidates.py promote demo-candidate --claim demo
+```
 
 先拿一个 eval id：
 
@@ -411,11 +433,12 @@ PY
 python -m dlef.cli report \
   --runs output/runs \
   --claims output/claims \
+  --candidates output/candidates \
   --out output/reports/report.md
 cat output/reports/report.md
 ```
 
-报告里的每一行都能追到 eval → checkpoint → run。
+报告先列 shortlist，再列 claims；每一行都能追到 run / eval → checkpoint → run。
 
 ---
 
@@ -427,6 +450,8 @@ cat output/reports/report.md
 python -m dlef.cli gc \
   --runs output/runs \
   --sweeps output/sweeps \
+  --candidates output/candidates \
+  --claims output/claims \
   --keep-last 2 \
   --keep-best 1 \
   --metric-key mae \
@@ -451,6 +476,8 @@ python -m dlef.cli gc \
 - 带 `reported` / `baseline` tag 的 run；
 - 其他 run 的 parent；
 - sweep 引用的 run；
+- active candidate（`candidate` / `promoted`）引用的 run；
+- claim 的 eval id 所在的 run；
 - 被 kept run 引用的 artifact。
 
 不要手动 `rm -rf output/runs`。
@@ -822,6 +849,7 @@ run dir
   → 看 manifest + config + metrics
   → val 上选模
   → 变体走 sweep
+  → 用 candidate 缩小到少数备选
   → 最终 test 单独 eval
   → claim + report
   → 给要保留的 run 打 tag / 用 gc 清理

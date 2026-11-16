@@ -4,6 +4,8 @@ One JSON file per claim: `output/claims/<claim_id>.json`.
 
 A **claim** is a number you intend to report (in a paper, a slide, or
 `output/reports/report.md`), stored together with the evidence that produced it.
+(For the experiment shortlist that comes *before* claims, see
+`../candidates/README.md`.)
 It is the glue between *what you measured* and *what you will write down*:
 
 ```text

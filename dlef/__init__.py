@@ -27,6 +27,13 @@ from .contracts import (
 )
 from .benchmark import BenchmarkSpec, canonical_digest, make_test_set_id
 from .checkpoint import CheckpointCodec, JsonCheckpointCodec
+from .candidates import (
+    CANDIDATE_ACTIVE_STATUSES,
+    CANDIDATE_STATUSES,
+    Candidate,
+    CandidateError,
+    CandidateStore,
+)
 from .claim import Claim, ClaimError, ClaimStore, TestAccessLog
 from .config import (
     Config,
@@ -44,7 +51,16 @@ from .run import ArtifactStore, Run, RunManifest, RunStore
 from .eval import EvalRecord, EvalSpec, eval_spec_digest
 from .runner import Runner
 from .seed import capture_rng_state, restore_rng_state, seed_everything
-from .report import format_claim_report, format_comparison, write_claim_report, write_comparison
+from .report import (
+    candidate_metric,
+    format_candidate_report,
+    format_claim_report,
+    format_comparison,
+    format_report,
+    write_claim_report,
+    write_comparison,
+    write_report,
+)
 from .launcher import Launcher, LocalLauncher
 from .sweep import (
     Choice,
@@ -99,6 +115,11 @@ __all__ = [
     "BenchmarkSpec",
     "canonical_digest",
     "make_test_set_id",
+    "Candidate",
+    "CandidateError",
+    "CandidateStore",
+    "CANDIDATE_STATUSES",
+    "CANDIDATE_ACTIVE_STATUSES",
     "Claim",
     "ClaimError",
     "ClaimStore",
@@ -126,10 +147,14 @@ __all__ = [
     "capture_rng_state",
     "restore_rng_state",
     "seed_everything",
+    "candidate_metric",
+    "format_candidate_report",
     "format_claim_report",
     "format_comparison",
+    "format_report",
     "write_claim_report",
     "write_comparison",
+    "write_report",
     "Launcher",
     "LocalLauncher",
     "Choice",

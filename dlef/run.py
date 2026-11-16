@@ -276,6 +276,29 @@ class Run:
         with self.metrics_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(dict(record), ensure_ascii=False, default=str) + "\n")
 
+    def read_metrics(self) -> list[dict[str, Any]]:
+        """Read ``metrics.jsonl``; malformed lines are skipped, not fatal."""
+
+        if not self.metrics_path.is_file():
+            return []
+        records: list[dict[str, Any]] = []
+        for line in self.metrics_path.read_text(encoding="utf-8").splitlines():
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(payload, dict):
+                records.append(payload)
+        return records
+
+    def latest_metrics(self, phase: str = "val") -> dict[str, Any]:
+        """Return the latest metrics record for ``phase`` (empty if absent)."""
+
+        for record in reversed(self.read_metrics()):
+            if record.get("phase", "") == phase:
+                return dict(record)
+        return {}
+
     def save_json(self, relative_path: str, payload: Any) -> Path:
         if dataclasses.is_dataclass(payload):
             payload = dataclasses.asdict(payload)

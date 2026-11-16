@@ -4,7 +4,7 @@ EXPERIMENT ?= baseline
 TENSORBOARD_PORT ?= 6006
 TENSORBOARD_ARGS ?=
 
-.PHONY: train eval inspect runs runs-all configs sweep report gc-dry check audit new-experiment new-benchmark status handoff test doctor tensorboard
+.PHONY: train eval inspect runs runs-all configs variants variants-runs sweep report gc-dry check audit new-experiment new-benchmark status handoff test doctor tensorboard
 
 train:
 	$(PYTHON) core/commands/train.py --config input/configs/base.yaml
@@ -29,6 +29,15 @@ tensorboard:
 configs:
 	$(PYTHON) core/tools/configs.py list
 
+# How many structures are declared under each model.name? A high count means a
+# topology switch should have been a new model.name.
+variants:
+	$(PYTHON) core/tools/variants.py configs
+
+# How many structures actually ran, and did the model code drift in place?
+variants-runs:
+	$(PYTHON) core/tools/variants.py runs --runs $(OUTPUT)/runs
+
 new-experiment:
 	@test -n "$(NAME)" || (echo "usage: make new-experiment NAME=<variant> [EXPERIMENT=<experiment>]"; exit 2)
 	$(PYTHON) core/tools/new_experiment.py --name $(NAME) --experiment $(EXPERIMENT)
@@ -47,11 +56,11 @@ sweep:
 	$(PYTHON) core/commands/sweep.py --config input/configs/base.yaml
 
 report:
-	$(PYTHON) -m dlef.cli report --runs $(OUTPUT)/runs --claims $(OUTPUT)/claims --out $(OUTPUT)/reports/report.md
+	$(PYTHON) -m dlef.cli report --runs $(OUTPUT)/runs --claims $(OUTPUT)/claims --candidates $(OUTPUT)/candidates --out $(OUTPUT)/reports/report.md
 
 # Change --metric-key to this project's primary metric before relying on it.
 gc-dry:
-	$(PYTHON) -m dlef.cli gc --runs $(OUTPUT)/runs --sweeps $(OUTPUT)/sweeps --keep-last 3 --keep-best 1 --metric-key mae --keep-tag reported --keep-tag baseline --artifact-ttl-days 30 --sweep-ttl-days 30
+	$(PYTHON) -m dlef.cli gc --runs $(OUTPUT)/runs --sweeps $(OUTPUT)/sweeps --candidates $(OUTPUT)/candidates --keep-last 3 --keep-best 1 --metric-key mae --keep-tag reported --keep-tag baseline --artifact-ttl-days 30 --sweep-ttl-days 30
 
 check:
 	$(PYTHON) core/tools/check.py --project PROJECT.yaml --config input/configs/base.yaml

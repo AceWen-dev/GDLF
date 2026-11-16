@@ -96,6 +96,7 @@ core/                     # layer 2: project source
     audit_data.py
     runs.py
     run_info.py
+    candidates.py
     configs.py
     benchmark.py
     new_experiment.py
@@ -118,6 +119,7 @@ output/                   # layer 3: generated results
   artifacts/
   sweeps/
   test_access/
+  candidates/             # human-authored shortlist
   claims/
   reports/
   README.md
@@ -291,13 +293,15 @@ python core/commands/eval.py \
 python core/tools/runs.py                    # experiment summary
 python core/tools/runs.py --experiment <name>
 python core/tools/run_info.py --run <run_id>
+python core/tools/candidates.py              # the shortlist
 python core/tools/configs.py list
 python core/commands/sweep.py --config input/configs/base.yaml
 make status                                 # phase / runs / next actions / git
 make audit                                  # data / split / leakage first pass
 make check                                  # initialization + config gate
 python -m unittest discover -s tests -v
-python -m dlef.cli report --runs output/runs --claims output/claims --out output/reports/report.md
+python -m dlef.cli report --runs output/runs --claims output/claims \
+  --candidates output/candidates --out output/reports/report.md
 tensorboard --logdir output/runs --port 6006
 ```
 
@@ -531,6 +535,31 @@ The run card prints:
 The config selects implementations; the `build.py` registries map names to
 files. The manifest records the exact code version and data versions, so a
 config name cannot silently drift to different source.
+
+## Shortlist: candidates before claims
+
+When runs outnumber the ones you can actually think about, shortlist the few
+that matter:
+
+```bash
+python core/tools/candidates.py add \
+  --id ranksim-g20 \
+  --title "RankSim + log target, 3 seeds" \
+  --run <run1> --run <run2> --run <run3> \
+  --metric <val-metric> \
+  --reason "best val score; verify the worst cohort" \
+  --next "inspect per-bin errors, then decide on test eval"
+
+python core/tools/candidates.py           # active shortlist with val metrics
+python core/tools/candidates.py show ranksim-g20
+python core/tools/candidates.py reject ranksim-g20 --reason "worst cohort regressed"
+python core/tools/candidates.py promote ranksim-g20 --claim <claim-id>
+```
+
+Candidates are evaluated on val and are protected from `dlef gc` while
+`candidate`/`promoted`. Test eval and `Claim` creation happen only after
+promotion. `make report` renders the shortlist above the claims; see
+`output/candidates/README.md` for the full contract.
 
 ## Changing data / model / loss mid-experiment
 

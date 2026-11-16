@@ -24,6 +24,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from .candidates import CandidateStore
+from .claim import ClaimStore
 from .run import ArtifactStore, Run, RunStore
 from .sweep import SweepStore
 
@@ -41,6 +43,8 @@ class RetentionPolicy:
     artifact_ttl_days: float = 30.0
     protect_sweep_runs: bool = True
     sweep_ttl_days: float | None = None
+    protect_candidates: bool = True
+    protect_claims: bool = True
 
     def validate(self) -> None:
         if self.keep_last < 0:
@@ -245,10 +249,14 @@ class RetentionService:
         run_store: RunStore,
         artifact_store: ArtifactStore | None = None,
         sweep_store: SweepStore | None = None,
+        candidate_store: CandidateStore | None = None,
+        claim_store: ClaimStore | None = None,
     ) -> None:
         self.run_store = run_store
         self.artifact_store = artifact_store or run_store.artifact_store
         self.sweep_store = sweep_store
+        self.candidate_store = candidate_store
+        self.claim_store = claim_store
 
     def plan(self, policy: RetentionPolicy) -> GcPlan:
         policy.validate()
@@ -300,6 +308,27 @@ class RetentionService:
                     run_id = result.get("run_id") if isinstance(result, Mapping) else getattr(result, "run_id", None)
                     if run_id and run_id in by_id:
                         keep[run_id].add(f"sweep:{sweep.sweep_id}")
+
+        # A shortlisted run is the raw material for a future claim; keep it
+        # until the candidate is rejected or archived.
+        if policy.protect_candidates and self.candidate_store is not None:
+            protected = self.candidate_store.protected_run_ids()
+            for run_id, candidate_ids in protected.items():
+                if run_id in by_id:
+                    keep[run_id].add("candidate:" + ",".join(sorted(candidate_ids)))
+
+        # Claims are reported evidence: deleting their eval record would turn a
+        # published number into MISSING. Resolve claim -> eval -> run.
+        if policy.protect_claims and self.claim_store is not None:
+            claims_by_eval: dict[str, list[str]] = defaultdict(list)
+            for claim in self.claim_store.list():
+                for eval_id in claim.eval_ids:
+                    claims_by_eval[eval_id].append(claim.claim_id)
+            if claims_by_eval:
+                for run, record in self.run_store.iter_evals():
+                    claim_ids = claims_by_eval.get(record.eval_id)
+                    if claim_ids:
+                        keep[run.run_id].add("claim:" + ",".join(sorted(claim_ids)))
 
         # Lineage closure: a kept run keeps its parents.
         changed = True

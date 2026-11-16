@@ -7,6 +7,8 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dlef.candidates import Candidate, CandidateStore
+from dlef.claim import Claim, ClaimStore
 from dlef.eval import EvalRecord
 from dlef.retention import RetentionPolicy, RetentionService
 from dlef.run import ArtifactStore, RunStore
@@ -167,6 +169,78 @@ class RetentionTests(unittest.TestCase):
                 permissive(protect_sweep_runs=False)
             )
             self.assertEqual({a.action for a in unprotected.runs}, {"delete"})
+
+    def test_candidate_protection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
+            kept = make_run(store, started="2026-06-01T00:00:00+00:00", seed=1)
+            rejected = make_run(store, started="2026-06-02T00:00:00+00:00", seed=2)
+            dropped = make_run(store, started="2026-06-03T00:00:00+00:00", seed=3)
+
+            candidates = CandidateStore(root / "candidates")
+            candidates.add(
+                Candidate(
+                    candidate_id="active",
+                    title="Active candidate",
+                    run_ids=(kept.run_id,),
+                    reason="still under review",
+                )
+            )
+            candidates.add(
+                Candidate(
+                    candidate_id="dead",
+                    title="Rejected candidate",
+                    run_ids=(rejected.run_id,),
+                    status="rejected",
+                    reason="regressed",
+                )
+            )
+
+            plan = RetentionService(store, candidate_store=candidates).plan(permissive())
+            actions = {action.run_id: action for action in plan.runs}
+            self.assertEqual(actions[kept.run_id].action, "keep")
+            self.assertIn("candidate:active", actions[kept.run_id].reason)
+            self.assertEqual(actions[rejected.run_id].action, "delete")
+            self.assertEqual(actions[dropped.run_id].action, "delete")
+
+            unprotected = RetentionService(
+                store, candidate_store=candidates
+            ).plan(permissive(protect_candidates=False))
+            self.assertEqual({action.action for action in unprotected.runs}, {"delete"})
+
+    def test_claim_protection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
+            cited = make_run(
+                store, started="2026-07-01T00:00:00+00:00", seed=1, metric=0.2
+            )
+            uncited = make_run(
+                store, started="2026-07-02T00:00:00+00:00", seed=2, metric=0.3
+            )
+            claims = ClaimStore(root / "claims")
+            claims.add(
+                Claim(
+                    claim_id="main",
+                    text="main result",
+                    eval_ids=("eval-1",),
+                    metric="mae",
+                )
+            )
+
+            plan = RetentionService(store, claim_store=claims).plan(permissive())
+            actions = {action.run_id: action for action in plan.runs}
+            self.assertEqual(actions[cited.run_id].action, "keep")
+            self.assertIn("claim:main", actions[cited.run_id].reason)
+            self.assertEqual(actions[uncited.run_id].action, "delete")
+
+            unprotected = RetentionService(store, claim_store=claims).plan(
+                permissive(protect_claims=False)
+            )
+            self.assertEqual(
+                {action.action for action in unprotected.runs}, {"delete"}
+            )
 
     def test_gc_prunes_empty_experiment_dirs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

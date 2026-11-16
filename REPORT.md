@@ -13,9 +13,10 @@
 - 支持 **grid / random sweep**，有 thread 和 subprocess 两种后端；一个 trial = 一个 run。
 - 支持 **AMP、梯度累积、梯度裁剪、可选 DDP**。
 - 支持 **retention / gc**：默认 dry-run，引用检查、血缘保护、artifact TTL。
+- 支持 **Candidate / shortlist**：在大量 run 和最终 claim 之间加一层人工判断；active candidate 受 gc 保护，promotion 之后才进入 test/claim。
 - 支持 **Claim / Markdown report**：报告里的数字可以反向解析到 eval record；test split 按 `test_set_id` 计数，重复访问标 `WARN`；跨 benchmark 标为不可比。
 - 项目模板 `templates/research-project/` 可以直接复制，**依赖 core 包，不复制 core**。
-- 测试：主套件 **62 个**；模板 smoke **27 个**（torch 环境全过）。
+- 测试：主套件 **95 个**；模板 smoke **44 个**（torch 环境全过）。
 - 真实跑通：CUDA AMP、2 进程 CPU DDP、subprocess sweep、模板 train/eval/sweep。
 
 ---
@@ -42,9 +43,9 @@ DLEF 的目标不是做“更强的训练框架”，而是做**实验操作系�
 ## 2. 核心模型：一条 spine
 
 ```text
-Config ──► Run ──► Eval ──► Claim
-             │        │
-             └── Artifact
+Config ──► Run ──► Candidate ──► Claim
+             │                      ▲
+             └── Eval ──────────────┘
 ```
 
 | 对象 | 含义 | 不变量 |
@@ -52,6 +53,7 @@ Config ──► Run ──► Eval ──► Claim
 | **Config** | 一次 run 的完整输入声明 | 类型化、unknown key 报错、运行前 dump + hash |
 | **Run** | 一份 resolved config × 一个 seed 的一次执行 | manifest 先写；完成后不可变；失败也保留 |
 | **Eval** | 一个 checkpoint × 一份 eval spec × 一个 benchmark | 独立 run；有自己的 manifest；test access 计数；benchmark id 可比性 |
+| **Candidate** | 一组值得继续研究的 run + 判断（reason / next） | 引用 run ids；val 上比较；active 受 gc 保护；promotion 才进入 claim |
 | **Claim** | 报告/论文里的一个数字、表或图 | 必须引用 eval；report 反向解析到 run |
 | **Artifact** | checkpoint、预测、指标表、图 | 内容寻址；被 kept run 引用则保护 |
 
@@ -76,9 +78,10 @@ Config ──► Run ──► Eval ──► Claim
 | 7 | 运行/输出 | `RunManifest` + `RunStore` + `ArtifactStore` | one run = config × seed；artifact 内容寻址；tracker 只是索引 | `dlef/run.py` |
 | 8 | 脚本 | `CLI` + `Launcher` + 项目模板 | 薄入口；一条命令一个工作流；preflight + smoke | `dlef/cli.py`、`templates/research-project/` |
 
-补上的两个横切层：
+补上的服务层：
 
 - **TrainingPolicy**：AMP / 梯度累积 / 梯度裁剪 / DDP 的接缝，core 不 import torch。
+- **Candidate**：run 与 claim 之间的备选层；记录“为什么留、下一步看什么”，避免在大量 run 里翻找。
 - **Claim / TestAccess**：把“报告里的数字”接回 eval，并记录 test split 访问次数。
 
 ---
@@ -95,12 +98,13 @@ core (dlef/)
   run.py          # manifest / run store / artifact store
   eval.py         # EvalSpec / EvalRecord
   benchmark.py    # test set + metric protocol -> benchmark id
+  candidates.py   # Candidate / CandidateStore: run → candidate → claim
   claim.py        # Claim / ClaimStore / TestAccessLog
   sweep.py        # SweepSpec / trials / thread + subprocess queues
   retention.py    # plan / apply / reference checks
-  report.py       # comparison + claim report
+  report.py       # comparison + shortlist + claim report
   registry.py     # name / class_path -> implementation
-  cli.py          # doctor / compare / gc / report
+  cli.py          # doctor / compare / report / gc
 
 adapters/torch/   # optional PyTorch adapter
   components.py   # DataLoader / Model / Loss / Optimizer / Scheduler / Metric / Task
@@ -183,11 +187,16 @@ core ← adapters ← examples / templates
   - 可选 DDP（rank 0 写 run/log/checkpoint）。
 - checkpoint 里保存 policy state（例如 scaler）。
 
-### 5.7 Claim / report
+### 5.7 Candidate / Claim / report
 
+- `Candidate`：candidate_id、title、run_ids、status、reason、next、metric、experiment、claim_ids、priority、tags。
+- `CandidateStore`：一个 candidate 一个 JSON，放在 `output/candidates/`。
+- 状态：`candidate → promoted | rejected`；`promoted → archived`。
+- `candidate` / `promoted` 的 run 受 retention 保护；`rejected` / `archived` 不保护。
+- 候选在 val 上比较；test eval 和 `Claim` 只在 promotion 之后发生。
 - `Claim`：claim_id、text、eval_ids、metric、value、unit、notes、tags、benchmark_id。
 - `ClaimStore`：一个 claim 一个 JSON。
-- `dlef report`：claim + eval records → Markdown。
+- `dlef report`：shortlist + claims + eval records → Markdown，先备选后结论。
 - 缺失 eval 会显示 `MISSING`；test access > 1 显示 `WARN`；claim 与 eval 的 benchmark 不一致显示 `MISMATCH`。
 
 ### 5.8 CLI
@@ -196,7 +205,8 @@ core ← adapters ← examples / templates
 python -m dlef.cli doctor
 python -m dlef.cli compare <eval-json-or-run-dir> ...
 python -m dlef.cli gc --runs runs --keep-last 3 --keep-best 1 --metric-key mae
-python -m dlef.cli report --runs output/runs --claims output/claims --out output/reports/report.md
+python -m dlef.cli report --runs output/runs --claims output/claims \
+  --candidates output/candidates --out output/reports/report.md
 ```
 
 ---
@@ -219,7 +229,7 @@ make test
 ```
 
 模板按三层组织：`input/`（配置 + benchmark）、`core/`（项目源码）、`output/`
-（run / claim / report）。项目根目录还有 `AGENTS.md`、`PROJECT.yaml`、
+（run / candidate / claim / report）。项目根目录还有 `AGENTS.md`、`PROJECT.yaml`、
 `STATE.md`、`DECISIONS.md`、`TUTORIAL.md`：`PROJECT.yaml` 是稳定契约，
 `STATE.md` 是当前快照，`DECISIONS.md` 是 append-only 决策日志。
 填完 brief 后先跑 `make audit` + `make check`；`make check` 在
@@ -508,9 +518,14 @@ reclaimable: 186.8 KiB (6 runs, 12 artifacts)
 dry-run: would delete 6 run(s), 12 artifact(s)
 ```
 
-### 7.7 Claim report
+### 7.7 Shortlist / claim report
 
 ```text
+## Shortlist
+| candidate | status | experiment | runs | metric | val | ...
+| ranksim-g20 | candidate | v11-ranksim-log-g20 | 3 | v11/worst_bin | 2.41 | ...
+
+## Claims
 | claim | text | metric | value | split | benchmark | eval | run | test_access |
 | c1 | Baseline comparison | mae | ... | test | 647b946221bf | ... | ... | WARN 2 |
 ```
@@ -583,6 +598,18 @@ ADR：`docs/adr/0002-template-imports-core.md`、`docs/adr/0003-benchmark-identi
 
 “只保留成功”会丢失最重要的信息。
 
+### 8.8 Candidate 是独立层，不是 Claim 的别名
+
+Claim 是“对外报的数 + 证据链”；Candidate 是“我认可、值得继续看的 run 集”。
+两者混用会破坏 Claim 的语义（必须引用 eval、per-number、最终结论）：
+
+- candidate 引用 run ids，不要求 eval；
+- candidate 有状态机（candidate / promoted / rejected / archived）；
+- candidate 记录 reason / next，claim 不需要；
+- active candidate 受 gc 保护，claim 的证据链也受保护。
+
+ADR：`docs/adr/0006-candidates-between-runs-and-claims.md`。
+
 ---
 
 ## 9. 目录导览
@@ -610,7 +637,7 @@ DLEF/
 3. 本报告 — 理解整体设计。
 4. `AGENTS.md` — 建新项目时 agent 必须读的规则（文件放哪、实验怎么组织）。
 5. `templates/research-project/AGENTS.md` — 项目复制后的本地规则。
-6. `docs/design/contracts-v0.md` — 看 18 个 contract。
+6. `docs/design/contracts-v0.md` — 看 19 个 contract。
 7. `templates/research-project/` — 看一个真实项目怎么接。
 8. `dlef/runner.py` / `dlef/policy.py` — 看训练循环和 AMP/DDP。
 9. `dlef/sweep.py` / `dlef/retention.py` — 看大量实验和清理。
@@ -652,9 +679,10 @@ DLEF/
    ```
 7. 跑 baseline；确认 manifest / config / checkpoint 都对。
 8. 需要多 seed 时，把 `seed` 加进 sweep 的 params；一个 seed 一个 run。
-9. val 上选模；test 只用冻结 benchmark 评一次。
-10. 写 claim（带 benchmark_id）；`dlef report` 生成报告。
-11. 给要保留的 run 打 `reported` tag；用 `dlef gc` 清理其余。
+9. val 上选模；把值得继续看的 run 建成 candidate（val 上比较，不碰 test）。
+10. 对 candidate 跑 test（冻结 benchmark，只跑一次）；写 claim（带 benchmark_id）；
+    把 candidate 标为 `promoted`。
+11. `dlef report` 生成报告；给要保留的 run 打 `reported` tag；用 `dlef gc` 清理其余。
 12. 归档：把 manifest、config、benchmark、报告、关键 checkpoint 放到长期存储。
 
 ---
@@ -669,6 +697,7 @@ DLEF/
 | **Artifact** | checkpoint、预测、指标表、图；内容寻址 |
 | **Eval** | 独立评测 run：checkpoint × eval spec × benchmark |
 | **Benchmark** | 测试集 + 标签 + eval transform + 指标协议；可比较性的单位 |
+| **Candidate** | 一组值得继续研究的 run + reason/next；run → candidate → claim |
 | **Claim** | 报告里的一个数字/表/图，链接到 eval |
 | **Sweep** | 一组 trial；一个 trial = 一个 run |
 | **Trial** | sweep 里的一个 run |

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from adapters.torch import TorchTask
+from adapters.torch import StructureCallback, TorchTask
 
 from .config import ProjectConfig
 
@@ -35,6 +35,9 @@ def build_task(config: ProjectConfig, device: Any = "cpu") -> TorchTask:
     metrics = build_metrics(config.metrics)
 
     callbacks = []
+    # Always on: records the structure that was actually built, so a run can be
+    # audited without reading model source and in-place edits become visible.
+    callbacks.append(StructureCallback(model.module))
     if config.tensorboard.enabled:
         callbacks.append(
             TensorBoardCallback(

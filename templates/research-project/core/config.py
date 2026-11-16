@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from dlef.config import ConfigError, ConfigSchema, TrainConfig
 
@@ -54,6 +55,30 @@ class ModelConfig(ConfigSchema):
             raise ConfigError(f"unknown model.name: {self.name!r}")
         if self.hidden <= 0:
             raise ConfigError("hidden must be > 0")
+
+    def structural_signature(self) -> dict[str, Any]:
+        """The fields that make two runs *different models*, not different sizes.
+
+        Consumed by ``core/tools/variants.py`` to count how many distinct
+        structures the configs declare under each ``model.name``. Maintain it by
+        hand and keep the boundary honest:
+
+        - include: selectors that add/remove modules or change connectivity
+          (head type, fusion mode, bypasses), and freeze strategy;
+        - exclude: pure size knobs that a sweep varies on purpose (width, depth,
+          hidden units), calibration constants, and checkpoint paths.
+
+        Excluding size knobs is what makes the count meaningful: sweeping
+        ``hidden`` over five values is one architecture, not five variants.
+        Including a topology switch is what makes it safe: a field missing from
+        here lets two different models hide behind one name.
+
+        Prefer adding a variant ``name`` over adding a boolean field. N booleans
+        describe 2**N structures but only N names, and the run record cannot
+        tell them apart.
+        """
+
+        return {"name": self.name}
 
 
 @dataclass

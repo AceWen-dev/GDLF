@@ -76,6 +76,23 @@ class TorchModel:
             return output
         return ModelOutput(predictions=output)
 
+    def train(self, mode: bool = True):
+        """切换训练/评估模式（D-0041）。
+
+        runner 的 `_validate` 通过 duck-typing 调用 `model.eval()`；此前
+        TorchModel 没有这个方法，导致验证/评估一直跑在 train 模式（BN 用批统计）。
+        这里补上 passthrough，使 eval 模式真正生效。
+        """
+        self.module.train(mode)
+        return self
+
+    def eval(self):
+        return self.train(False)
+
+    @property
+    def training(self) -> bool:
+        return bool(self.module.training)
+
     def parameters(self):
         return self.module.parameters()
 

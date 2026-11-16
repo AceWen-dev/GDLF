@@ -37,6 +37,7 @@ dlef/
   run.py           # manifest, run store, content-addressed artifacts
   eval.py          # EvalSpec / EvalRecord
   benchmark.py     # test set + metric protocol -> benchmark id
+  candidates.py    # Candidate / CandidateStore: shortlist between runs and claims
   claim.py         # Claim / ClaimStore / TestAccessLog
   runner.py        # minimal train/eval loop
   seed.py          # seed + capture/restore Python/NumPy/Torch RNG
@@ -44,8 +45,8 @@ dlef/
   checkpoint.py    # CheckpointCodec: JSON default, binary adapters
   sweep.py         # SweepSpec, trials, local GPU-aware queue
   retention.py     # reference-checked retention / gc
-  report.py        # comparison table from eval records
-  cli.py           # init / doctor / compare / gc
+  report.py        # comparison table, shortlist, claim report
+  cli.py           # init / doctor / compare / report / gc
   _template_data.py # embedded template for wheel installs (generated)
   launcher.py      # local launcher stub
 adapters/torch/    # optional PyTorch adapter (not imported by core)
@@ -165,6 +166,11 @@ examples/toy/output/
   digest, original config source and code version. The template's
   `core/tools/runs.py` is the experiment-level index; `run_info.py` resolves a
   run's config to its source files.
+- Every run also records a structure fingerprint (`model_structure.json`), so a
+  run card answers "which network was built", not just "which config was
+  declared". `core/tools/variants.py` counts declared and observed variants and
+  flags in-place model edits: one config digest mapping to two structure
+  digests.
 
 It does **not** prove a good model, a real dataset pipeline, or distributed
 training. Those are adapter concerns.
@@ -334,7 +340,7 @@ available on `seed_everything` for cuDNN deterministic kernels.
 **only its contents**; do not copy the DLEF repository. It imports `dlef`; it
 does not vendor the core. The project is organized into three layers: `input/`
 (configs and benchmarks), `core/` (project source), and `output/` (runs,
-claims, reports).
+candidates, claims, reports).
 
 ```bash
 pip install -e /path/to/DLEF
@@ -352,6 +358,45 @@ a configurable `output_root`, and an optional TensorBoard mirror. The framework
 runbook stays in `docs/TUTORIAL.md` and is not copied into the project.
 `make check` fails while the project still uses the synthetic placeholder. See
 `templates/research-project/README.md` for the replace points and commands.
+
+## Candidates / shortlist
+
+Runs accumulate faster than reports. A `Candidate` is the triage layer between
+the run store and claims: a named pointer to one or more runs, plus why it is
+worth studying and what to inspect next. Candidates are compared on validation
+metrics; test evaluation happens only after promotion.
+
+```python
+from dlef.candidates import Candidate, CandidateStore
+
+CandidateStore("output/candidates").add(
+    Candidate(
+        candidate_id="ranksim-g20",
+        title="RankSim + log target, 3 seeds",
+        run_ids=("run-1", "run-2", "run-3"),
+        reason="best val worst-case score; verify the D cohort",
+        next="inspect per-bin errors, then decide on test eval",
+        metric="mae",
+    )
+)
+```
+
+The template ships `core/tools/candidates.py`:
+
+```bash
+python core/tools/candidates.py                 # active shortlist
+python core/tools/candidates.py show <id>
+python core/tools/candidates.py reject <id> --reason "..."
+python core/tools/candidates.py promote <id> --claim <claim-id>
+```
+
+`candidate`/`promoted` runs are protected by `dlef gc`; `rejected`/`archived`
+runs follow normal retention. The report renders the shortlist above claims:
+
+```bash
+python -m dlef.cli report --runs output/runs --claims output/claims \
+  --candidates output/candidates --out output/reports/report.md
+```
 
 ## Claims / report
 
@@ -372,7 +417,8 @@ ClaimStore("output/claims").add(
 ```
 
 ```bash
-python -m dlef.cli report --runs output/runs --claims output/claims --out output/reports/report.md
+python -m dlef.cli report --runs output/runs --claims output/claims \
+  --candidates output/candidates --out output/reports/report.md
 ```
 
 Test-set access is logged under `runs/../test_access/`, keyed by `test_set_id`,
@@ -399,3 +445,5 @@ Markdown; there is no web UI.
 - `docs/adr/0002-template-imports-core.md` — template imports the versioned core; no vendoring.
 - `docs/adr/0003-benchmark-identity.md` — frozen benchmark: test set + metric protocol.
 - `docs/adr/0004-selection-vs-early-stopping.md` — selection and early stopping are independent.
+- `docs/adr/0005-model-variants-over-flags.md` — a topology change is a new model name, and runs record a structure fingerprint.
+- `docs/adr/0006-candidates-between-runs-and-claims.md` — why the shortlist is a separate, gc-protected layer.

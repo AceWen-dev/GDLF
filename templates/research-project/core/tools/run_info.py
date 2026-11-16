@@ -61,6 +61,18 @@ def _source(relative: str) -> str:
     return f"{relative}{suffix}"
 
 
+def _structure(run: Run) -> dict[str, Any]:
+    """The recorded structure fingerprint, or {} for runs that predate it."""
+
+    path = run.directory / "model_structure.json"
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
 def _print_source(label: str, relative: str) -> None:
     print(f"  {label}: {_source(relative)}")
 
@@ -125,6 +137,21 @@ def main() -> int:
     _print_source(
         "model_source", f"core/models/{model.get('name', '<name>')}.py"
     )
+    structure = _structure(run)
+    if structure:
+        # The config above says what was asked for; this says what was built.
+        # A shared config_digest with a differing struct# means the model code
+        # changed in place, so those runs are not comparable.
+        print(
+            f"  model_structure: struct#{str(structure.get('digest', ''))[:12]} "
+            f"topo#{str(structure.get('topology_digest', ''))[:12]} "
+            f"layers={structure.get('n_layers')} "
+            f"params={structure.get('n_params')} "
+            f"trainable={structure.get('n_trainable')}"
+        )
+        print(f"    record: {run.directory / 'model_structure.json'}")
+    else:
+        print("  model_structure: (none recorded)")
     print(f"  loss: {loss.get('name', '')} {loss}")
     _print_source("loss_source", f"core/losses/{loss.get('name', '<name>')}.py")
     print(f"  optimizer: {optim.get('name', '')} {optim}")
