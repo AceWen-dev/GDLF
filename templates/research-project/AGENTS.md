@@ -211,6 +211,7 @@ output/                   # layer 3: generated results (default output_root)
   candidates/             # one JSON per shortlisted run set
   claims/                 # one JSON per reported claim
   reports/
+  charts/                 # generated static SVGs + index.md
   README.md
 
 AGENTS.md                # project-local guide
@@ -248,6 +249,7 @@ If you rename `core`, update:
 | test | `tests/test_*.py` | run `python -m unittest discover -s tests` |
 | candidate | `output/candidates/` | `core/tools/candidates.py`, `CandidateStore` |
 | claim | `output/claims/` | `ClaimStore` |
+| chart view | `input/views/charts.yaml` | `core/tools/charts.py`, `make charts` |
 | reusable cross-project code | DLEF core or `adapters/` | not in `core/` |
 | generated run output | `output/` | never edit by hand |
 
@@ -544,10 +546,11 @@ Recommended order:
    # core/commands/sweep.py maps every param with set_dotted; one seed = one run.
    ```
 9. Create a claim for each reported number.
-10. Run `dlef gc` dry-run; tag runs that must survive (`reported`, `baseline`)
+10. Run `make charts`; keep `output/charts/index.md` with the report.
+11. Run `dlef gc` dry-run; tag runs that must survive (`reported`, `baseline`)
     at launch, not after deletion.
-11. Archive manifest/config/report/key checkpoints.
-12. Update `STATE.md` with the run/eval ids and metrics; append a
+12. Archive manifest/config/report/charts/key checkpoints.
+13. Update `STATE.md` with the run/eval ids and metrics; append a
     `DECISIONS.md` entry if the choice is hard to reverse; run `make handoff`.
 
 Phase gates (enforced by `make check`):
@@ -679,6 +682,33 @@ file, the project's TensorBoard integration is incomplete.
 
 TensorBoard is a mirror, not a new record source. Never edit event files by
 hand, never make TensorBoard the only record, and never tune on test metrics.
+
+### 6.2 Static charts
+
+`output/charts/` is a **derived projection** for reports and one-glance review.
+It is regenerated with:
+
+```bash
+make charts
+# or: python core/tools/charts.py --output output
+```
+
+The project declares what to draw in `input/views/charts.yaml`:
+
+- `experiments`: latest val metric per experiment, with seed spread;
+- `candidates`: mean val metric per candidate, colored by status;
+- `claims`: reported values resolved from eval records.
+
+Rules:
+
+- Charts are never the record; `runs/`, `evals/`, candidates and claims are.
+- Never hand-edit `output/charts/*.svg` or `index.md`; change the view spec and
+  rebuild. Stale SVGs for removed views are deleted automatically.
+- Use the project's own metric keys in the view spec; do not put domain metric
+  names in `dlef/`.
+- Do not chart test metrics before a claim exists. `experiments` uses the val
+  stream on purpose.
+- Learning curves stay in TensorBoard; charts are static comparison snapshots.
 
 ---
 

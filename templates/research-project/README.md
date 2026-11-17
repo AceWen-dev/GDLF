@@ -66,6 +66,7 @@ input/                    # layer 1: immutable inputs
   configs/sweeps/         # optional parameter-space specs
   benchmarks/             # one frozen JSON per benchmark
   datasets/               # dataset cards: version, manifest hash, split counts
+  views/charts.yaml       # which static charts to generate
   README.md
 
 core/                     # layer 2: project source
@@ -97,6 +98,7 @@ core/                     # layer 2: project source
     runs.py
     run_info.py
     candidates.py
+    charts.py
     configs.py
     benchmark.py
     new_experiment.py
@@ -121,6 +123,7 @@ output/                   # layer 3: generated results
   candidates/             # human-authored shortlist
   claims/
   reports/
+  charts/                 # generated SVGs + index.md
   README.md
 
 AGENTS.md                 # project-local agent guide
@@ -293,6 +296,7 @@ python core/tools/runs.py                    # experiment summary
 python core/tools/runs.py --experiment <name>
 python core/tools/run_info.py --run <run_id>
 python core/tools/candidates.py              # the shortlist
+python core/tools/charts.py                  # static charts -> output/charts/
 python core/tools/configs.py list
 python core/commands/sweep.py --config input/configs/base.yaml
 make status                                 # phase / runs / next actions / git
@@ -305,7 +309,7 @@ tensorboard --logdir output/runs --port 6006
 ```
 
 Or `make train`, `make runs`, `make runs-all`, `make configs`,
-`make new-experiment`, `make new-benchmark`, `make sweep`, `make report`,
+`make new-experiment`, `make new-benchmark`, `make sweep`, `make charts`, `make report`,
 `make gc-dry`, `make audit`, `make check`, `make status`, `make handoff`,
 `make test`, `make doctor`.
 `OUTPUT=<path>` overrides the output root for the tools (`make runs OUTPUT=...`).
@@ -559,6 +563,21 @@ Candidates are evaluated on val and are protected from `dlef gc` while
 `candidate`/`promoted`. Test eval and `Claim` creation happen only after
 promotion. `make report` renders the shortlist above the claims; see
 `output/candidates/README.md` for the full contract.
+
+## Static charts
+
+`make charts` writes dependency-free SVGs and a one-page index:
+
+```bash
+make charts
+# output/charts/index.md + experiments-val.svg, candidates-val.svg, claims-test.svg
+```
+
+The views live in `input/views/charts.yaml`: experiments by validation metric,
+candidates, and reported claims. Replace `mae` with the project's metric; add
+one chart per metric when needed. Charts are derived and rebuildable, never a
+record. Learning curves stay in TensorBoard; static charts are for reports and
+for seeing the funnel at a glance. See `input/views/README.md` for the schema.
 
 ## Changing data / model / loss mid-experiment
 

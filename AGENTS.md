@@ -179,6 +179,7 @@ A project has this shape (from `templates/research-project/`):
     candidates/            # one JSON per shortlisted run set
     claims/                # one JSON per reported claim
     reports/
+    charts/                # generated static SVGs + index.md
     README.md
   AGENTS.md                # project-local guide (from the template)
   README.md
@@ -218,8 +219,11 @@ Placement rules:
 - **Candidates** → `output/candidates/<candidate_id>.json` via `CandidateStore`
   or `core/tools/candidates.py`; one candidate = one run set + reason/next.
 - **Claims** → `output/claims/<claim_id>.json` via `ClaimStore`.
-- **Generated outputs** → `output/`; never edit by hand. Candidates and claims
-  are the small, human-authored exceptions.
+- **Chart views** → `input/views/charts.yaml`; generated SVGs and `index.md`
+  go to `output/charts/` via `core/tools/charts.py` / `make charts`.
+- **Generated outputs** → `output/`; never edit them by hand. Candidates and
+  claims are the small, human-authored exceptions; charts are derived, never
+  the record.
 - **Reusable adapter** → `adapters/<stack>/` in the DLEF repo, not in a project.
 - **Project-specific adapter** → project `core/`; do not force it into the DLEF core.
 
@@ -446,6 +450,9 @@ python -m dlef.cli report \
 
 - Do not hand-copy numbers into a paper/report. Let the claim/report tool
   resolve them.
+- Static charts are a derived projection (`make charts`), not a record. The
+  project declares metrics/filters in `input/views/charts.yaml`; never edit
+  `output/charts/` by hand and never chart test metrics before a claim exists.
 
 ---
 
@@ -517,6 +524,8 @@ Every project should have:
 - Do not write `runs/` / `manifest.json` by hand.
 - Do not edit completed metrics/manifests/eval records.
 - Do not delete runs/sweeps without `dlef gc`.
+- Do not hand-edit `output/charts/*.svg` or `index.md`; change
+  `input/views/charts.yaml` and rebuild with `make charts`.
 - Do not tune on test; do not report a single lucky seed as the result.
 - Do not make W&B/MLflow/TensorBoard the only record.
 - Do not store secrets in config or logs.
@@ -565,6 +574,7 @@ A project task is done when:
 - `docs/adr/0005-model-variants-over-flags.md` — why a topology change needs a new model name, and why structure is fingerprinted.
 - `docs/adr/0006-candidates-between-runs-and-claims.md` — why the shortlist is a separate layer, and why it is gc-protected.
 - `docs/adr/0007-remove-artifact-store.md` — why all files live in the run directory and the artifact store was removed.
+- `docs/adr/0008-static-charts.md` — why charts are derived, view-spec-driven projections.
 - `examples/torch_regression/` — a complete torch + sweep example.
 
 If a requirement is genuinely ambiguous, ask the human once, then follow the

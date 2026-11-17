@@ -14,9 +14,10 @@
 - 支持 **AMP、梯度累积、梯度裁剪、可选 DDP**。
 - 支持 **retention / gc**：默认 dry-run，引用检查、血缘保护、candidate/claim 保护。
 - 支持 **Candidate / shortlist**：在大量 run 和最终 claim 之间加一层人工判断；active candidate 受 gc 保护，promotion 之后才进入 test/claim。
+- 支持 **静态图表**：`make charts` 从 runs/candidates/claims 生成 SVG + `output/charts/index.md`，依赖为零，可重建。
 - 支持 **Claim / Markdown report**：报告里的数字可以反向解析到 eval record；test split 按 `test_set_id` 计数，重复访问标 `WARN`；跨 benchmark 标为不可比。
 - 项目模板 `templates/research-project/` 可以直接复制，**依赖 core 包，不复制 core**。
-- 测试：主套件 **96 个**；模板 smoke **44 个**（torch 环境全过）。
+- 测试：主套件 **101 个**；模板 smoke **48 个**（torch 环境全过）。
 - 真实跑通：CUDA AMP、2 进程 CPU DDP、subprocess sweep、模板 train/eval/sweep。
 
 ---
@@ -98,6 +99,7 @@ core (dlef/)
   eval.py         # EvalSpec / EvalRecord
   benchmark.py    # test set + metric protocol -> benchmark id
   candidates.py   # Candidate / CandidateStore: run → candidate → claim
+  charts.py       # generic BarChart / SVG renderer (domain-free)
   claim.py        # Claim / ClaimStore / TestAccessLog
   sweep.py        # SweepSpec / trials / thread + subprocess queues
   retention.py    # plan / apply / reference checks
@@ -205,7 +207,19 @@ python -m dlef.cli compare <eval-json-or-run-dir> ...
 python -m dlef.cli gc --runs runs --keep-last 3 --keep-best 1 --metric-key mae
 python -m dlef.cli report --runs output/runs --claims output/claims \
   --candidates output/candidates --out output/reports/report.md
+python core/tools/charts.py --output output   # -> output/charts/*.svg
 ```
+
+### 5.9 Charts
+
+- `output/charts/`：静态 SVG + `index.md`，由 `make charts` 生成。
+- `input/views/charts.yaml`：项目声明画什么指标、如何聚合、最多几条。
+- `experiments`：每个实验的最新 val 指标，带 seed 的 min/max。
+- `candidates`：每个备选的 val 均值，按状态着色。
+- `claims`：已报告的值，从 eval record 解析。
+- `dlef/charts.py` 只提供通用 `ChartBar` / `BarChart` / SVG 渲染；core 不知道
+  任何领域指标名。
+- 图表是派生投影，可随时重建；不是记录，不参与 claim 证据链。
 
 ---
 
@@ -634,7 +648,7 @@ DLEF/
 3. 本报告 — 理解整体设计。
 4. `AGENTS.md` — 建新项目时 agent 必须读的规则（文件放哪、实验怎么组织）。
 5. `templates/research-project/AGENTS.md` — 项目复制后的本地规则。
-6. `docs/design/contracts-v0.md` — 看 19 个 contract。
+6. `docs/design/contracts-v0.md` — 看 20 个 contract。
 7. `templates/research-project/` — 看一个真实项目怎么接。
 8. `dlef/runner.py` / `dlef/policy.py` — 看训练循环和 AMP/DDP。
 9. `dlef/sweep.py` / `dlef/retention.py` — 看大量实验和清理。
@@ -679,8 +693,9 @@ DLEF/
 9. val 上选模；把值得继续看的 run 建成 candidate（val 上比较，不碰 test）。
 10. 对 candidate 跑 test（冻结 benchmark，只跑一次）；写 claim（带 benchmark_id）；
     把 candidate 标为 `promoted`。
-11. `dlef report` 生成报告；给要保留的 run 打 `reported` tag；用 `dlef gc` 清理其余。
-12. 归档：把 manifest、config、benchmark、报告、关键 checkpoint 放到长期存储。
+11. `make charts` 生成静态图；`dlef report` 生成报告；给要保留的 run 打
+    `reported` tag；用 `dlef gc` 清理其余。
+12. 归档：把 manifest、config、benchmark、报告、图表、关键 checkpoint 放到长期存储。
 
 ---
 
@@ -694,6 +709,7 @@ DLEF/
 | **Eval** | 独立评测 run：checkpoint × eval spec × benchmark |
 | **Benchmark** | 测试集 + 标签 + eval transform + 指标协议；可比较性的单位 |
 | **Candidate** | 一组值得继续研究的 run + reason/next；run → candidate → claim |
+| **Charts** | `output/charts/` 的派生 SVG + index；由 `input/views/charts.yaml` 声明，可重建 |
 | **Claim** | 报告里的一个数字/表/图，链接到 eval |
 | **Sweep** | 一组 trial；一个 trial = 一个 run |
 | **Trial** | sweep 里的一个 run |

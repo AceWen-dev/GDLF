@@ -38,6 +38,7 @@ dlef/
   eval.py          # EvalSpec / EvalRecord
   benchmark.py     # test set + metric protocol -> benchmark id
   candidates.py    # Candidate / CandidateStore: shortlist between runs and claims
+  charts.py        # generic BarChart / SVG renderer (domain-free)
   claim.py         # Claim / ClaimStore / TestAccessLog
   runner.py        # minimal train/eval loop
   seed.py          # seed + capture/restore Python/NumPy/Torch RNG
@@ -397,6 +398,23 @@ python -m dlef.cli report --runs output/runs --claims output/claims \
   --candidates output/candidates --out output/reports/report.md
 ```
 
+## Static charts
+
+`output/charts/` holds dependency-free SVGs plus a one-page index, generated
+from the run store, candidates and claims:
+
+```bash
+make charts
+# or: python core/tools/charts.py --output output
+# open output/charts/index.md
+```
+
+The project declares views in `input/views/charts.yaml`: validation metric per
+experiment (with seed spread), candidate comparison, and reported claims. The
+core renderer (`dlef/charts.py`) only knows labels, values and SVG; metric names
+stay in the project. Charts are derived and rebuildable, never a record. Live
+learning curves stay in TensorBoard.
+
 ## Claims / report
 
 A `Claim` links a reported number/table to one or more `EvalRecord`s.
@@ -447,3 +465,4 @@ Markdown; there is no web UI.
 - `docs/adr/0005-model-variants-over-flags.md` — a topology change is a new model name, and runs record a structure fingerprint.
 - `docs/adr/0006-candidates-between-runs-and-claims.md` — why the shortlist is a separate, gc-protected layer.
 - `docs/adr/0007-remove-artifact-store.md` — why all files live in the run directory.
+- `docs/adr/0008-static-charts.md` — why charts are derived, view-spec-driven projections.

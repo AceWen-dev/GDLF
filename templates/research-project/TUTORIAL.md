@@ -464,6 +464,19 @@ python -m dlef.cli report \
 报告先列 shortlist，再列 claims。不要手抄数字；让 claim/report 从
 eval → checkpoint → run 解析。
 
+生成静态图表（SVG + 一页 index）：
+
+```bash
+make charts
+# 或：
+python core/tools/charts.py --output output
+# 打开 output/charts/index.md
+```
+
+图表由 `input/views/charts.yaml` 声明：experiments（每个实验的 val 指标，
+带 seed 范围）、candidates（备选的 val 均值）、claims（已报告的值）。
+换主指标时改这个文件，不要手改 SVG。学习曲线仍在 TensorBoard。
+
 ---
 
 ## 10. 清理

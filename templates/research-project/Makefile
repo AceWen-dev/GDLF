@@ -55,6 +55,9 @@ handoff:
 sweep:
 	$(PYTHON) core/commands/sweep.py --config input/configs/base.yaml
 
+charts:
+	$(PYTHON) core/tools/charts.py --output $(OUTPUT) --views input/views/charts.yaml
+
 report:
 	$(PYTHON) -m dlef.cli report --runs $(OUTPUT)/runs --claims $(OUTPUT)/claims --candidates $(OUTPUT)/candidates --out $(OUTPUT)/reports/report.md
 

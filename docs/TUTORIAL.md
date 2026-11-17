@@ -440,6 +440,17 @@ cat output/reports/report.md
 
 报告先列 shortlist，再列 claims；每一行都能追到 run / eval → checkpoint → run。
 
+生成静态图表：
+
+```bash
+python core/tools/charts.py --output output
+# 或：make charts
+cat output/charts/index.md
+```
+
+图表视图在 `input/views/charts.yaml` 里声明（experiments / candidates /
+claims）；图表是派生结果，可随时重建，不是记录。学习曲线仍看 TensorBoard。
+
 ---
 
 ## 10. 清理旧实验

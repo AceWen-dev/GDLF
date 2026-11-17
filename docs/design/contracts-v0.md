@@ -31,6 +31,7 @@
 | 17 | Claim | service | 是 | Claim / ClaimStore / report | 无 | claim → eval → run；test access 可见 |
 | 18 | TestAccess | service | 是 | append-only log + count | 无 | 每个 test set 的 test 访问计数 |
 | 19 | Candidate | service | 可选 | Candidate / CandidateStore / shortlist | 无 | candidate → runs；promoted → claim；active 受 gc 保护 |
+| 20 | Charts | service | 可选 | `BarChart` / SVG renderer / view spec | 领域指标选择 | 派生、可重建；不是记录 |
 
 **runtime contract**：每次实验都会实例化的对象。
 **service**：框架提供的运行时设施，不是用户实现的算法组件。
@@ -617,6 +618,38 @@ class Candidate:
 - report 先渲染 shortlist，再渲染 claims：`run → candidate → claim → report`。
 - Claim 不要求来自 candidate；candidate 是推荐路径，不是强制外键。
 
+### 4.10 Charts（派生视图）
+
+```python
+@dataclass(frozen=True)
+class ChartBar:
+    label: str
+    value: float
+    low: float | None = None
+    high: float | None = None
+    note: str = ""
+    color: str = ""
+
+@dataclass(frozen=True)
+class BarChart:
+    chart_id: str
+    title: str
+    bars: tuple[ChartBar, ...]
+    subtitle: str = ""
+    unit: str = ""
+    mode: str = "min"          # min | max
+    footer: str = ""
+```
+
+约束：
+
+- chart 是 RunStore / candidate / claim 的**派生投影**，可随时重建；不是记录。
+- core 只提供通用 SVG 渲染（label / value / low / high / color / title）；
+  具体指标、实验筛选、聚合方式由项目 `input/views/charts.yaml` 声明。
+- `output/charts/` 由工具生成；不手改 SVG，不把图表当作唯一证据。
+- `experiments` 视图使用训练 val 流；test 数字只能来自 claim。
+- 删除视图后，对应旧 SVG 会在下次生成时清理。
+
 ---
 
 ## 5. 13 条不变量
@@ -649,6 +682,7 @@ core/
   sweep/          # SweepSpec, trials, thread/subprocess GPU-aware queues
   run/            # manifest, run store
   candidates/     # shortlist between runs and claims
+  charts/         # generic BarChart / SVG renderer (derived views)
   claim/          # claims + test-access log
   retention/      # plan / apply / reference checks
   benchmark/      # test set + metric protocol -> benchmark id
@@ -682,7 +716,7 @@ templates/
 - 任何 tracker 厂商 SDK。
 - 任何实验 protocol 的正文（那是文档，不是代码）。
 - 任何“最佳实践”的默认值（默认值属于 template，不属于 core）。
-- 任何可视化 / dashboard。
+- 任何领域特定的可视化 / dashboard；通用 SVG 渲染契约可以留在 core（见 §4.10 Charts）。
 
 ---
 
@@ -700,6 +734,7 @@ templates/
 8. **Delivery**：项目模板 `templates/research-project/` 依赖版本化 core，不 vendor core（ADR 0002）。
 9. **Claim / TestAccess**：Claim 对象 + Markdown report；test-split access 按 `test_set_id` 计数，report 标记 WARN；跨 benchmark 显示不可比。
 10. **Candidate**：run 与 claim 之间的备选层；一个 candidate = 一组 run + 判断（reason/next）+ 生命周期；active candidate 受 gc 保护，promotion 才进入 test/claim。
+11. **Charts**：通用 SVG renderer + 项目 view spec；`output/charts/` 是可重建的派生投影，不是记录。
 
 **待定：**
 

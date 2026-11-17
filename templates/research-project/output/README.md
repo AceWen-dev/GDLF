@@ -10,6 +10,7 @@ output/
   candidates/    # human-authored shortlist (small JSON, commit it)
   claims/        # reported claims (small JSON, can be committed)
   reports/       # generated Markdown reports
+  charts/        # generated static SVGs + index.md
 ```
 
 `candidates/` and `claims/` are the two human-authored folders: candidates record
@@ -74,6 +75,19 @@ tensorboard --logdir output/runs --port 6006
 ```
 
 TensorBoard is a mirror; the files above remain the record.
+
+## Charts
+
+`output/charts/` holds static SVGs for reports and a one-page `index.md`:
+
+```bash
+make charts
+# or: python core/tools/charts.py --output output
+```
+
+Views are declared in `input/views/charts.yaml`: experiments by validation
+metric, candidates, and reported claims. Charts are derived and rebuildable;
+never edit them by hand. Learning curves stay in TensorBoard.
 
 ## Shortlist before claims
 
