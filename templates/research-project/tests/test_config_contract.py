@@ -51,11 +51,11 @@ class ConfigContractTests(unittest.TestCase):
     def test_output_root_resolution(self) -> None:
         relative = resolve_config(
             ProjectConfig,
-            {"output_root": "artifacts"},
+            {"output_root": "workspace"},
         )
         self.assertEqual(
             resolve_output_root(relative.schema, "/tmp/project"),
-            Path("/tmp/project/artifacts"),
+            Path("/tmp/project/workspace"),
         )
         absolute = resolve_config(
             ProjectConfig,

@@ -21,7 +21,7 @@
 | 7 | Metric | runtime | 评测必需 | `Metric` / `MetricResult` | 指标数学 | 按 split 命名；确定性 |
 | 8 | Task / Runner | runtime | 是 | Runner 循环、`StepOutput`、resume | Task 的 step | step 纯函数；不写磁盘 |
 | 9 | Config | service | 是 | schema、resolver、digest | 配置值 | 严格、已解析、有 hash |
-| 10 | Run / Artifact | service | 是 | `RunManifest` / `RunStore` / `ArtifactStore` | 无 | manifest 先写；不可变；内容寻址 |
+| 10 | Run | service | 是 | `RunManifest` / `RunStore` | 无 | manifest 先写；不可变；文件只写 run 目录 |
 | 11 | Eval | service | 是 | `EvalSpec` / `EvalRecord` / benchmark id / 聚合 | 指标选择 | 独立 run；test access 计数 |
 | 12 | CLI / Launcher | service | 是 | commands、launcher 协议 | 项目入口配置 | 薄入口；一条命令一个工作流 |
 | 13 | Registry | service | 是 | register / create / resolve | 实现注册 | 不重名；显式 `class_path` 逃生口 |
@@ -48,9 +48,7 @@ Registry ──► Task { Dataset, Model, Loss, Optimizer, Scheduler, Metrics, C
   ▼
 Runner { train / eval / predict }
   │
-  ├──► Run { Manifest, Metrics, Checkpoints }
-  │        │
-  │        └──► ArtifactStore
+  ├──► Run { Manifest, Metrics, Checkpoints, Evals }
   │
   └──► EvalRecord ──► Compare / Report
 ```
@@ -257,7 +255,7 @@ class Task(Protocol):
 
 - **标准路径**：`train_step` 只返回 loss；Runner 负责 `backward` / `step` / AMP / accumulation / clipping。
 - **逃生口**：需要自定义反向/多优化器/对抗训练时，Task 实现 `custom_train_step(batch)`，Runner 只负责生命周期和记录。逃生口必须显式声明，不能偷偷绕过。
-- Task 不写磁盘；日志、artifact、checkpoint 由 Runner / RunStore 处理。
+- Task 不写磁盘；日志、checkpoint、eval 记录由 Runner / RunStore 处理。
 - Task 不读全局 config；所需值在构造时注入。
 - Runner 拥有：device、AMP、grad accumulation、grad clip、checkpoint/resume、NaN/Inf fail-fast、吞吐记录、callback 调度。
 - Runner 必须通过 kill-resume 测试：中断后续跑，结果与不中断一致（或差异可解释）。
@@ -268,7 +266,7 @@ class Task(Protocol):
 class Runner:
     def fit(self, task: Task, dataset: Dataset, config: Config) -> Run: ...
     def evaluate(self, task: Task, dataset: Dataset, spec: EvalSpec) -> EvalRecord: ...
-    def predict(self, task: Task, dataset: Dataset, spec: PredictSpec) -> Artifact: ...
+    def predict(self, task: Task, dataset: Dataset, spec: PredictSpec) -> Path: ...
 ```
 
 `Runner` 是 core 的具体实现，不是 Protocol。它不包含领域逻辑。
@@ -357,7 +355,7 @@ last       -> last.pt       末轮权重
 `best_raw` / `best_ema` 的保存不依赖 early stopping。训练入口按
 `selection.checkpoint` 选择 checkpoint 做最终 val eval；test eval 仍然是独立 run。
 
-### 4.2 Run / Artifact
+### 4.2 Run
 
 ```python
 @dataclass
@@ -371,7 +369,6 @@ class RunManifest:
     env: Mapping[str, Any]
     seed: int
     status: str                      # running / completed / failed / killed
-    artifacts: Mapping[str, str]
     started_at: str
     ended_at: str | None = None
     parent_run_id: str | None = None
@@ -383,7 +380,8 @@ class RunManifest:
 
 - 第一个 step 之前写 `status: running`；结束原子更新。
 - 完成的 run 不可变；修正用新的 run 或 append-only annotation。
-- artifact 以内容 hash 寻址；checkpoint 去重。
+- checkpoint、eval record、预测文件都写在 run 目录内；没有第二份 artifact 副本。
+- 旧 manifest 里的 `artifacts` 字段读取时忽略，新 manifest 不再写。
 - RunStore 是事实来源；Tracker 只是可选索引。
 - 本地优先；远程存储是 mirror，不是前提。
 
@@ -554,7 +552,6 @@ class RetentionPolicy:
     keep_tags: frozenset[str] = frozenset({"reported"})
     protect_status: frozenset[str] = frozenset({"running"})
     min_age_days: float = 0.0
-    artifact_ttl_days: float = 30.0
     protect_sweep_runs: bool = True
     sweep_ttl_days: float | None = None
 ```
@@ -563,8 +560,7 @@ class RetentionPolicy:
 
 - `plan` 先于任何删除；默认 `apply(dry_run=True)`。
 - 保护：per-experiment last/best/every-N；protected tags/status；young；parent lineage closure；sweep-referenced runs；active candidate（`candidate`/`promoted`）引用的 runs；claim 的 eval id 所在的 runs。
-- Artifact 保护：被 kept run 引用的 digest；或 age < TTL。只有无引用且超过 TTL 的 artifact 才 delete。
-- 删除 run 是 `shutil.rmtree`；删除 artifact 是内容寻址 store 的 `delete`。
+- 删除 run 是 `shutil.rmtree`；文件都在 run 目录内，没有第二个 artifact 副本。
 - 所有 action 带 reason 和 size；plan 可审计。
 
 ### 4.8 Claim / TestAccess
@@ -628,7 +624,7 @@ class Candidate:
 1. **Run identity**：一个 run = 一份 resolved config × 一个 seed；seed 是维度，不是循环。
 2. **Config**：第一个 step 前完全解析、dump、hash；unknown key 报错。
 3. **Manifest**：第一个 step 前写 `running`；状态只允许 `running / completed / failed / killed`。
-4. **Isolation**：训练代码不写 run 目录之外；artifact 走 store。
+4. **Isolation**：训练代码不写 run 目录之外；所有产物都在 run 目录内。
 5. **Loss**：`total` + 命名 `terms`；每个 term 都记录。
 6. **Metrics**：按 split 命名；eval 是独立 run。
 7. **Lineage**：claim → eval → checkpoint → run，逐级可追。
@@ -651,7 +647,7 @@ core/
   runner/         # train / eval / predict loop
   policy/         # TrainingPolicy: AMP / accumulation / clipping / DDP seam
   sweep/          # SweepSpec, trials, thread/subprocess GPU-aware queues
-  run/            # manifest, run store, artifact store
+  run/            # manifest, run store
   candidates/     # shortlist between runs and claims
   claim/          # claims + test-access log
   retention/      # plan / apply / reference checks

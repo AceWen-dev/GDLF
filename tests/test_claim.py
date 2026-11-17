@@ -12,7 +12,7 @@ from dlef.cli import main
 from dlef.config import resolve_config
 from dlef.eval import EvalSpec
 from dlef.report import format_claim_report, write_claim_report
-from dlef.run import ArtifactStore, RunStore
+from dlef.run import RunStore
 from dlef.runner import Runner
 from examples.toy.components import ToyDataset
 from examples.toy.config import ToyConfig
@@ -23,9 +23,9 @@ class ClaimTests(unittest.TestCase):
     def test_test_access_and_claim_report(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
+            store = RunStore(root / "runs")
             access = TestAccessLog(root / "test_access")
-            runner = Runner(store, store.artifact_store, test_access_log=access)
+            runner = Runner(store, test_access_log=access)
             config = resolve_config(
                 ToyConfig,
                 {"seed": 1, "epochs": 1, "n_train": 16, "n_val": 16, "batch_size": 8},

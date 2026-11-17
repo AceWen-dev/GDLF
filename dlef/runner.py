@@ -57,6 +57,7 @@ class Runner:
         ema_factory: Any | None = None,
     ) -> None:
         self.run_store = run_store
+        # Deprecated compatibility slot; the artifact store was removed.
         self.artifact_store = artifact_store or run_store.artifact_store
         self.checkpoint_codec: CheckpointCodec = checkpoint_codec or JsonCheckpointCodec()
         self.training_policy: TrainingPolicy = training_policy or NoOpTrainingPolicy()
@@ -422,7 +423,6 @@ class Runner:
                                 epoch,
                                 global_step,
                                 "best",
-                                artifact=False,
                             )
                             run.log(
                                 f"Selection(raw): {raw_monitor}={raw_smooth:.6g} "
@@ -461,7 +461,6 @@ class Runner:
                                 epoch,
                                 global_step,
                                 "best_ema",
-                                artifact=False,
                                 model_state=ema.state_dict(),
                             )
                             run.log(
@@ -537,7 +536,6 @@ class Runner:
                         epoch,
                         global_step,
                         f"epoch-{epoch:04d}",
-                        artifact=False,
                         ema_state=ema.state_dict() if ema is not None else None,
                     )
                     keep = int(getattr(schema, "checkpoint_keep", 0) or 0)
@@ -583,10 +581,6 @@ class Runner:
                     "last",
                     ema_state=ema.state_dict() if ema is not None else None,
                 )
-                if best_path is not None and best_path.is_file():
-                    run.save_artifact(best_path, "checkpoint:best")
-                if best_ema_path is not None and best_ema_path.is_file():
-                    run.save_artifact(best_ema_path, "checkpoint:best_ema")
                 if ema is not None:
                     # 训练结束时的 EMA 权重（D-0024）：选模优先 EMA 时作为首选
                     # checkpoint。窄 val 场景下 best_ema 会停得很早，final_ema 更稳。
@@ -598,10 +592,8 @@ class Runner:
                         last_epoch,
                         global_step,
                         "final_ema",
-                        artifact=False,
                         model_state=ema.state_dict(),
                     )
-                    run.save_artifact(final_ema_path, "checkpoint:final_ema")
             policy.on_fit_end(task, optimizer)
             self._call(callbacks, "on_run_end", ctx)
             if run is not None:
@@ -652,7 +644,6 @@ class Runner:
             test_set_id=test_set_id,
         )
         path = run.save_json(f"evals/{record.eval_id}.json", record.to_dict())
-        run.save_artifact(path, f"eval:{record.eval_id}")
         metric_text = " ".join(f"{key}={value:.6g}" for key, value in values.items())
         run.log(
             f"Eval [{spec.split}] done eval_id={record.eval_id} "
@@ -728,7 +719,6 @@ class Runner:
         step: int,
         name: str,
         *,
-        artifact: bool = True,
         model_state: Mapping[str, Any] | None = None,
         ema_state: Mapping[str, Any] | None = None,
     ) -> Path:
@@ -751,8 +741,6 @@ class Runner:
         path = run.dir / "checkpoints" / f"{name}{self.checkpoint_codec.suffix}"
         path.parent.mkdir(parents=True, exist_ok=True)
         self.checkpoint_codec.dump(path, checkpoint)
-        if artifact:
-            run.save_artifact(path, f"checkpoint:{name}")
         run.log(f"Checkpoint: {name} -> {path.name}")
         return path
 

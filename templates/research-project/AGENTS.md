@@ -44,7 +44,7 @@ export DLEF_DATA_ROOT=<data-root>
 ```
 
 Do **not** copy `<DLEF-root>/dlef`, `adapters`, `examples`, `docs`, the DLEF
-root `tests`, `.git`, or any `output/runs|artifacts|sweeps|test_access`.
+root `tests`, `.git`, or any `output/runs|sweeps|test_access`.
 
 **Existing project.** Do not re-initialize. Verify the wiring:
 
@@ -206,9 +206,9 @@ scripts/                 # project-specific scripts, intentionally unstructured
 
 output/                   # layer 3: generated results (default output_root)
   runs/                   # logs/train.log + tensorboard/ per run
-  artifacts/
   sweeps/
   test_access/
+  candidates/             # one JSON per shortlisted run set
   claims/                 # one JSON per reported claim
   reports/
   README.md
@@ -490,7 +490,7 @@ only. Report the comparison through `dlef compare` / `dlef report`.
 - Discover configs with `python core/tools/configs.py list`; map runs to configs
   with `python core/tools/runs.py`.
 - `output_root` (default `output`) is a **workspace path**, not an experiment
-  variable: it controls where runs/artifacts/sweeps are written. Relative values
+  variable: it controls where runs/sweeps are written. Relative values
   resolve against the project root. It does not change what is compared. Tools
   default to `DLEF_OUTPUT_ROOT` or `output`; pass `--runs` / `OUTPUT=` when the
   root differs.
@@ -773,7 +773,7 @@ python -m dlef.cli gc \
   --runs output/runs --sweeps output/sweeps --candidates output/candidates \
   --keep-last 3 --keep-best 1 --metric-key <your-metric> \
   --keep-tag reported --keep-tag baseline \
-  --artifact-ttl-days 30 --sweep-ttl-days 30 --apply
+  --sweep-ttl-days 30 --apply
 ```
 
 - Default is dry-run; `--apply` is explicit.
@@ -784,8 +784,8 @@ python -m dlef.cli gc \
   sweep-referenced runs and active candidates.
 - Reject/archive a candidate to release its runs to normal retention; do not
   bypass `gc`.
-- Artifacts are content-addressed; only unreferenced + TTL-expired ones are
-  deleted.
+- Checkpoints, eval records and predictions live inside the run directory;
+  there is no second artifact copy to clean up.
 
 ---
 
@@ -820,7 +820,7 @@ Do not edit the installed `dlef` package in place.
 - Do not call `loss.backward()` / `optimizer.step()` inside a Task.
 - Do not write to `output/runs/...` by hand.
 - Do not edit completed manifests/metrics/eval records.
-- Do not delete runs/artifacts manually.
+- Do not delete runs/sweeps manually.
 - Do not create one experiment per smoke test; use a `debug`/`smoke`
   experiment or `--tag debug`.
 - Do not tune on test; do not report a single lucky seed.

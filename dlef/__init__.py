@@ -82,7 +82,6 @@ from .sweep import (
     param_space_from_dict,
 )
 from .retention import (
-    ArtifactAction,
     GcPlan,
     GcResult,
     RetentionPolicy,
@@ -174,7 +173,6 @@ __all__ = [
     "TrialSpec",
     "Uniform",
     "param_space_from_dict",
-    "ArtifactAction",
     "GcPlan",
     "GcResult",
     "RetentionPolicy",

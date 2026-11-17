@@ -19,7 +19,7 @@ if str(ROOT) not in sys.path:
 from dlef.config import resolve_config  # noqa: E402
 from dlef.eval import EvalSpec  # noqa: E402
 from dlef.report import format_comparison, write_comparison  # noqa: E402
-from dlef.run import ArtifactStore, RunStore  # noqa: E402
+from dlef.run import RunStore  # noqa: E402
 from dlef.runner import Runner  # noqa: E402
 from dlef.seed import seed_everything  # noqa: E402
 from examples.toy.components import ToyDataset  # noqa: E402
@@ -30,8 +30,7 @@ from examples.toy.task import ToyTask  # noqa: E402
 def main() -> int:
     outputs = Path(__file__).resolve().parent / "outputs"
     run_store = RunStore(outputs / "runs")
-    artifact_store = ArtifactStore(outputs / "artifacts")
-    runner = Runner(run_store, artifact_store)
+    runner = Runner(run_store)
 
     records = []
     for lr in (0.1, 0.02):

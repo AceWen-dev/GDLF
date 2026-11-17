@@ -9,7 +9,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 from dlef.claim import Claim, ClaimStore
-from dlef.run import ArtifactStore, RunStore
+from dlef.run import RunStore
 
 from core.tools import candidates as candidates_tool
 
@@ -21,7 +21,7 @@ class CandidatesToolTests(unittest.TestCase):
         self.runs_root = root / "runs"
         self.candidates_root = root / "candidates"
         self.claims_root = root / "claims"
-        store = RunStore(self.runs_root, ArtifactStore(root / "artifacts"))
+        store = RunStore(self.runs_root)
         self.runs = []
         for experiment, seed, metric in (
             ("v11-ranksim", 1, 2.5),

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from dlef.config import resolve_config
 from dlef.eval import EvalSpec
-from dlef.run import ArtifactStore, RunStore
+from dlef.run import RunStore
 from dlef.runner import Runner
 from dlef.sweep import (
     Choice,
@@ -131,8 +131,8 @@ class SweepEndToEndTests(unittest.TestCase):
     def test_local_sweep_toy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            run_store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
-            runner = Runner(run_store, run_store.artifact_store)
+            run_store = RunStore(root / "runs")
+            runner = Runner(run_store)
             sweep_store = SweepStore(root / "sweeps")
 
             def trial_fn(trial, context):

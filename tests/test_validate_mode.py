@@ -12,7 +12,7 @@ from pathlib import Path
 
 from dlef.contracts import Metric, MetricResult, StepOutput
 from dlef.policy import NoOpTrainingPolicy
-from dlef.run import ArtifactStore, RunStore
+from dlef.run import RunStore
 from dlef.runner import Runner
 
 
@@ -60,8 +60,8 @@ class ValidateModeTests(unittest.TestCase):
     def test_validate_uses_eval_mode_and_restores_train(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
-            runner = Runner(store, store.artifact_store)
+            store = RunStore(root / "runs")
+            runner = Runner(store)
             task = RecordingTask()
             values = runner._validate(
                 task, [{}, {}, {}], {"mae": MeanMetric()}, NoOpTrainingPolicy()

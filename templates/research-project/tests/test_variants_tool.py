@@ -14,7 +14,7 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 
-from dlef.run import ArtifactStore, RunStore
+from dlef.run import RunStore
 
 from core.tools import variants as variants_tool
 
@@ -97,7 +97,7 @@ class VariantsRunsViewTests(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         root = Path(self._tmp.name)
         self.runs_root = root / "runs"
-        store = RunStore(self.runs_root, ArtifactStore(root / "artifacts"))
+        store = RunStore(self.runs_root)
 
         # Same config digest, two structures: the model was edited in place.
         self._make(store, "a", seed=1, config_digest="c" * 64, structure="s1", topology="t1")

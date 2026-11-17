@@ -8,7 +8,7 @@ from pathlib import Path
 
 from dlef.config import resolve_config
 from dlef.seed import capture_rng_state, restore_rng_state
-from dlef.run import ArtifactStore, RunStore
+from dlef.run import RunStore
 from dlef.runner import Runner
 from examples.toy.components import ToyDataset
 from examples.toy.config import ToyConfig
@@ -19,8 +19,8 @@ class ResumeTests(unittest.TestCase):
     def test_checkpoint_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
-            runner = Runner(store, store.artifact_store)
+            store = RunStore(root / "runs")
+            runner = Runner(store)
             config = resolve_config(
                 ToyConfig,
                 {"seed": 5, "epochs": 3, "lr": 0.05, "n_train": 64, "n_val": 32, "batch_size": 8},

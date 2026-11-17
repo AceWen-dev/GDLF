@@ -1,6 +1,8 @@
-"""Run identity, local run store, and content-addressed artifacts.
+"""Run identity and the local run store.
 
 The Run Store is the source of truth. A tracker, if any, is only an index.
+All run files (checkpoints, eval records, predictions) live inside the run
+directory; there is no second artifact copy.
 """
 
 from __future__ import annotations
@@ -10,7 +12,6 @@ import hashlib
 import json
 import os
 import platform
-import shutil
 import subprocess
 import sys
 import uuid
@@ -78,6 +79,8 @@ class RunManifest:
     seed: int
     data_versions: Mapping[str, str] = field(default_factory=dict)
     status: str = "running"
+    # Legacy field from the removed artifact store. It is accepted when reading
+    # old manifests but never written again; files live in the run directory.
     artifacts: Mapping[str, str] = field(default_factory=dict)
     started_at: str = field(default_factory=utc_now)
     ended_at: str | None = None
@@ -87,99 +90,40 @@ class RunManifest:
     config_source: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        payload.pop("artifacts", None)
+        return payload
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, Any]) -> "RunManifest":
-        return cls(**payload)
-
-
-@dataclass(frozen=True)
-class ArtifactEntry:
-    digest: str
-    name: str
-    size_bytes: int
-    mtime: float
-    path: Path
-
-    def to_dict(self) -> dict[str, Any]:
-        payload = asdict(self)
-        payload["path"] = str(self.path)
-        return payload
+        data = dict(payload)
+        data.pop("artifacts", None)
+        return cls(**data)
 
 
 class ArtifactStore:
-    """Content-addressed file store.
+    """Deprecated compatibility shim; the artifact store was removed.
 
-    Layout: ``<root>/<sha[:2]>/<sha>/<name>``. Directories are not supported
-    in v0; adapters can zip or tar before storing.
+    Checkpoints, eval records and other files live in the run directory.
+    This class stays importable so older project wiring keeps working; it
+    never writes a second copy.
     """
 
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
-        self.root.mkdir(parents=True, exist_ok=True)
 
     def put(self, path: str | Path, name: str | None = None) -> str:
-        path = Path(path)
-        if not path.is_file():
-            raise IsADirectoryError(f"artifact must be a file in v0: {path}")
-        digest = sha256_file(path)
-        target_dir = self.root / digest[:2] / digest
-        target_dir.mkdir(parents=True, exist_ok=True)
-        target = target_dir / (name or path.name)
-        if not target.exists():
-            shutil.copy2(path, target)
-        return digest
-
-    def get(self, digest: str, name: str) -> Path:
-        target = self.root / digest[:2] / digest / name
-        if not target.is_file():
-            raise FileNotFoundError(target)
-        return target
-
-    def exists(self, digest: str, name: str) -> bool:
-        return (self.root / digest[:2] / digest / name).is_file()
-
-    def list(self) -> list[ArtifactEntry]:
-        entries: list[ArtifactEntry] = []
-        for path in sorted(self.root.rglob("*")):
-            if not path.is_file():
-                continue
-            digest = path.parent.name
-            if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
-                continue
-            stat = path.stat()
-            entries.append(
-                ArtifactEntry(
-                    digest=digest,
-                    name=path.name,
-                    size_bytes=stat.st_size,
-                    mtime=stat.st_mtime,
-                    path=path,
-                )
-            )
-        return entries
-
-    def delete(self, digest: str, name: str) -> bool:
-        path = self.root / digest[:2] / digest / name
-        if not path.is_file():
-            return False
-        path.unlink()
-        for candidate in (path.parent, path.parent.parent):
-            try:
-                candidate.rmdir()
-            except OSError:
-                break
-        return True
+        raise RuntimeError(
+            "artifact store was removed; keep files in the run directory"
+        )
 
 
 class Run:
     """A single immutable run directory."""
 
-    def __init__(self, directory: Path, manifest: RunManifest, artifact_store: ArtifactStore) -> None:
+    def __init__(self, directory: Path, manifest: RunManifest) -> None:
         self.directory = Path(directory)
         self.manifest = manifest
-        self.artifact_store = artifact_store
         self.directory.mkdir(parents=True, exist_ok=True)
 
     @property
@@ -310,14 +254,6 @@ class Run:
         )
         return path
 
-    def save_artifact(self, path: str | Path, name: str) -> str:
-        digest = self.artifact_store.put(path, name)
-        artifacts = dict(self.manifest.artifacts)
-        artifacts[name] = digest
-        self.manifest.artifacts = artifacts
-        self.write_manifest()
-        return digest
-
     def finalize(self, status: str = "completed", *, error: str | None = None) -> None:
         if status not in {"completed", "failed", "killed"}:
             raise ValueError(f"invalid final status: {status}")
@@ -349,7 +285,8 @@ class RunStore:
     ) -> None:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
-        self.artifact_store = artifact_store or ArtifactStore(self.root.parent / "artifacts")
+        # Kept only so older project wiring keeps working; nothing writes here.
+        self.artifact_store = artifact_store
         self.code_root = Path(code_root) if code_root is not None else Path.cwd()
 
     def create(
@@ -380,7 +317,7 @@ class RunStore:
             parent_run_id=parent_run_id,
             config_source=config_source,
         )
-        run = Run(directory, manifest, self.artifact_store)
+        run = Run(directory, manifest)
         run.write_manifest()
         return run
 
@@ -390,7 +327,7 @@ class RunStore:
             directory = directory.parent
         manifest_path = directory / self.MANIFEST
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        return Run(directory, RunManifest.from_dict(payload), self.artifact_store)
+        return Run(directory, RunManifest.from_dict(payload))
 
     def iter_runs(self) -> list[Run]:
         return [self.open(path) for path in sorted(self.root.rglob(self.MANIFEST))]

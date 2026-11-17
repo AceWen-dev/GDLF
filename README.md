@@ -19,7 +19,7 @@ reports; training stacks live in adapters.
 A thin experiment OS skeleton:
 
 - **Contracts**: Data, Model, Loss, Optimizer, Scheduler, Callback, Metric, Task/Runner, TrainingPolicy.
-- **Services**: Config, Run/Artifact, Eval, Sweep, Retention, CLI/Launcher, Registry.
+- **Services**: Config, Run, Eval, Sweep, Retention, CLI/Launcher, Registry.
 - **Invariants**: one run = one resolved config × one seed; manifest before the
   first step; named loss terms; eval as a separate run; resumable checkpoints;
   local-first run store; tracker optional.
@@ -34,7 +34,7 @@ dlef/
   contracts.py     # Protocol + dataclass contracts
   config.py        # typed schema, strict loader, digest
   registry.py      # name/class_path -> implementation
-  run.py           # manifest, run store, content-addressed artifacts
+  run.py           # manifest, run store (all files live in the run directory)
   eval.py          # EvalSpec / EvalRecord
   benchmark.py     # test set + metric protocol -> benchmark id
   candidates.py    # Candidate / CandidateStore: shortlist between runs and claims
@@ -126,7 +126,6 @@ examples/toy/output/
     checkpoints/last.*      # .json by default, .pt with the torch codec
     checkpoints/best.*      # best early-stopping checkpoint, when enabled
     evals/<eval_id>.json
-  artifacts/<sha[:2]>/<sha>/<name>
   comparison.md
 ```
 
@@ -152,7 +151,7 @@ examples/toy/output/
 - Callbacks and step/epoch schedulers are lifecycle-tested.
 - Grid/random sweeps run one trial per run, with a local GPU-aware queue.
 - A failed trial is recorded as `failed` without killing the sweep.
-- Retention plans protect lineage, sweep references, and referenced artifacts;
+- Retention plans protect lineage, sweep references, candidates and claims;
   deletion is dry-run by default and reference-checked.
 - The optional torch adapter implements the same contracts against real tensors,
   with a binary checkpoint codec; the core never imports torch.
@@ -246,7 +245,7 @@ python -m dlef.cli gc \
   --runs runs --sweeps sweeps \
   --keep-last 3 --keep-best 1 --metric-key val_loss \
   --keep-tag reported --keep-tag baseline \
-  --artifact-ttl-days 30 --sweep-ttl-days 30
+  --sweep-ttl-days 30
 ```
 
 Default is a dry-run; pass `--apply` to delete. Tag runs at launch
@@ -260,7 +259,7 @@ kept. The plan protects:
 - runs with protected tags/status;
 - parents of kept runs;
 - runs referenced by sweeps (unless `--no-protect-sweep-runs`);
-- artifacts referenced by kept runs, or younger than TTL.
+- runs referenced by active candidates and claims.
 
 The plan is printed before anything is deleted. `--verbose` shows kept items too.
 
@@ -447,3 +446,4 @@ Markdown; there is no web UI.
 - `docs/adr/0004-selection-vs-early-stopping.md` — selection and early stopping are independent.
 - `docs/adr/0005-model-variants-over-flags.md` — a topology change is a new model name, and runs record a structure fingerprint.
 - `docs/adr/0006-candidates-between-runs-and-claims.md` — why the shortlist is a separate, gc-protected layer.
+- `docs/adr/0007-remove-artifact-store.md` — why all files live in the run directory.

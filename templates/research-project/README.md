@@ -116,7 +116,6 @@ scripts/                  # project-specific scripts, intentionally free-form
 
 output/                   # layer 3: generated results
   runs/
-  artifacts/
   sweeps/
   test_access/
   candidates/             # human-authored shortlist
@@ -368,7 +367,7 @@ early_stopping:
   min_delta: 0.0
   min_epochs: 0
 
-# Workspace path: where runs/artifacts/sweeps are written.
+# Workspace path: where runs/sweeps are written.
 # Relative paths resolve against the project root.
 output_root: output
 

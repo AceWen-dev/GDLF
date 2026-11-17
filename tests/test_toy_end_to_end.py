@@ -8,7 +8,7 @@ from pathlib import Path
 from dlef.config import resolve_config
 from dlef.eval import EvalSpec
 from dlef.report import format_comparison, write_comparison
-from dlef.run import ArtifactStore, RunStore
+from dlef.run import RunStore
 from dlef.runner import Runner
 from examples.toy.components import ToyDataset
 from examples.toy.config import ToyConfig
@@ -19,8 +19,8 @@ class ToyEndToEndTests(unittest.TestCase):
     def test_two_runs_eval_compare(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
-            runner = Runner(store, store.artifact_store)
+            store = RunStore(root / "runs")
+            runner = Runner(store)
             records = []
 
             for lr in (0.1, 0.02):
@@ -61,7 +61,6 @@ class ToyEndToEndTests(unittest.TestCase):
                 self.assertEqual(json.loads(run.config_path.read_text(encoding="utf-8"))["seed"], 7)
                 self.assertTrue(run.metrics_path.is_file())
                 self.assertTrue(run.checkpoint_path.is_file())
-                self.assertIn("checkpoint:last", run.manifest.artifacts)
 
                 losses = [
                     json.loads(line)["loss"]

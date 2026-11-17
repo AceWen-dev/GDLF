@@ -65,7 +65,7 @@ DLEF 是一个薄薄的、领域无关的实验操作系统：
 
 - `input/`：声明式输入——config、冻结的 benchmark；
 - `core/`：你的项目代码——data / model / loss / optimizer / scheduler / metric；
-- `output/`：生成的结果——runs、artifacts、sweeps、test_access、claims、reports。
+- `output/`：生成的结果——runs、sweeps、test_access、candidates、claims、reports。
 
 DLEF core 以 `dlef` 包的形式安装，不复制进项目；`adapters/torch` 随 core 一起安装。
 一个 run = 一个 resolved config × 一个 seed；manifest 在第一个 step 之前写；
@@ -252,7 +252,7 @@ input/configs/
   `$DLEF_DATA_ROOT`，不复制进 repo；
 - 所有影响行为的选项都进 typed config，unknown key 报错；
 - `output_root` 是 **workspace path**（默认 `output`），控制
-  runs/artifacts/sweeps 写到哪里；相对路径相对项目根。它不是实验变量，
+  runs/sweeps 写到哪里；相对路径相对项目根。它不是实验变量，
   不要用它区分 run；
 - `tensorboard` 是可选镜像；事件写 `<run_dir>/tensorboard/`，
   RunStore / `metrics.jsonl` / `logs/train.log` 仍是记录；
@@ -483,7 +483,7 @@ python -m dlef.cli gc \
   --candidates output/candidates --claims output/claims \
   --keep-last 3 --keep-best 1 --metric-key <your-metric> \
   --keep-tag reported --keep-tag baseline \
-  --artifact-ttl-days 30 --sweep-ttl-days 30 --apply
+  --sweep-ttl-days 30 --apply
 ```
 
 不要 `rm -rf output/runs/...`。`reported` / `baseline` tag 的 run 会被保护；

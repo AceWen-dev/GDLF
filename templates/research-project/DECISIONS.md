@@ -12,7 +12,7 @@ refactor) belong in the config or a run, not here.
 - data source/version, split membership, grouping or leakage rule;
 - frozen benchmark: test membership, labels, eval transform, metric protocol;
 - baseline model/loss/optimizer/scheduler choice;
-- output root, logging, retention or artifact policy future runs depend on;
+- output root, logging or retention policy future runs depend on;
 - anything a future agent would otherwise re-litigate.
 
 ## When not to write

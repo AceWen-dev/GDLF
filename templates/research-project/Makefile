@@ -60,7 +60,7 @@ report:
 
 # Change --metric-key to this project's primary metric before relying on it.
 gc-dry:
-	$(PYTHON) -m dlef.cli gc --runs $(OUTPUT)/runs --sweeps $(OUTPUT)/sweeps --candidates $(OUTPUT)/candidates --keep-last 3 --keep-best 1 --metric-key mae --keep-tag reported --keep-tag baseline --artifact-ttl-days 30 --sweep-ttl-days 30
+	$(PYTHON) -m dlef.cli gc --runs $(OUTPUT)/runs --sweeps $(OUTPUT)/sweeps --candidates $(OUTPUT)/candidates --keep-last 3 --keep-best 1 --metric-key mae --keep-tag reported --keep-tag baseline --sweep-ttl-days 30
 
 check:
 	$(PYTHON) core/tools/check.py --project PROJECT.yaml --config input/configs/base.yaml

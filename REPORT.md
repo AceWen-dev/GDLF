@@ -12,11 +12,11 @@
 - **eval 是独立 run**；每个数字能追到 checkpoint，再追到 run。
 - 支持 **grid / random sweep**，有 thread 和 subprocess 两种后端；一个 trial = 一个 run。
 - 支持 **AMP、梯度累积、梯度裁剪、可选 DDP**。
-- 支持 **retention / gc**：默认 dry-run，引用检查、血缘保护、artifact TTL。
+- 支持 **retention / gc**：默认 dry-run，引用检查、血缘保护、candidate/claim 保护。
 - 支持 **Candidate / shortlist**：在大量 run 和最终 claim 之间加一层人工判断；active candidate 受 gc 保护，promotion 之后才进入 test/claim。
 - 支持 **Claim / Markdown report**：报告里的数字可以反向解析到 eval record；test split 按 `test_set_id` 计数，重复访问标 `WARN`；跨 benchmark 标为不可比。
 - 项目模板 `templates/research-project/` 可以直接复制，**依赖 core 包，不复制 core**。
-- 测试：主套件 **95 个**；模板 smoke **44 个**（torch 环境全过）。
+- 测试：主套件 **96 个**；模板 smoke **44 个**（torch 环境全过）。
 - 真实跑通：CUDA AMP、2 进程 CPU DDP、subprocess sweep、模板 train/eval/sweep。
 
 ---
@@ -55,7 +55,6 @@ Config ──► Run ──► Candidate ──► Claim
 | **Eval** | 一个 checkpoint × 一份 eval spec × 一个 benchmark | 独立 run；有自己的 manifest；test access 计数；benchmark id 可比性 |
 | **Candidate** | 一组值得继续研究的 run + 判断（reason / next） | 引用 run ids；val 上比较；active 受 gc 保护；promotion 才进入 claim |
 | **Claim** | 报告/论文里的一个数字、表或图 | 必须引用 eval；report 反向解析到 run |
-| **Artifact** | checkpoint、预测、指标表、图 | 内容寻址；被 kept run 引用则保护 |
 
 一句话规则：
 
@@ -75,7 +74,7 @@ Config ──► Run ──► Candidate ──► Claim
 | 4 | 训练 | `Runner` + `TrainingPolicy` | loop 归 Runner；AMP/accum/clip/resume 可插拔 | `dlef/runner.py`、`dlef/policy.py` |
 | 5 | 配置 | `Config` + dataclass schema | 类型化；unknown key 报错；resolved + digest | `dlef/config.py` |
 | 6 | 指标/评测 | `Metric` + `EvalSpec` + `EvalRecord` | eval 独立 run；split 命名空间；test access 计数 | `dlef/eval.py`、`dlef/claim.py` |
-| 7 | 运行/输出 | `RunManifest` + `RunStore` + `ArtifactStore` | one run = config × seed；artifact 内容寻址；tracker 只是索引 | `dlef/run.py` |
+| 7 | 运行/输出 | `RunManifest` + `RunStore` | one run = config × seed；所有文件在 run 目录；tracker 只是索引 | `dlef/run.py` |
 | 8 | 脚本 | `CLI` + `Launcher` + 项目模板 | 薄入口；一条命令一个工作流；preflight + smoke | `dlef/cli.py`、`templates/research-project/` |
 
 补上的服务层：
@@ -95,7 +94,7 @@ core (dlef/)
   runner.py       # train/eval loop
   policy.py       # TrainingPolicy: AMP / accum / clip / DDP seam
   checkpoint.py   # CheckpointCodec: JSON default
-  run.py          # manifest / run store / artifact store
+  run.py          # manifest / run store (files live in the run directory)
   eval.py         # EvalSpec / EvalRecord
   benchmark.py    # test set + metric protocol -> benchmark id
   candidates.py   # Candidate / CandidateStore: run → candidate → claim
@@ -143,11 +142,11 @@ core ← adapters ← examples / templates
   `tensorboard` 是可选镜像（`enabled` / `subdir` / `flush_secs`）。
 - JSON 永远可用；YAML 在安装 PyYAML 后可用。
 
-### 5.2 Run / Artifact
+### 5.2 Run
 
-- `RunManifest`：run_id、project、experiment、config_digest、config_source、code_version、data_versions、env、seed、status、artifacts、parent_run_id、tags、error。
+- `RunManifest`：run_id、project、experiment、config_digest、config_source、code_version、data_versions、env、seed、status、parent_run_id、tags、error。
 - `RunStore`：`runs/<project>/<experiment>/<run_id>/`。
-- `ArtifactStore`：内容寻址 `<sha[:2]>/<sha>/<name>`。
+- checkpoint、eval record、预测文件都写在 run 目录内；没有第二份 artifact 副本。
 - checkpoint 默认 JSON；torch adapter 用 `.pt`（`torch.save`）。
 - run 目录同时有 `metrics.jsonl`（机器可读）和 `logs/train.log`（epoch/step/eval/checkpoint 文本日志）；
   `tensorboard.enabled=true` 时还有 `tensorboard/` 事件文件（可选镜像）。
@@ -172,8 +171,7 @@ core ← adapters ← examples / templates
 
 ### 5.5 Retention / gc
 
-- 保护规则：per-experiment last N、best N、every-N、tags、status、age、parent lineage、sweep references。
-- artifact：被 kept run 引用，或 age < TTL，才保留；否则删除。
+- 保护规则：per-experiment last N、best N、every-N、tags、status、age、parent lineage、sweep references、active candidates、claims。
 - 默认 dry-run；`--apply` 才删。
 - 计划里每个 action 都有 reason 和 size。
 
@@ -398,7 +396,7 @@ python -m dlef.cli report --runs output/runs --claims output/claims --out output
 python -m dlef.cli gc \
   --runs output/runs --sweeps output/sweeps \
   --keep-last 3 --keep-best 1 --metric-key mae \
-  --keep-tag reported --artifact-ttl-days 30
+  --keep-tag reported
 
 # 确认后
 python -m dlef.cli gc ... --apply
@@ -514,8 +512,8 @@ sweep: 20261027-152422_... status=completed
 ### 7.6 Retention
 
 ```text
-reclaimable: 186.8 KiB (6 runs, 12 artifacts)
-dry-run: would delete 6 run(s), 12 artifact(s)
+reclaimable: 186.8 KiB (6 runs)
+dry-run: would delete 6 run(s)
 ```
 
 ### 7.7 Shortlist / claim report
@@ -542,7 +540,6 @@ DLEF 拥有的是：
 
 - typed config；
 - run manifest；
-- artifact store；
 - eval record；
 - claim / report；
 - sweep / retention / policy 这些接缝。
@@ -694,7 +691,6 @@ DLEF/
 | **Run** | 一份 config × 一个 seed 的一次执行 |
 | **Manifest** | Run 的身份证：代码、config、数据、环境、seed、状态、产物 |
 | **Config** | 一次 run 的完整输入声明；resolved + hash |
-| **Artifact** | checkpoint、预测、指标表、图；内容寻址 |
 | **Eval** | 独立评测 run：checkpoint × eval spec × benchmark |
 | **Benchmark** | 测试集 + 标签 + eval transform + 指标协议；可比较性的单位 |
 | **Candidate** | 一组值得继续研究的 run + reason/next；run → candidate → claim |

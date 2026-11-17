@@ -9,7 +9,7 @@ from pathlib import Path
 from dlef.config import resolve_config
 from dlef.contracts import LossOutput, ModelOutput
 from dlef.eval import EvalSpec
-from dlef.run import ArtifactStore, RunStore
+from dlef.run import RunStore
 from dlef.runner import Runner
 
 try:
@@ -87,10 +87,9 @@ class TorchAdapterTests(unittest.TestCase):
     def test_end_to_end_and_checkpoint(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
+            store = RunStore(root / "runs")
             runner = Runner(
                 store,
-                store.artifact_store,
                 checkpoint_codec=TorchCheckpointCodec(),
             )
             config = resolve_config(
@@ -116,7 +115,7 @@ class TorchAdapterTests(unittest.TestCase):
             self.assertEqual(run.manifest.status, "completed")
             self.assertTrue(run.checkpoint_path.is_file())
             self.assertEqual(run.checkpoint_path.suffix, ".pt")
-            self.assertIn("checkpoint:last", run.manifest.artifacts)
+            self.assertFalse((root / "artifacts").exists())
 
             record = runner.evaluate(
                 task,
@@ -162,10 +161,9 @@ class TorchAdapterTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
+            store = RunStore(root / "runs")
             runner = Runner(
                 store,
-                store.artifact_store,
                 checkpoint_codec=TorchCheckpointCodec(),
                 training_policy=policy,
             )
@@ -206,10 +204,9 @@ class TorchAdapterTests(unittest.TestCase):
         policy.setup()
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
+            store = RunStore(root / "runs")
             runner = Runner(
                 store,
-                store.artifact_store,
                 checkpoint_codec=TorchCheckpointCodec(),
                 training_policy=policy,
             )

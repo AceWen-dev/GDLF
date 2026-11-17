@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import os
 import tempfile
-import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,7 +9,7 @@ from dlef.candidates import Candidate, CandidateStore
 from dlef.claim import Claim, ClaimStore
 from dlef.eval import EvalRecord
 from dlef.retention import RetentionPolicy, RetentionService
-from dlef.run import ArtifactStore, RunStore
+from dlef.run import RunStore
 from dlef.sweep import SweepRecord, SweepStore
 
 
@@ -59,7 +57,6 @@ def permissive(**overrides) -> RetentionPolicy:
         "keep_tags": frozenset(),
         "protect_status": frozenset(),
         "min_age_days": 0.0,
-        "artifact_ttl_days": 0.0,
         "protect_sweep_runs": False,
     }
     values.update(overrides)
@@ -151,7 +148,7 @@ class RetentionTests(unittest.TestCase):
     def test_sweep_protection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
+            store = RunStore(root / "runs")
             run = make_run(store, started="2026-05-01T00:00:00+00:00", seed=1)
             sweep_store = SweepStore(root / "sweeps")
             sweep_store.save(
@@ -173,7 +170,7 @@ class RetentionTests(unittest.TestCase):
     def test_candidate_protection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
+            store = RunStore(root / "runs")
             kept = make_run(store, started="2026-06-01T00:00:00+00:00", seed=1)
             rejected = make_run(store, started="2026-06-02T00:00:00+00:00", seed=2)
             dropped = make_run(store, started="2026-06-03T00:00:00+00:00", seed=3)
@@ -212,7 +209,7 @@ class RetentionTests(unittest.TestCase):
     def test_claim_protection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
+            store = RunStore(root / "runs")
             cited = make_run(
                 store, started="2026-07-01T00:00:00+00:00", seed=1, metric=0.2
             )
@@ -257,7 +254,7 @@ class RetentionTests(unittest.TestCase):
     def test_sweep_gc(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
+            store = RunStore(root / "runs")
             run = make_run(store, started="2026-05-01T00:00:00+00:00", seed=1)
             sweep_store = SweepStore(root / "sweeps")
             sweep_store.save(
@@ -302,37 +299,6 @@ class RetentionTests(unittest.TestCase):
             self.assertFalse((sweep_store.root / "sweep-old").exists())
             self.assertTrue((sweep_store.root / "sweep-running").exists())
             self.assertTrue((sweep_store.root / "sweep-kept-run").exists())
-
-    def test_artifact_gc(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
-            run = make_run(store, started="2026-06-01T00:00:00+00:00", seed=1)
-            kept_file = root / "kept.bin"
-            kept_file.write_bytes(b"k" * 1024)
-            kept_digest = run.save_artifact(kept_file, "checkpoint")
-
-            orphan_file = root / "orphan.bin"
-            orphan_file.write_bytes(b"o" * 2048)
-            orphan_digest = store.artifact_store.put(orphan_file, "orphan")
-            orphan_path = store.artifact_store.get(orphan_digest, "orphan")
-            old = time.time() - 40 * 86400
-            os.utime(orphan_path, (old, old))
-
-            service = RetentionService(store)
-            plan = service.plan(permissive(keep_last=1, artifact_ttl_days=30.0))
-            self.assertEqual(plan.delete_runs, ())
-            self.assertEqual({a.digest for a in plan.delete_artifacts}, {orphan_digest})
-            self.assertTrue(plan.delete_artifacts[0].size_bytes >= 2048)
-
-            dry = service.apply(plan, dry_run=True)
-            self.assertTrue(dry.dry_run)
-            self.assertTrue(orphan_path.is_file())
-
-            applied = service.apply(plan, dry_run=False)
-            self.assertFalse(orphan_path.is_file())
-            self.assertTrue(service.artifact_store.exists(kept_digest, "checkpoint"))
-            self.assertGreaterEqual(applied.bytes_freed, 2048)
 
     def test_apply_run_deletion(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

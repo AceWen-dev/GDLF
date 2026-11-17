@@ -10,7 +10,7 @@ from typing import Any, Mapping
 import yaml
 
 from adapters.torch import TorchCheckpointCodec, TorchTrainingPolicy
-from dlef.run import ArtifactStore, Run, RunStore
+from dlef.run import Run, RunStore
 from dlef.runner import Runner
 from dlef.sweep import TrialResult
 
@@ -54,10 +54,8 @@ def resolve_output_root(config: ProjectConfig, base: str | Path) -> Path:
 def build_runner(outputs: str | Path, policy: TorchTrainingPolicy) -> Runner:
     outputs = Path(outputs)
     run_store = RunStore(outputs / "runs")
-    artifact_store = ArtifactStore(outputs / "artifacts")
     return Runner(
         run_store, #数据记录
-        artifact_store,
         checkpoint_codec=TorchCheckpointCodec(),
         training_policy=policy,
     )

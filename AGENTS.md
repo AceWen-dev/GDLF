@@ -57,10 +57,11 @@ Do **not** modify `dlef/` for project-specific needs.
 5. **Eval is a separate run.** A train run does not own test numbers.
 6. **RunStore is the source of truth.** W&B / MLflow / TensorBoard, if added,
    are indexes/mirrors only.
-7. **No writes outside the run directory or artifact store.** Scripts do not
-   hand-write into `runs/`.
+7. **No writes outside the run directory.** Checkpoints, eval records and
+   predictions all live inside the run directory; scripts do not hand-write
+   into `runs/`.
 8. **No manual deletion.** Use `dlef gc` (dry-run first). It checks references,
-   lineage, sweep references and artifact TTL.
+   lineage, sweep references, candidates and claims.
 9. **Do not edit completed `manifest.json` / metrics / eval records.** Create a
    new run or an append-only annotation.
 10. **Training mechanics go through `TrainingPolicy`.** Do not call
@@ -173,7 +174,6 @@ A project has this shape (from `templates/research-project/`):
   scripts/                 # project-specific scripts, intentionally unstructured
   output/                  # layer 3: generated results
     runs/
-    artifacts/
     sweeps/
     test_access/
     candidates/            # one JSON per shortlisted run set
@@ -218,8 +218,8 @@ Placement rules:
 - **Candidates** → `output/candidates/<candidate_id>.json` via `CandidateStore`
   or `core/tools/candidates.py`; one candidate = one run set + reason/next.
 - **Claims** → `output/claims/<claim_id>.json` via `ClaimStore`.
-- **Generated artifacts** → `output/`; never edit by hand. Candidates and
-  claims are the small, human-authored exceptions.
+- **Generated outputs** → `output/`; never edit by hand. Candidates and claims
+  are the small, human-authored exceptions.
 - **Reusable adapter** → `adapters/<stack>/` in the DLEF repo, not in a project.
 - **Project-specific adapter** → project `core/`; do not force it into the DLEF core.
 
@@ -326,9 +326,9 @@ Changing data/model/loss mid-experiment:
   eval records. `core/tools/run_info.py --run <id>` prints the config-to-source
   map.
 - Secrets go through environment variables, never config files.
-- `output_root` is a workspace path (where runs/artifacts/sweeps live), not an
-  experiment choice; the per-run directory is still derived. Do not put
-  individual run/artifact paths in config.
+- `output_root` is a workspace path (where runs/sweeps live), not an experiment
+  choice; the per-run directory is still derived. Do not put individual run
+  paths in config.
 - Do not use `if debug` branches inside model/task code; use a separate debug
   config with tiny data and few steps.
 - YAML is optional; JSON always works. The template uses YAML.
@@ -351,8 +351,8 @@ Changing data/model/loss mid-experiment:
   old version.
 - `Dataset` is an **iterable of batches** (`Mapping[str, Any]`); batching,
   shuffling, padding and collation belong to the data adapter.
-- Data is read-only. Preprocessing writes a new versioned artifact, not an
-  in-place mutation.
+- Data is read-only. Preprocessing writes a new versioned copy, not an in-place
+  mutation.
 - Split must be materialized; never do random splitting inside `__getitem__`.
   Loaders read a recorded membership (`role -> indices`), not a fresh seed.
 - Test membership is frozen per benchmark and must not depend on the run seed.
@@ -462,8 +462,8 @@ python -m dlef.cli report \
 - Do not run nested loops in a single process for variants.
 - RunStore is canonical; do not rely on logs alone.
 - Retention: `dlef gc` (dry-run default). Protect `reported`/`baseline` tags,
-  parents of kept runs, sweep references, active candidate runs, claim evidence,
-  referenced artifacts.
+  parents of kept runs, sweep references, active candidate runs and claim
+  evidence.
 - Never `rm -rf runs/...` manually.
 - Reject/archive a candidate to release its runs to normal retention; do not
   delete the candidate JSON to bypass `gc`.
@@ -516,7 +516,7 @@ Every project should have:
 - Do not write a bare training loop outside `Runner`/`TrainingPolicy`.
 - Do not write `runs/` / `manifest.json` by hand.
 - Do not edit completed metrics/manifests/eval records.
-- Do not delete runs/artifacts without `dlef gc`.
+- Do not delete runs/sweeps without `dlef gc`.
 - Do not tune on test; do not report a single lucky seed as the result.
 - Do not make W&B/MLflow/TensorBoard the only record.
 - Do not store secrets in config or logs.
@@ -564,6 +564,7 @@ A project task is done when:
 - `docs/adr/0004-selection-vs-early-stopping.md` — why selection and early stopping are separate.
 - `docs/adr/0005-model-variants-over-flags.md` — why a topology change needs a new model name, and why structure is fingerprinted.
 - `docs/adr/0006-candidates-between-runs-and-claims.md` — why the shortlist is a separate layer, and why it is gc-protected.
+- `docs/adr/0007-remove-artifact-store.md` — why all files live in the run directory and the artifact store was removed.
 - `examples/torch_regression/` — a complete torch + sweep example.
 
 If a requirement is genuinely ambiguous, ask the human once, then follow the

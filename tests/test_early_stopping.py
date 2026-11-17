@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from dlef.config import ConfigError, resolve_config
-from dlef.run import ArtifactStore, RunStore
+from dlef.run import RunStore
 from dlef.runner import Runner
 from examples.toy.components import ToyDataset
 from examples.toy.config import ToyConfig
@@ -17,8 +17,8 @@ class EarlyStoppingTests(unittest.TestCase):
     def test_stops_after_patience(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
-            runner = Runner(store, store.artifact_store)
+            store = RunStore(root / "runs")
+            runner = Runner(store)
             config = resolve_config(
                 ToyConfig,
                 {
@@ -61,7 +61,6 @@ class EarlyStoppingTests(unittest.TestCase):
             last_payload = json.loads(run.checkpoint_path.read_text(encoding="utf-8"))
             self.assertEqual(best_payload["epoch"], 2)
             self.assertEqual(last_payload["epoch"], 2)
-            self.assertIn("checkpoint:best", run.manifest.artifacts)
             self.assertIn("Checkpoint: best", log)
 
             task2 = ToyTask(config.schema)
@@ -72,8 +71,8 @@ class EarlyStoppingTests(unittest.TestCase):
     def test_best_checkpoint_does_not_require_early_stopping(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
-            runner = Runner(store, store.artifact_store)
+            store = RunStore(root / "runs")
+            runner = Runner(store)
             config = resolve_config(
                 ToyConfig,
                 {
@@ -99,7 +98,6 @@ class EarlyStoppingTests(unittest.TestCase):
             self.assertTrue((run.directory / "checkpoints" / "best.json").is_file())
             self.assertTrue(run.checkpoint_path_for("best_raw").is_file())
             self.assertEqual(run.checkpoint_path_for("last"), run.checkpoint_path)
-            self.assertIn("checkpoint:best", run.manifest.artifacts)
             self.assertNotIn("Early stopping: triggered", run.log_path.read_text(encoding="utf-8"))
 
     def test_ema_monitor_keeps_raw_and_ema_best_separate(self) -> None:
@@ -126,8 +124,8 @@ class EarlyStoppingTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
-            runner = Runner(store, store.artifact_store, ema_factory=FakeEMA)
+            store = RunStore(root / "runs")
+            runner = Runner(store, ema_factory=FakeEMA)
             config = resolve_config(
                 ToyConfig,
                 {
@@ -172,8 +170,6 @@ class EarlyStoppingTests(unittest.TestCase):
             # D-0026：查询首选 checkpoint 时 EMA 优先（final_ema → best_ema → best）；
             # 原始权重仍保留在 best.json 里可查。
             self.assertEqual(run.best_checkpoint_path, final_ema)
-            self.assertIn("checkpoint:best", run.manifest.artifacts)
-            self.assertIn("checkpoint:best_ema", run.manifest.artifacts)
 
             log = run.log_path.read_text(encoding="utf-8")
             self.assertIn("Selection(raw):", log)
@@ -199,8 +195,8 @@ class EarlyStoppingTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
-            runner = Runner(store, store.artifact_store, ema_factory=FakeEMA)
+            store = RunStore(root / "runs")
+            runner = Runner(store, ema_factory=FakeEMA)
             config = resolve_config(
                 ToyConfig,
                 {

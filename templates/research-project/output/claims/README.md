@@ -20,8 +20,8 @@ and it prints `MISSING` / `MISMATCH` / `WARN` when the chain is broken.
 ## A note on this folder
 
 Everything else under `output/` is generated: the Runner writes `runs/`,
-`artifacts/`, `sweeps/`, `test_access/`, and you regenerate `reports/` from
-claims. **This folder is the exception.** Claims are written only by you (or
+`sweeps/`, `test_access/`, and you regenerate `reports/` from claims.
+**This folder is the exception.** Claims are written only by you (or
 your agent), through `ClaimStore`, and the files are small enough to commit.
 Treat claims as your citation list: they should stay true even after old runs
 are garbage-collected.

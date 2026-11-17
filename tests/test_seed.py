@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from dlef.config import resolve_config
-from dlef.run import ArtifactStore, RunStore
+from dlef.run import RunStore
 from dlef.runner import Runner
 from dlef.seed import capture_rng_state, restore_rng_state, seed_everything
 from examples.toy.components import ToyDataset
@@ -85,8 +85,8 @@ class SeedTests(unittest.TestCase):
     def test_runner_seeds_training_rng(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
-            runner = Runner(store, store.artifact_store)
+            store = RunStore(root / "runs")
+            runner = Runner(store)
             config = resolve_config(
                 ToyConfig,
                 {

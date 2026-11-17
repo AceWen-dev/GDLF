@@ -165,7 +165,7 @@ class BenchmarkConfig(ConfigSchema):
 
 @dataclass
 class ProjectConfig(TrainConfig):
-    # Workspace path: where runs/artifacts/sweeps are written. Relative paths
+    # Workspace path: where runs/sweeps are written. Relative paths
     # resolve against the project root, not the current working directory.
     output_root: str = "output"
     data: DataConfig = field(default_factory=DataConfig)

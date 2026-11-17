@@ -17,7 +17,7 @@ from dlef.report import (
     format_candidate_report,
     format_report,
 )
-from dlef.run import ArtifactStore, RunStore
+from dlef.run import RunStore
 
 
 def make_run(store: RunStore, *, seed: int, experiment: str = "e"):
@@ -147,7 +147,7 @@ class CandidateReportTests(unittest.TestCase):
     def test_candidate_table_and_metric_mean(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
+            store = RunStore(root / "runs")
             runs = [make_run(store, seed=seed) for seed in (1, 2)]
             for run, value in zip(runs, (0.4, 0.6)):
                 run.log_metrics({"phase": "val", "epoch": 1, "mae": value})
@@ -191,7 +191,7 @@ class CandidateReportTests(unittest.TestCase):
     def test_cli_report_with_only_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
+            store = RunStore(root / "runs")
             run = make_run(store, seed=1)
             run.log_metrics({"phase": "val", "epoch": 1, "mae": 0.25})
 

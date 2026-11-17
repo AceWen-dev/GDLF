@@ -19,7 +19,7 @@ if str(ROOT) not in sys.path:
 
 from dlef.config import resolve_config  # noqa: E402
 from dlef.eval import EvalSpec  # noqa: E402
-from dlef.run import ArtifactStore, RunStore  # noqa: E402
+from dlef.run import RunStore  # noqa: E402
 from dlef.runner import Runner  # noqa: E402
 from dlef.seed import seed_everything  # noqa: E402
 from dlef.sweep import Choice, LocalSweep, SweepSpec, SweepStore, TrialResult  # noqa: E402
@@ -80,7 +80,7 @@ def make_trial_fn(run_store: RunStore, runner: Runner):
 def main() -> int:
     outputs = Path(__file__).resolve().parent / "outputs"
     run_store = RunStore(outputs / "runs")
-    runner = Runner(run_store, ArtifactStore(outputs / "artifacts"))
+    runner = Runner(run_store)
     sweep_store = SweepStore(outputs / "sweeps")
 
     spec = SweepSpec(

@@ -63,7 +63,12 @@ def main(argv: list[str] | None = None) -> int:
     gc.add_argument("--keep-tag", action="append", default=[])
     gc.add_argument("--protect-status", action="append", default=["running"])
     gc.add_argument("--min-age-days", type=float, default=0.0)
-    gc.add_argument("--artifact-ttl-days", type=float, default=30.0)
+    gc.add_argument(
+        "--artifact-ttl-days",
+        type=float,
+        default=None,
+        help=argparse.SUPPRESS,  # removed feature; accepted for old Makefiles
+    )
     gc.add_argument("--no-protect-sweep-runs", action="store_true")
     gc.add_argument("--sweep-ttl-days", type=float, default=None)
     gc.add_argument(
@@ -86,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="do not keep runs referenced by claims",
     )
-    gc.add_argument("--verbose", action="store_true", help="show kept runs/artifacts too")
+    gc.add_argument("--verbose", action="store_true", help="show kept runs/sweeps too")
     gc.add_argument("--apply", action="store_true", help="actually delete; default is dry-run")
 
     args = parser.parse_args(argv)
@@ -142,7 +147,6 @@ def _ignore_generated(directory: str, names: list[str]) -> set[str]:
             ignored.add(name)
         elif Path(directory).name == "output" and name in {
             "runs",
-            "artifacts",
             "sweeps",
             "test_access",
         }:
@@ -261,7 +265,6 @@ def doctor() -> int:
     print(f"platform: {platform.platform()}")
     print(f"cwd: {cwd}")
     print(f"runs/: {(cwd / 'runs').is_dir()}")
-    print(f"artifacts/: {(cwd / 'artifacts').is_dir()}")
     free_gb = shutil.disk_usage(cwd).free / 1_000_000_000
     print(f"disk free: {free_gb:.1f} GB")
 
@@ -340,6 +343,11 @@ def report_command(args: argparse.Namespace) -> int:
 
 
 def gc_command(args: argparse.Namespace) -> int:
+    if args.artifact_ttl_days is not None:
+        print(
+            "note: --artifact-ttl-days is deprecated; "
+            "artifacts are no longer stored"
+        )
     run_store = RunStore(args.runs)
     sweep_store = SweepStore(args.sweeps) if args.sweeps else None
 
@@ -378,7 +386,6 @@ def gc_command(args: argparse.Namespace) -> int:
         keep_tags=keep_tags,
         protect_status=frozenset(args.protect_status),
         min_age_days=args.min_age_days,
-        artifact_ttl_days=args.artifact_ttl_days,
         protect_sweep_runs=not args.no_protect_sweep_runs,
         sweep_ttl_days=args.sweep_ttl_days,
         protect_candidates=not args.no_protect_candidates,

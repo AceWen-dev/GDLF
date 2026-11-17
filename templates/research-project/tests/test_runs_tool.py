@@ -9,7 +9,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 from dlef.eval import EvalRecord
-from dlef.run import ArtifactStore, RunStore
+from dlef.run import RunStore
 
 from core.tools import runs as runs_tool
 
@@ -19,7 +19,7 @@ class RunsToolTests(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         root = Path(self._tmp.name)
         self.runs_root = root / "runs"
-        store = RunStore(self.runs_root, ArtifactStore(root / "artifacts"))
+        store = RunStore(self.runs_root)
         self.runs = []
         for experiment, seed, tags, metric in (
             ("baseline", 1, {"baseline": "true"}, 0.5),

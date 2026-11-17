@@ -122,7 +122,7 @@ git init
 mkdir -p ~/dl-projects/demo
 rsync -a \
   --exclude '__pycache__' --exclude '*.pyc' \
-  --exclude 'output/runs' --exclude 'output/artifacts' \
+  --exclude 'output/runs' \
   --exclude 'output/sweeps' --exclude 'output/test_access' \
   --exclude 'TUTORIAL.md' \
   /path/to/DLEF/templates/research-project/ ~/dl-projects/demo/
@@ -135,7 +135,7 @@ rsync -a \
 再开始真实实验。`TUTORIAL.md` 留在 DLEF 仓库，不复制。
 
 > **不要复制**：`dlef/`、`adapters/`、`examples/`、DLEF 根目录的 `tests/`、
-> `docs/`、`.git/`、`output/runs|artifacts|sweeps|test_access`。
+> `docs/`、`.git/`、`output/runs|sweeps|test_access`。
 > 数据字节放 `$DLEF_DATA_ROOT`，不进项目。
 
 ---
@@ -477,8 +477,7 @@ python -m dlef.cli gc \
 - 其他 run 的 parent；
 - sweep 引用的 run；
 - active candidate（`candidate` / `promoted`）引用的 run；
-- claim 的 eval id 所在的 run；
-- 被 kept run 引用的 artifact。
+- claim 的 eval id 所在的 run。
 
 不要手动 `rm -rf output/runs`。
 

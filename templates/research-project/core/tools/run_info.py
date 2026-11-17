@@ -183,7 +183,7 @@ def main() -> int:
         )
     print()
 
-    print("artifacts:")
+    print("files:")
     checkpoint = run.checkpoint_path
     if checkpoint.is_file():
         print(f"  checkpoint: {checkpoint}")

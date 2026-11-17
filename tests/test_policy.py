@@ -8,7 +8,7 @@ from pathlib import Path
 
 from dlef.config import resolve_config
 from dlef.policy import NoOpTrainingPolicy
-from dlef.run import ArtifactStore, RunStore
+from dlef.run import RunStore
 from dlef.runner import Runner
 from examples.toy.components import ToyDataset
 from examples.toy.config import ToyConfig
@@ -77,8 +77,8 @@ class PolicyIntegrationTests(unittest.TestCase):
     def _run(self, policy, **overrides):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            store = RunStore(root / "runs", ArtifactStore(root / "artifacts"))
-            runner = Runner(store, store.artifact_store, training_policy=policy)
+            store = RunStore(root / "runs")
+            runner = Runner(store, training_policy=policy)
             raw = {
                 "seed": 1,
                 "epochs": 1,
