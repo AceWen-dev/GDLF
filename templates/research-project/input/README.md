@@ -7,7 +7,6 @@ input/
   configs/       # experiment variants
   benchmarks/    # frozen benchmark manifests
   datasets/      # dataset cards: name, version, manifest path/hash, split counts
-  views/         # declarative chart views for `make charts`
 ```
 
 Dataset bytes are not stored here; they live outside the repo under

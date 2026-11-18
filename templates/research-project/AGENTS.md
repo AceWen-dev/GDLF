@@ -211,7 +211,6 @@ output/                   # layer 3: generated results (default output_root)
   candidates/             # one JSON per shortlisted run set
   claims/                 # one JSON per reported claim
   reports/
-  charts/                 # generated static SVGs + index.md
   README.md
 
 AGENTS.md                # project-local guide
@@ -247,17 +246,41 @@ If you rename `core`, update:
 | experiment config | `input/configs/experiments/<experiment>/<variant>.yaml` | `core/tools/configs.py list --check` |
 | generic maintenance utility (provided by template) | `core/tools/` | keep generic; do not dump project scripts |
 | test | `tests/test_*.py` | run `python -m unittest discover -s tests` |
-| candidate | `output/candidates/` | `core/tools/candidates.py`, `CandidateStore` |
-| claim | `output/claims/` | `ClaimStore` |
-| chart view | `input/views/charts.yaml` | `core/tools/charts.py`, `make charts` |
+| candidate | `output/candidates/` | `core/tools/candidates.py`, `CandidateStore`; **owner approval required** |
+| claim | `output/claims/` | `ClaimStore`; **owner approval required** |
 | reusable cross-project code | DLEF core or `adapters/` | not in `core/` |
 | generated run output | `output/` | never edit by hand |
+| generated overview | `output/INDEX.md` | `make index`; never hand-edit |
+| disposable draft / probe / cache | `output/scratch/` | never cited by claims, candidates or INDEX |
 
 **Rules:** no ad-hoc scripts in `core/commands/`; `scripts/` is intentionally
 unstructured and project-specific (no video/data assumptions); `core/tools/` holds
 only generic maintenance utilities. If a script grows reusable logic, move the
 logic into `core/` (or core/adapters) and leave a thin CLI. No `utils.py`
 at the project root.
+
+### 1.2 Output provenance classes
+
+A file's location under `output/` is decided by **where it comes from**, not by
+what it is about. Every file has exactly one class:
+
+| Class | Dirs | Who writes | Editable? | Lifecycle |
+|---|---|---|---|---|
+| Recorded | `runs/`, `sweeps/`, `test_access/` | DLEF only | never | immutable; `dlef gc` |
+| Judged | `candidates/`, `claims/` | the **owner**, via the tools | via `candidates.py` / `ClaimStore` only | status lifecycle |
+| Rendered | `INDEX.md`, `reports/` | `make index` / `make report` | never by hand | delete freely, regenerate |
+| Scratch | `scratch/` | anyone | freely | may vanish any time |
+
+- The front door is `output/INDEX.md` (`make index`): funnel, experiments,
+  recent runs, shortlist, claims, approvers. Never hand-maintain an overview;
+  a stale hand-written index lies.
+- Anything not derivable from runs + candidates + claims is scratch: probes,
+  exported JSONs, copied stdout, ad-hoc plots. Claims, candidates and INDEX must
+  never reference scratch.
+- Files a future run will read are **data**, not output: put them under
+  `$DLEF_DATA_ROOT` with a dataset card.
+- Do not copy eval numbers or stdout into `reports/`; evidence lives in eval
+  records, and reports are regenerated from them.
 
 ---
 
@@ -546,11 +569,10 @@ Recommended order:
    # core/commands/sweep.py maps every param with set_dotted; one seed = one run.
    ```
 9. Create a claim for each reported number.
-10. Run `make charts`; keep `output/charts/index.md` with the report.
-11. Run `dlef gc` dry-run; tag runs that must survive (`reported`, `baseline`)
+10. Run `dlef gc` dry-run; tag runs that must survive (`reported`, `baseline`)
     at launch, not after deletion.
-12. Archive manifest/config/report/charts/key checkpoints.
-13. Update `STATE.md` with the run/eval ids and metrics; append a
+11. Archive manifest/config/report/key checkpoints.
+12. Update `STATE.md` with the run/eval ids and metrics; append a
     `DECISIONS.md` entry if the choice is hard to reverse; run `make handoff`.
 
 Phase gates (enforced by `make check`):
@@ -683,33 +705,6 @@ file, the project's TensorBoard integration is incomplete.
 TensorBoard is a mirror, not a new record source. Never edit event files by
 hand, never make TensorBoard the only record, and never tune on test metrics.
 
-### 6.2 Static charts
-
-`output/charts/` is a **derived projection** for reports and one-glance review.
-It is regenerated with:
-
-```bash
-make charts
-# or: python core/tools/charts.py --output output
-```
-
-The project declares what to draw in `input/views/charts.yaml`:
-
-- `experiments`: latest val metric per experiment, with seed spread;
-- `candidates`: mean val metric per candidate, colored by status;
-- `claims`: reported values resolved from eval records.
-
-Rules:
-
-- Charts are never the record; `runs/`, `evals/`, candidates and claims are.
-- Never hand-edit `output/charts/*.svg` or `index.md`; change the view spec and
-  rebuild. Stale SVGs for removed views are deleted automatically.
-- Use the project's own metric keys in the view spec; do not put domain metric
-  names in `dlef/`.
-- Do not chart test metrics before a claim exists. `experiments` uses the val
-  stream on purpose.
-- Learning curves stay in TensorBoard; charts are static comparison snapshots.
-
 ---
 
 ## 7. Eval / claim rules
@@ -727,8 +722,8 @@ Rules:
   the original run directory is gone.
 - Test access is counted under `output/test_access/` by `test_set_id`; report
   shows `WARN` when the same test set is accessed more than once.
-- A `Claim` must reference at least one eval id and should pin the benchmark
-  id it belongs to:
+- A `Claim` must reference at least one eval id, should pin the benchmark
+  id it belongs to, and **requires the owner's approval** in `approved_by`:
   ```python
   from dlef.claim import Claim, ClaimStore
   ClaimStore("output/claims").add(
@@ -738,12 +733,15 @@ Rules:
           eval_ids=("eval-id",),
           metric="mae",
           benchmark_id="sha256:...",
+          approved_by="<owner, date: approval quote>",
       )
   )
   ```
+  `ClaimStore.add` refuses a claim without `approved_by`. Agents propose the
+  claim and wait; the owner's yes goes into the record.
 - Generate the report, do not hand-copy numbers:
   ```bash
-  make report
+  make report   # also regenerates output/INDEX.md
   # or: python -m dlef.cli report --runs output/runs --claims output/claims \
   #     --candidates output/candidates --out output/reports/report.md
   ```
@@ -765,24 +763,34 @@ python core/tools/candidates.py add \
   --run <run1> --run <run2> \
   --metric <val-metric> \
   --reason "<why this is worth keeping>" \
-  --next "<what to inspect next>"
+  --next "<what to inspect next>" \
+  --approved-by "<owner, date: approval quote>"
 
 python core/tools/candidates.py            # active shortlist
-python core/tools/candidates.py show <id>  # runs + claims
-python core/tools/candidates.py reject <id> --reason "<why not>"
-python core/tools/candidates.py promote <id> --claim <claim-id>
+python core/tools/candidates.py show <id>  # runs + claims + approver
+python core/tools/candidates.py reject <id> --reason "<why not>" \
+  --approved-by "<owner, date: approval quote>"
+python core/tools/candidates.py promote <id> --claim <claim-id> \
+  --approved-by "<owner, date: approval quote>"
 ```
 
 Rules:
 
+- **Owner approval is mandatory.** `add` / `promote` / `reject` / `archive`
+  refuse to run without `--approved-by`, and claims refuse to be created
+  without `approved_by`. An agent may *propose* — prepare the exact command and
+  the expected record — but it must ask the owner first and quote the owner's
+  answer. **Never write `--approved-by` from your own judgment.** The report
+  and INDEX render the approver; unapproved records are flagged and locked.
 - Shortlist after reading results; never auto-create candidates from a metric
   ranking. A candidate is a judgment, not a leaderboard position.
 - `run_ids` is a snapshot: one configuration across seeds. Do not silently add
   runs to an existing candidate; create a new one.
 - Evaluate candidates on val. Spend test eval only after a candidate is chosen.
   Promotions should be rare; repeated test access is reported as `WARN`.
-- Promotion order is fixed: test eval → `Claim` → `promote` with the claim ids.
-  `promote` refuses claim ids that do not exist.
+- Promotion order is fixed: owner approval → test eval → `Claim` (with
+  `approved_by`) → `promote` with the claim ids. `promote` refuses claim ids
+  that do not exist.
 - Every `candidate` and `rejected` record needs a real `reason`. "good" is not
   a reason.
 - Keep rejected candidates: their reason is the memory of a dead end.
@@ -790,7 +798,8 @@ Rules:
   `archived` are not.
 - Never edit run directories or claims from the candidate store; candidates only
   point at them.
-- `make report` renders the shortlist above the claims.
+- `make report` renders the shortlist above the claims; `make index`
+  regenerates the front door.
 
 ---
 
@@ -846,6 +855,15 @@ Do not edit the installed `dlef` package in place.
 
 ## 10. Forbidden
 
+- Do not create, promote, reject, archive or remove candidates or claims
+  without the owner's explicit approval recorded in `approved_by` /
+  `--approved-by`. Propose, wait, then quote the approval. Never approve
+  your own.
+- Do not hand-edit `output/INDEX.md` or `output/reports/`; they are generated
+  (`make index` / `make report`).
+- Do not park evidence outside the chain: no eval-number JSON exports or copied
+  stdout in `reports/`; numbers come from eval records and claims.
+- Do not put anything a claim/candidate/INDEX cites into `scratch/`.
 - Do not copy `dlef` core code into this project.
 - Do not call `loss.backward()` / `optimizer.step()` inside a Task.
 - Do not write to `output/runs/...` by hand.

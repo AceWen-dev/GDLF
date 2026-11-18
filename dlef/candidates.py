@@ -9,6 +9,10 @@ through a small status lifecycle.
 It is also the layer that protects promising runs from retention before they
 become claims. ``RetentionService`` keeps runs referenced by active candidates.
 
+Candidates are an **owner-approved registry**: a run set enters the shortlist,
+gets promoted or rejected only with the owner's explicit approval, recorded in
+``approved_by``. Agents propose candidates; they never approve their own.
+
 Files: ``<root>/<candidate_id>.json``, one per candidate.
 """
 
@@ -46,6 +50,10 @@ class Candidate:
     claim_ids: tuple[str, ...] = ()
     priority: int = 0
     tags: Mapping[str, str] = field(default_factory=dict)
+    # Owner approval is part of the record, not of the chat log: a candidate
+    # enters the shortlist only when the owner says so, and the record says
+    # who approved it. Agents must ask, never self-approve.
+    approved_by: str = ""
     created_at: str = field(default_factory=utc_now)
     updated_at: str = field(default_factory=utc_now)
 
@@ -75,6 +83,7 @@ class Candidate:
             claim_ids=tuple(str(item) for item in payload.get("claim_ids", ())),
             priority=int(payload.get("priority", 0) or 0),
             tags=dict(payload.get("tags", {})),
+            approved_by=str(payload.get("approved_by", "")),
             created_at=str(payload.get("created_at", "")),
             updated_at=str(payload.get("updated_at", "")),
         )
@@ -101,6 +110,11 @@ class Candidate:
         if self.status == "promoted" and not self.claim_ids:
             raise CandidateError(
                 "a promoted candidate must reference at least one claim id"
+            )
+        if not self.approved_by.strip():
+            raise CandidateError(
+                "a candidate needs approved_by: the owner's approval that these "
+                "runs enter the shortlist. Agents propose; the owner approves."
             )
 
 

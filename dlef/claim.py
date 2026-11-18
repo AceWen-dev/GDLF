@@ -3,6 +3,10 @@
 A Claim is a reported number/table/figure linked to one or more EvalRecords.
 The test-access log records every test-split evaluation per test set, so the
 report can flag reuse instead of silently treating test numbers as fresh.
+
+Claims are an **owner-approved registry**: a number becomes a claim only with
+the owner's explicit approval, recorded in ``approved_by``. Agents propose
+claims with their evidence chain; they never approve their own.
 """
 
 from __future__ import annotations
@@ -33,6 +37,9 @@ class Claim:
     tags: Mapping[str, str] = field(default_factory=dict)
     created_at: str = field(default_factory=utc_now)
     benchmark_id: str = ""
+    # Owner approval is part of the record: a number becomes a claim only when
+    # the owner approves reporting it. Agents propose; the owner approves.
+    approved_by: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -52,6 +59,7 @@ class Claim:
             tags=dict(payload.get("tags", {})),
             created_at=str(payload.get("created_at", "")),
             benchmark_id=str(payload.get("benchmark_id", "")),
+            approved_by=str(payload.get("approved_by", "")),
         )
 
 
@@ -66,6 +74,11 @@ class ClaimStore:
         _safe_id(claim.claim_id)
         if not claim.eval_ids:
             raise ClaimError("a claim must reference at least one eval id")
+        if not claim.approved_by.strip():
+            raise ClaimError(
+                "a claim needs approved_by: the owner's approval that this "
+                "number is reported. Agents propose; the owner approves."
+            )
         path = self.root / f"{claim.claim_id}.json"
         if path.exists():
             raise ClaimError(f"claim already exists: {claim.claim_id}")

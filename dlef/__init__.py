@@ -34,7 +34,6 @@ from .candidates import (
     CandidateError,
     CandidateStore,
 )
-from .charts import BarChart, ChartBar, render_bar_chart_svg
 from .claim import Claim, ClaimError, ClaimStore, TestAccessLog
 from .config import (
     Config,
@@ -120,9 +119,6 @@ __all__ = [
     "CandidateStore",
     "CANDIDATE_STATUSES",
     "CANDIDATE_ACTIVE_STATUSES",
-    "BarChart",
-    "ChartBar",
-    "render_bar_chart_svg",
     "Claim",
     "ClaimError",
     "ClaimStore",

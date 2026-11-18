@@ -105,6 +105,7 @@ class BenchmarkIdentityTests(unittest.TestCase):
             eval_ids=("e1",),
             metric="mae",
             benchmark_id="sha256:bench-b",
+            approved_by="owner: ok",
         )
         run = SimpleNamespace(run_id="run-1")
         report = format_claim_report([claim], {"e1": (run, record)})  # type: ignore[arg-type]

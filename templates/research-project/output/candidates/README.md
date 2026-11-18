@@ -55,10 +55,33 @@ committed with the project; they are part of the experiment's memory.
 | `claim_ids` | promoted | claims created from this candidate |
 | `priority` | | sort order; lower comes first |
 | `tags` | | free labels, e.g. `{"question": "ranking-loss"}` |
+| `approved_by` | ✓ | the owner's approval, quoted with date/context; agents propose, the owner approves |
 | `created_at` / `updated_at` | auto | timestamps |
 
 `run_ids` is a **snapshot**. Creating a candidate from an experiment name
 expands the runs at creation time; later runs do not silently join.
+
+## Owner approval is required
+
+The shortlist is the owner's decision, not the agent's. `add` / `promote` /
+`reject` / `archive` all refuse to run without `--approved-by`, and that value
+must quote the owner's explicit approval:
+
+```bash
+python core/tools/candidates.py add ... \
+  --approved-by "twj 2026-11-18: v11-ranksim-g20 may enter the shortlist"
+```
+
+The workflow for an agent is:
+
+1. prepare the exact command and the expected record (ids, reason, next);
+2. ask the owner and wait for an explicit yes/no;
+3. only then execute, with `--approved-by` quoting that decision.
+
+An agent never writes `--approved-by` from its own judgment. The report and
+`make index` show the approver for every candidate; records without one are
+flagged as `UNAPPROVED` and cannot change status until the owner re-approves
+them.
 
 ## Statuses
 
@@ -93,7 +116,7 @@ python core/tools/candidates.py list --all
 python core/tools/candidates.py show v11-ranksim-g20
 ```
 
-Shortlist a run set:
+Shortlist a run set (owner approval):
 
 ```bash
 python core/tools/candidates.py add \
@@ -104,25 +127,28 @@ python core/tools/candidates.py add \
   --run <run_id_seed3> \
   --metric v11/worst_bin \
   --reason "best worst_bin so far; D cohort slightly worse, needs a look" \
-  --next "per-bin MAE, then test eval if it holds"
+  --next "per-bin MAE, then test eval if it holds" \
+  --approved-by "twj 2026-11-18: v11-ranksim-g20 may enter the shortlist"
 ```
 
 The tool prints warnings when a run is missing or when the run set spans more
 than one experiment, but it does not guess. Every run id must resolve under
 `output/runs/` at creation time.
 
-Close a dead end:
+Close a dead end (owner approval):
 
 ```bash
 python core/tools/candidates.py reject v11-ranksim-g20 \
-  --reason "D cohort regressed; not worth test access"
+  --reason "D cohort regressed; not worth test access" \
+  --approved-by "twj 2026-11-18: agreed, close it"
 ```
 
-Promote a candidate after its claims exist:
+Promote a candidate after its claims exist (owner approval):
 
 ```bash
 python core/tools/candidates.py promote v11-ranksim-g20 \
-  --claim best-d-worst --claim best-d-lt10
+  --claim best-d-worst --claim best-d-lt10 \
+  --approved-by "twj 2026-11-18: promote with the d-worst claim"
 ```
 
 Promotion checks that every claim id exists in `output/claims/`. The order is
@@ -130,16 +156,18 @@ deliberate:
 
 ```text
 1. compare candidates on val
-2. run test eval for the winner
-3. create Claim(s) from the eval ids
-4. promote the candidate with those claim ids
+2. ask the owner; record the approval
+3. run test eval for the winner
+4. create Claim(s) from the eval ids (approved_by required there too)
+5. promote the candidate with those claim ids
 ```
 
 Archive a candidate whose claims are stable and whose runs no longer need
 candidate-level protection:
 
 ```bash
-python core/tools/candidates.py archive v11-ranksim-g20
+python core/tools/candidates.py archive v11-ranksim-g20 \
+  --approved-by "twj 2026-11-18: archive it"
 ```
 
 ## Retention

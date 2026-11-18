@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -40,6 +41,7 @@ class CandidateStoreTests(unittest.TestCase):
                 run_ids=("r1", "r2", "r2"),
                 reason="promising on val",
                 metric="mae",
+                approved_by="owner 2026-11-18: ok",
             )
             store.add(candidate)
 
@@ -67,6 +69,7 @@ class CandidateStoreTests(unittest.TestCase):
                 run_ids=("r3",),
                 status="rejected",
                 reason="regressed",
+                approved_by="owner 2026-11-18: not worth it",
             )
             store.add(rejected)
             self.assertEqual(store.protected_run_ids(), {"r1": ["exp-a"], "r2": ["exp-a"]})
@@ -82,14 +85,15 @@ class CandidateStoreTests(unittest.TestCase):
             store = CandidateStore(Path(tmp))
 
             bad_cases = [
-                Candidate(candidate_id="x", title="", run_ids=("r1",), reason="r"),
-                Candidate(candidate_id="x", title="t", run_ids=(), reason="r"),
+                Candidate(candidate_id="x", title="", run_ids=("r1",), reason="r", approved_by="owner"),
+                Candidate(candidate_id="x", title="t", run_ids=(), reason="r", approved_by="owner"),
                 Candidate(
                     candidate_id="x",
                     title="t",
                     run_ids=("r1",),
                     status="unknown",
                     reason="r",
+                    approved_by="owner",
                 ),
                 Candidate(candidate_id="x", title="t", run_ids=("r1",)),
                 Candidate(
@@ -97,6 +101,7 @@ class CandidateStoreTests(unittest.TestCase):
                     title="t",
                     run_ids=("r1",),
                     status="rejected",
+                    approved_by="owner",
                 ),
                 Candidate(
                     candidate_id="x",
@@ -104,6 +109,7 @@ class CandidateStoreTests(unittest.TestCase):
                     run_ids=("r1",),
                     status="promoted",
                     reason="r",
+                    approved_by="owner",
                 ),
             ]
             for candidate in bad_cases:
@@ -115,6 +121,7 @@ class CandidateStoreTests(unittest.TestCase):
                 title="t",
                 run_ids=("r1",),
                 reason="r",
+                approved_by="owner 2026-11-18: ok",
             )
             store.add(good)
             with self.assertRaises(CandidateError):
@@ -126,6 +133,31 @@ class CandidateStoreTests(unittest.TestCase):
             with self.assertRaises(CandidateError):
                 store.update("x", candidate_id="y")
 
+    def test_legacy_record_needs_reapproval(self) -> None:
+        """Old candidate JSON without approved_by cannot mutate until re-approved."""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = CandidateStore(Path(tmp))
+            payload = {
+                "candidate_id": "legacy",
+                "title": "Legacy",
+                "run_ids": ["r1"],
+                "reason": "imported",
+                "status": "candidate",
+            }
+            path = store.root / "legacy.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+
+            legacy = store.get("legacy")
+            self.assertEqual(legacy.approved_by, "")
+            with self.assertRaises(CandidateError):
+                store.update("legacy", status="promoted", claim_ids=("c1",))
+            reapproved = store.update(
+                "legacy", status="promoted", claim_ids=("c1",), approved_by="owner: ok"
+            )
+            self.assertEqual(reapproved.status, "promoted")
+            self.assertEqual(reapproved.approved_by, "owner: ok")
+
     def test_update_ignores_none(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             store = CandidateStore(Path(tmp))
@@ -136,6 +168,7 @@ class CandidateStoreTests(unittest.TestCase):
                     run_ids=("r1",),
                     reason="r",
                     next="look at bins",
+                    approved_by="owner: ok",
                 )
             )
             updated = store.update("x", next=None, metric="mae")
@@ -160,6 +193,7 @@ class CandidateReportTests(unittest.TestCase):
                     reason="promising on val",
                     metric="mae",
                     experiment="e",
+                    approved_by="owner: ok",
                 )
             ]
             mean, resolved, total = candidate_metric(
@@ -182,11 +216,18 @@ class CandidateReportTests(unittest.TestCase):
             title="Experiment A",
             run_ids=("r1",),
             reason="promising",
+            approved_by="owner: ok",
         )
         text = format_report([], {}, candidates=[candidate], runs={})
         self.assertLess(text.index("## Shortlist"), text.index("## Claims"))
         self.assertIn("exp-a", text)
+        self.assertIn("owner: ok", text)
         self.assertIn("(no claims)", text)
+
+    def test_report_note_is_rendered_under_the_title(self) -> None:
+        text = format_report([], {}, note="generated view; rebuild me")
+        self.assertIn("# Experiment report", text)
+        self.assertLess(text.index("> generated view"), text.index("## Claims"))
 
     def test_cli_report_with_only_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -203,6 +244,7 @@ class CandidateReportTests(unittest.TestCase):
                     run_ids=(run.run_id,),
                     reason="promising",
                     metric="mae",
+                    approved_by="owner: ok",
                 )
             )
 

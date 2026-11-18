@@ -5,16 +5,23 @@ across seeds) plus *why* it is worth keeping and *what to look at next*. It is
 not a claim: claims record reported numbers with an eval/checkpoint/run evidence
 chain. Candidates are the triage layer in between.
 
+**Owner approval is required.** The shortlist and the claim registry are the
+owner's decisions, not the agent's. `add` / `promote` / `reject` / `archive`
+refuse to run without ``--approved-by``, which must quote the owner's approval
+(e.g. ``'twj 2026-11-18: ranksim-g20 may enter'``). An agent may *propose* —
+prepare the exact command and the expected record — but it must ask the owner
+first and never write the approval itself.
+
 The tool only edits ``output/candidates/``. RunStore remains the source of truth;
 runs are never modified.
 
 Views / commands:
   list      one row per candidate (default; active candidates only)
   show      one candidate with its runs and claims
-  add       shortlist a run set
-  promote   mark a candidate as promoted and attach claim ids
-  reject    close a candidate with a reason
-  archive   keep the record but stop protecting its runs
+  add       shortlist a run set (owner approval)
+  promote   attach claim ids and promote (owner approval)
+  reject    close a candidate with a reason (owner approval)
+  archive   keep the record but stop protecting its runs (owner approval)
 
 Examples:
   python core/tools/candidates.py
@@ -27,13 +34,16 @@ Examples:
     --run <run1> --run <run2> --run <run3> \
     --metric v11/worst_bin \
     --reason "best worst_bin so far; verify the D cohort" \
-    --next "per-bin MAE, then test eval if it holds"
+    --next "per-bin MAE, then test eval if it holds" \
+    --approved-by "twj 2026-11-18: v11-ranksim-g20 may enter the shortlist"
 
   python core/tools/candidates.py reject v11-ranksim-g20 \
-    --reason "D cohort regressed; not worth test access"
+    --reason "D cohort regressed; not worth test access" \
+    --approved-by "twj 2026-11-18: agreed, close it"
 
   python core/tools/candidates.py promote v11-ranksim-g20 \
-    --claim best-d-worst
+    --claim best-d-worst \
+    --approved-by "twj 2026-11-18: promote with the d-worst claim"
 """
 
 from __future__ import annotations
@@ -156,6 +166,7 @@ def _cmd_show(args: argparse.Namespace) -> int:
         )
     print()
     print("claims:", ", ".join(candidate.claim_ids) or "-")
+    print("approved_by:", candidate.approved_by or "(not recorded)")
     return 0
 
 
@@ -178,9 +189,11 @@ def _cmd_add(args: argparse.Namespace) -> int:
         experiment=args.experiment or experiments[0],
         priority=args.priority,
         tags=_parse_tags(args.tag),
+        approved_by=args.approved_by,
     )
     _store(args).add(candidate)
     print(f"candidate added: {candidate.candidate_id} ({len(found)} run(s))")
+    print(f"approved_by: {candidate.approved_by}")
     print(f"candidates: {args.candidates}")
     return 0
 
@@ -201,9 +214,11 @@ def _cmd_promote(args: argparse.Namespace) -> int:
         args.candidate_id,
         status="promoted",
         claim_ids=tuple(args.claim),
+        approved_by=args.approved_by,
     )
     print(f"candidate promoted: {updated.candidate_id}")
     print("claims:", ", ".join(updated.claim_ids))
+    print(f"approved_by: {updated.approved_by}")
     return 0
 
 
@@ -212,14 +227,21 @@ def _cmd_reject(args: argparse.Namespace) -> int:
         args.candidate_id,
         status="rejected",
         reason=args.reason,
+        approved_by=args.approved_by,
     )
     print(f"candidate rejected: {updated.candidate_id}")
+    print(f"approved_by: {updated.approved_by}")
     return 0
 
 
 def _cmd_archive(args: argparse.Namespace) -> int:
-    updated = _store(args).update(args.candidate_id, status="archived")
+    updated = _store(args).update(
+        args.candidate_id,
+        status="archived",
+        approved_by=args.approved_by,
+    )
     print(f"candidate archived: {updated.candidate_id}")
+    print(f"approved_by: {updated.approved_by}")
     return 0
 
 
@@ -239,6 +261,18 @@ def _common_paths() -> argparse.ArgumentParser:
         help="claim store root (used by promote)",
     )
     return parser
+
+
+def _approval_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--approved-by",
+        required=True,
+        metavar="OWNER_APPROVAL",
+        help="the owner's approval, quoted, e.g. "
+        "'twj 2026-11-18: ranksim-g20 may enter the shortlist'. "
+        "Agents must ask the owner first and quote the answer; "
+        "never write this on their own judgment",
+    )
 
 
 def main() -> int:
@@ -273,7 +307,7 @@ def main() -> int:
     show_parser.set_defaults(func=_cmd_show)
 
     add_parser = sub.add_parser(
-        "add", parents=[common], help="shortlist a run set"
+        "add", parents=[common], help="shortlist a run set (owner approval required)"
     )
     add_parser.add_argument("--id", required=True, help="candidate id (= file name)")
     add_parser.add_argument("--title", required=True)
@@ -297,10 +331,11 @@ def main() -> int:
     add_parser.add_argument(
         "--tag", action="append", default=[], metavar="NAME[=VALUE]"
     )
+    _approval_argument(add_parser)
     add_parser.set_defaults(func=_cmd_add)
 
     promote_parser = sub.add_parser(
-        "promote", parents=[common], help="attach claim ids and promote"
+        "promote", parents=[common], help="attach claim ids and promote (owner approval required)"
     )
     promote_parser.add_argument("candidate_id")
     promote_parser.add_argument(
@@ -309,19 +344,22 @@ def main() -> int:
         required=True,
         help="claim id created from this candidate; repeat if needed",
     )
+    _approval_argument(promote_parser)
     promote_parser.set_defaults(func=_cmd_promote)
 
     reject_parser = sub.add_parser(
-        "reject", parents=[common], help="close a candidate with a reason"
+        "reject", parents=[common], help="close a candidate with a reason (owner approval required)"
     )
     reject_parser.add_argument("candidate_id")
     reject_parser.add_argument("--reason", required=True)
+    _approval_argument(reject_parser)
     reject_parser.set_defaults(func=_cmd_reject)
 
     archive_parser = sub.add_parser(
-        "archive", parents=[common], help="stop protecting the candidate's runs"
+        "archive", parents=[common], help="stop protecting the candidate's runs (owner approval required)"
     )
     archive_parser.add_argument("candidate_id")
+    _approval_argument(archive_parser)
     archive_parser.set_defaults(func=_cmd_archive)
 
     args = parser.parse_args()

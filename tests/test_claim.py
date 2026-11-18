@@ -63,6 +63,7 @@ class ClaimTests(unittest.TestCase):
                 eval_ids=(second.eval_id,),
                 metric="mae",
                 unit="points",
+                approved_by="owner 2026-11-18: approved for the report",
             )
             claims.add(claim)
             self.assertEqual(claims.get("c1").text, "Baseline comparison")
@@ -71,12 +72,22 @@ class ClaimTests(unittest.TestCase):
                 claims.add(claim)
             with self.assertRaises(ClaimError):
                 claims.add(Claim(claim_id="bad", text="no eval", eval_ids=()))
+            with self.assertRaises(ClaimError):
+                claims.add(
+                    Claim(
+                        claim_id="unapproved",
+                        text="agent liked it",
+                        eval_ids=(second.eval_id,),
+                        approved_by="",
+                    )
+                )
 
             report = format_claim_report(
                 [claim],
                 {second.eval_id: (run, second)},
             )
             self.assertIn("Baseline comparison", report)
+            self.assertIn("owner 2026-11-18", report)
             self.assertIn(second.eval_id, report)
             self.assertIn(run.run_id, report)
             self.assertIn("WARN 2", report)
@@ -110,6 +121,7 @@ class ClaimTests(unittest.TestCase):
                 claim_id="c1",
                 text="Missing eval",
                 eval_ids=("does-not-exist",),
+                approved_by="owner: ok",
             )
             claims.add(claim)
             report = format_claim_report([claim], {})

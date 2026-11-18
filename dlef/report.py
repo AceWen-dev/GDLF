@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -53,6 +54,7 @@ def format_claim_report(
         "text",
         "metric",
         "value",
+        "approved_by",
         "split",
         "benchmark",
         "eval",
@@ -64,13 +66,14 @@ def format_claim_report(
         "|" + "|".join(["---"] * len(headers)) + "|",
     ]
     for claim in claims:
+        approver = _clip(claim.approved_by, 24) or "UNAPPROVED"
         eval_ids = claim.eval_ids or ("",)
         for eval_id in eval_ids:
             item = resolved.get(eval_id)
             if item is None:
                 lines.append(
                     f"| {claim.claim_id} | {claim.text} | {claim.metric} | "
-                    f"{_format_value(claim.value)} |  | "
+                    f"{_format_value(claim.value)} | {approver} | "
                     f"{_short(claim.benchmark_id)} | {eval_id} | MISSING |  |"
                 )
                 continue
@@ -95,7 +98,7 @@ def format_claim_report(
                     test_access = f"WARN {test_access}"
             lines.append(
                 f"| {claim.claim_id} | {claim.text} | {claim.metric} | {rendered} | "
-                f"{record.split} | {_short(benchmark)} | {eval_id} | "
+                f"{approver} | {record.split} | {_short(benchmark)} | {eval_id} | "
                 f"{run.run_id} | {test_access} |"
             )
     lines.extend(
@@ -166,6 +169,7 @@ def format_candidate_report(
     headers = [
         "candidate",
         "status",
+        "approved_by",
         "experiment",
         "runs",
         "metric",
@@ -205,12 +209,13 @@ def format_candidate_report(
                 [
                     candidate.candidate_id,
                     candidate.status,
+                    _clip(candidate.approved_by, 16) or "UNAPPROVED",
                     experiment or "-",
                     str(total),
                     candidate.metric or "-",
                     value,
                     str(candidate.priority),
-                    _clip(candidate.updated_at.replace("T", " ")[:19], 19) or "-",
+                    _local_timestamp(candidate.updated_at),
                     _clip(candidate.reason, 48) or "-",
                     _clip(candidate.next, 40) or "-",
                 ]
@@ -228,10 +233,17 @@ def format_report(
     candidates: Sequence[Candidate] = (),
     runs: Mapping[str, Run] | None = None,
     title: str = "Experiment report",
+    note: str = "",
 ) -> str:
-    """Shortlist first, then claims: the funnel at a glance."""
+    """Shortlist first, then claims: the funnel at a glance.
+
+    ``note`` is a single line rendered under the title; the CLI uses it for the
+    "generated view, rebuild me" stamp.
+    """
 
     sections = [f"# {title}"]
+    if note:
+        sections.append(f"> {note}")
     if candidates:
         sections.append("## Shortlist\n\n" + format_candidate_report(candidates, runs))
     sections.append("## Claims\n\n" + format_claim_report(claims, resolved))
@@ -246,6 +258,7 @@ def write_report(
     candidates: Sequence[Candidate] = (),
     runs: Mapping[str, Run] | None = None,
     title: str = "Experiment report",
+    note: str = "",
 ) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -256,6 +269,7 @@ def write_report(
             candidates=candidates,
             runs=runs,
             title=title,
+            note=note,
         )
         + "\n",
         encoding="utf-8",
@@ -270,6 +284,20 @@ def _clip(value: object, width: int) -> str:
     if len(text) <= width:
         return text
     return text[: max(0, width - 1)] + "…"
+
+
+def _local_timestamp(value: str) -> str:
+    """Render an ISO timestamp in local time, matching run ids / train.log."""
+
+    if not value:
+        return "-"
+    try:
+        moment = datetime.fromisoformat(value)
+    except ValueError:
+        return value[:19].replace("T", " ")
+    if moment.tzinfo is not None:
+        moment = moment.astimezone()
+    return moment.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _benchmark_warning(records: Sequence[EvalRecord]) -> str:

@@ -31,7 +31,6 @@
 | 17 | Claim | service | 是 | Claim / ClaimStore / report | 无 | claim → eval → run；test access 可见 |
 | 18 | TestAccess | service | 是 | append-only log + count | 无 | 每个 test set 的 test 访问计数 |
 | 19 | Candidate | service | 可选 | Candidate / CandidateStore / shortlist | 无 | candidate → runs；promoted → claim；active 受 gc 保护 |
-| 20 | Charts | service | 可选 | `BarChart` / SVG renderer / view spec | 领域指标选择 | 派生、可重建；不是记录 |
 
 **runtime contract**：每次实验都会实例化的对象。
 **service**：框架提供的运行时设施，不是用户实现的算法组件。
@@ -577,15 +576,19 @@ class Claim:
     unit: str = ""
     notes: str = ""
     benchmark_id: str = ""
+    approved_by: str = ""     # owner 批准；agent 只能提议
 ```
 
 约束：
 
 - Claim 必须至少引用一个 eval id；report 生成时通过 `RunStore.find_eval` 解析。
 - Claim 应记录 `benchmark_id`；如果 claim 和 eval 的 benchmark 不同，report 标 `MISMATCH`。
+- Claim 必须记录 `approved_by`（owner 的显式批准）；没有它 `ClaimStore.add` 拒绝写入。
+  这是登记层的准入规则：**agent 提议，owner 批准**；report/INDEX 渲染批准人，
+  未批准的记录显示 `UNAPPROVED`。
 - `TestAccessLog` 是 append-only；`Runner.evaluate` 对 `split == "test"` 按 `test_set_id` 记录计数，写入 `EvalRecord.test_access`。
 - 报告里 `test_access > 1` 标记 `WARN`；v0 只警告，不阻塞。
-- Claim/report 是本地 JSON / Markdown；没有 Web UI。
+- Claim/report 是本地 JSON / Markdown；没有 Web UI。报告是可重建的视图（RENDERED），带 generated 戳。
 - `ClaimStore` 一个 claim 一个 JSON 文件；`dlef report` 生成 Markdown。
 
 ### 4.9 Candidate（备选）
@@ -604,12 +607,16 @@ class Candidate:
     claim_ids: tuple[str, ...] = ()
     priority: int = 0
     tags: Mapping[str, str] = field(default_factory=dict)
+    approved_by: str = ""          # owner 批准；agent 只能提议
 ```
 
 约束：
 
 - 一个 candidate 至少引用一个 run id；`run_ids` 是创建时的快照，新 run 不会自动加入。
 - `status=candidate|rejected` 必须有 `reason`；`status=promoted` 必须有至少一个 `claim_ids`。
+- **必须有 `approved_by`（owner 的显式批准）**：`add` / `promote` / `reject` / `archive`
+  都要带批准；agent 提议确切命令，owner 点头后带 `--approved-by` 执行。
+  旧记录没有 `approved_by` 时不能改状态，直到 owner 补批准。
 - candidate 在 val 上比较；test eval 只在 promotion 之后发生，避免提前消耗 test access。
 - `candidate`/`promoted` 的 run 默认被 retention 保护；`rejected`/`archived` 不保护。
 - `candidate` 是判断层，不是指标排行榜：工具不按 metric 自动创建备选。
@@ -618,37 +625,22 @@ class Candidate:
 - report 先渲染 shortlist，再渲染 claims：`run → candidate → claim → report`。
 - Claim 不要求来自 candidate；candidate 是推荐路径，不是强制外键。
 
-### 4.10 Charts（派生视图）
+### 4.10 Output provenance（output 目录按来源分类）
 
-```python
-@dataclass(frozen=True)
-class ChartBar:
-    label: str
-    value: float
-    low: float | None = None
-    high: float | None = None
-    note: str = ""
-    color: str = ""
+output 里一个文件的位置由**它从哪来**决定，不是由它讲什么决定：
 
-@dataclass(frozen=True)
-class BarChart:
-    chart_id: str
-    title: str
-    bars: tuple[ChartBar, ...]
-    subtitle: str = ""
-    unit: str = ""
-    mode: str = "min"          # min | max
-    footer: str = ""
-```
+| 类 | 目录 | 谁写 | 可手改？ | 生命周期 |
+|---|---|---|---|---|
+| Recorded | `runs/`、`sweeps/`、`test_access/` | 框架 | 否 | 不可变；`dlef gc` |
+| Judged | `candidates/`、`claims/` | owner（agent 提议） | 只经工具/API | 状态机 |
+| Rendered | `INDEX.md`、`reports/` | `make index` / `make report` | 否 | 删除无损，重建即得 |
+| Scratch | `scratch/` | 任何人 | 随意 | 随时可消失 |
 
-约束：
-
-- chart 是 RunStore / candidate / claim 的**派生投影**，可随时重建；不是记录。
-- core 只提供通用 SVG 渲染（label / value / low / high / color / title）；
-  具体指标、实验筛选、聚合方式由项目 `input/views/charts.yaml` 声明。
-- `output/charts/` 由工具生成；不手改 SVG，不把图表当作唯一证据。
-- `experiments` 视图使用训练 val 流；test 数字只能来自 claim。
-- 删除视图后，对应旧 SVG 会在下次生成时清理。
+- 门面是 `output/INDEX.md`（漏斗、实验表、最近 run、shortlist、claims、批准人）；
+  它是 generated 视图，禁止手写维护——手写索引必然过期，过期即误导。
+- agent 的草稿（probe、导出的 JSON、复制的 stdout、临时图）一律进 `scratch/`，
+  claims / candidates / INDEX 禁止引用 scratch；数字类证据只能走 eval record → claim。
+- 未来 run 要读的文件是**数据**，进 `$DLEF_DATA_ROOT` + dataset card，不进 output。
 
 ---
 
@@ -682,7 +674,6 @@ core/
   sweep/          # SweepSpec, trials, thread/subprocess GPU-aware queues
   run/            # manifest, run store
   candidates/     # shortlist between runs and claims
-  charts/         # generic BarChart / SVG renderer (derived views)
   claim/          # claims + test-access log
   retention/      # plan / apply / reference checks
   benchmark/      # test set + metric protocol -> benchmark id
@@ -716,7 +707,7 @@ templates/
 - 任何 tracker 厂商 SDK。
 - 任何实验 protocol 的正文（那是文档，不是代码）。
 - 任何“最佳实践”的默认值（默认值属于 template，不属于 core）。
-- 任何领域特定的可视化 / dashboard；通用 SVG 渲染契约可以留在 core（见 §4.10 Charts）。
+- 任何可视化 / dashboard。
 
 ---
 
@@ -734,7 +725,6 @@ templates/
 8. **Delivery**：项目模板 `templates/research-project/` 依赖版本化 core，不 vendor core（ADR 0002）。
 9. **Claim / TestAccess**：Claim 对象 + Markdown report；test-split access 按 `test_set_id` 计数，report 标记 WARN；跨 benchmark 显示不可比。
 10. **Candidate**：run 与 claim 之间的备选层；一个 candidate = 一组 run + 判断（reason/next）+ 生命周期；active candidate 受 gc 保护，promotion 才进入 test/claim。
-11. **Charts**：通用 SVG renderer + 项目 view spec；`output/charts/` 是可重建的派生投影，不是记录。
 
 **待定：**
 

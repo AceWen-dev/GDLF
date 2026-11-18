@@ -14,8 +14,8 @@ core/tools/
   status.py      # one-screen status / handoff
   runs.py        # experiment summary / run index (filters, --all, --json)
   run_info.py    # one run: config -> benchmark -> source files
-  candidates.py  # shortlist: add / list / show / promote / reject / archive
-  charts.py      # static SVG charts + index from input/views/charts.yaml
+  candidates.py  # shortlist: add / list / show / promote / reject / archive (owner-approved)
+  index.py       # regenerate output/INDEX.md: funnel + experiments + shortlist + claims
   variants.py    # variant count: declared (configs) / observed (runs) + drift
   _bootstrap.py  # internal: find the core when running in-repo
 ```

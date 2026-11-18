@@ -182,6 +182,7 @@ class RetentionTests(unittest.TestCase):
                     title="Active candidate",
                     run_ids=(kept.run_id,),
                     reason="still under review",
+                    approved_by="owner: ok",
                 )
             )
             candidates.add(
@@ -191,6 +192,7 @@ class RetentionTests(unittest.TestCase):
                     run_ids=(rejected.run_id,),
                     status="rejected",
                     reason="regressed",
+                    approved_by="owner: rejected",
                 )
             )
 
@@ -223,6 +225,7 @@ class RetentionTests(unittest.TestCase):
                     text="main result",
                     eval_ids=("eval-1",),
                     metric="mae",
+                    approved_by="owner: ok",
                 )
             )
 

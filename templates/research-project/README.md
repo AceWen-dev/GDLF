@@ -66,7 +66,6 @@ input/                    # layer 1: immutable inputs
   configs/sweeps/         # optional parameter-space specs
   benchmarks/             # one frozen JSON per benchmark
   datasets/               # dataset cards: version, manifest hash, split counts
-  views/charts.yaml       # which static charts to generate
   README.md
 
 core/                     # layer 2: project source
@@ -98,7 +97,6 @@ core/                     # layer 2: project source
     runs.py
     run_info.py
     candidates.py
-    charts.py
     configs.py
     benchmark.py
     new_experiment.py
@@ -117,13 +115,14 @@ scripts/                  # project-specific scripts, intentionally free-form
   README.md
 
 output/                   # layer 3: generated results
+  INDEX.md                # generated front door (make index)
   runs/
   sweeps/
   test_access/
-  candidates/             # human-authored shortlist
-  claims/
-  reports/
-  charts/                 # generated SVGs + index.md
+  candidates/             # human-authored shortlist (owner-approved)
+  claims/                 # owner-approved reported claims
+  reports/                # generated Markdown reports (rebuildable)
+  scratch/                # disposable drafts; never cited
   README.md
 
 AGENTS.md                 # project-local agent guide
@@ -296,7 +295,6 @@ python core/tools/runs.py                    # experiment summary
 python core/tools/runs.py --experiment <name>
 python core/tools/run_info.py --run <run_id>
 python core/tools/candidates.py              # the shortlist
-python core/tools/charts.py                  # static charts -> output/charts/
 python core/tools/configs.py list
 python core/commands/sweep.py --config input/configs/base.yaml
 make status                                 # phase / runs / next actions / git
@@ -305,11 +303,12 @@ make check                                  # initialization + config gate
 python -m unittest discover -s tests -v
 python -m dlef.cli report --runs output/runs --claims output/claims \
   --candidates output/candidates --out output/reports/report.md
+make index                                  # regenerate output/INDEX.md
 tensorboard --logdir output/runs --port 6006
 ```
 
-Or `make train`, `make runs`, `make runs-all`, `make configs`,
-`make new-experiment`, `make new-benchmark`, `make sweep`, `make charts`, `make report`,
+Or `make train`, `make runs`, `make runs-all`, `make configs`, `make index`,
+`make new-experiment`, `make new-benchmark`, `make sweep`, `make report`,
 `make gc-dry`, `make audit`, `make check`, `make status`, `make handoff`,
 `make test`, `make doctor`.
 `OUTPUT=<path>` overrides the output root for the tools (`make runs OUTPUT=...`).
@@ -542,7 +541,9 @@ config name cannot silently drift to different source.
 ## Shortlist: candidates before claims
 
 When runs outnumber the ones you can actually think about, shortlist the few
-that matter:
+that matter. **Every registry write needs the owner's approval** — the tool
+refuses without `--approved-by`, and an agent may only propose the command and
+wait:
 
 ```bash
 python core/tools/candidates.py add \
@@ -551,33 +552,22 @@ python core/tools/candidates.py add \
   --run <run1> --run <run2> --run <run3> \
   --metric <val-metric> \
   --reason "best val score; verify the worst cohort" \
-  --next "inspect per-bin errors, then decide on test eval"
+  --next "inspect per-bin errors, then decide on test eval" \
+  --approved-by "<owner, date: approval quote>"
 
 python core/tools/candidates.py           # active shortlist with val metrics
 python core/tools/candidates.py show ranksim-g20
-python core/tools/candidates.py reject ranksim-g20 --reason "worst cohort regressed"
-python core/tools/candidates.py promote ranksim-g20 --claim <claim-id>
+python core/tools/candidates.py reject ranksim-g20 --reason "worst cohort regressed" \
+  --approved-by "<owner, date: approval quote>"
+python core/tools/candidates.py promote ranksim-g20 --claim <claim-id> \
+  --approved-by "<owner, date: approval quote>"
 ```
 
 Candidates are evaluated on val and are protected from `dlef gc` while
 `candidate`/`promoted`. Test eval and `Claim` creation happen only after
-promotion. `make report` renders the shortlist above the claims; see
+promotion (claims need `approved_by` too). `make report` renders the shortlist
+above the claims and `make index` regenerates the front door; see
 `output/candidates/README.md` for the full contract.
-
-## Static charts
-
-`make charts` writes dependency-free SVGs and a one-page index:
-
-```bash
-make charts
-# output/charts/index.md + experiments-val.svg, candidates-val.svg, claims-test.svg
-```
-
-The views live in `input/views/charts.yaml`: experiments by validation metric,
-candidates, and reported claims. Replace `mae` with the project's metric; add
-one chart per metric when needed. Charts are derived and rebuildable, never a
-record. Learning curves stay in TensorBoard; static charts are for reports and
-for seeing the funnel at a glance. See `input/views/README.md` for the schema.
 
 ## Changing data / model / loss mid-experiment
 

@@ -39,6 +39,7 @@ One claim, one file, file name = `claim_id`:
 | `value` | | the reported value (e.g. the seed mean); if omitted, the report shows the per-eval value of `metric` |
 | `unit` | | unit string, e.g. `mm` |
 | `benchmark_id` | | pin the frozen benchmark; the report flags `MISMATCH` if an eval record was produced on a different one |
+| `approved_by` | ✓ | the owner's approval that this number is reported, quoted with date/context |
 | `tags` | | free-form labels, e.g. `{"experiment": "baseline"}` |
 | `notes` | | recipe, seeds, aggregation method |
 | `created_at` | | filled automatically |
@@ -57,6 +58,12 @@ The same files sit in the eval run's `evals/` directory. `dlef report
 different output root will show as `MISSING`.
 
 ## Creating a claim
+
+**A claim needs the owner's approval.** `ClaimStore.add` refuses a claim
+without `approved_by`, and an agent must never write that value itself: propose
+the claim (ids, value, text) in the conversation, wait for the owner's explicit
+yes, then record that approval in `approved_by`. The report renders the
+approver, so every reported number says who signed it off.
 
 ```python
 import statistics
@@ -79,6 +86,7 @@ ClaimStore("output/claims").add(
         value=statistics.mean(values),
         tags={"experiment": "baseline"},
         notes="best.pt selected on val; seeds 1/2/3",
+        approved_by="twj 2026-11-18: ok to report the 3-seed mean",
     )
 )
 ```
@@ -86,6 +94,8 @@ ClaimStore("output/claims").add(
 Rules already enforced by `ClaimStore`:
 
 - `eval_ids` must be non-empty;
+- `approved_by` must record the owner's approval — agents propose, the owner
+  approves;
 - duplicate `claim_id` → `ClaimError` (quotes, slashes, empty ids rejected too);
 - the file is written under the store root as `<claim_id>.json`.
 

@@ -379,7 +379,8 @@ output/sweeps/<sweep_id>/trials/
 ## 9. 备选（candidate）、写 claim、生成报告
 
 实验多了以后，先建备选，把要研究的 run 从 run store 里抽出来。candidate 用
-val 指标比较，不消耗 test access：
+val 指标比较，不消耗 test access。**candidate/claim 是 owner 批准制**：没有
+`--approved-by` 工具直接拒绝；agent 只能提议并等 owner 点头，批准原话记进记录：
 
 ```bash
 python core/tools/candidates.py add \
@@ -388,19 +389,23 @@ python core/tools/candidates.py add \
   --run <run1> --run <run2> \
   --metric mae \
   --reason "best val MAE; verify before test" \
-  --next "check the error slices"
+  --next "check the error slices" \
+  --approved-by "<owner, date: 批准原话>"
 
 python core/tools/candidates.py
-python core/tools/candidates.py reject demo-candidate --reason "regressed"
+python core/tools/candidates.py reject demo-candidate --reason "regressed" \
+  --approved-by "<owner, date: 批准原话>"
 ```
 
 确认后再跑 test eval、建 claim，最后 promote：
 
 ```bash
-python core/tools/candidates.py promote demo-candidate --claim demo
+python core/tools/candidates.py promote demo-candidate --claim demo \
+  --approved-by "<owner, date: 批准原话>"
 ```
 
-先拿一个 eval id：
+`make index` 生成 `output/INDEX.md` 门面（漏斗 + 实验表 + shortlist + claims +
+批准人），索引永远由命令生成，不手写。先拿一个 eval id：
 
 ```bash
 EVAL_ID=$(python - <<'PY'
@@ -413,7 +418,7 @@ PY
 echo "$EVAL_ID"
 ```
 
-写 claim：
+写 claim（**必须带 owner 批准**，agent 只能提议、不能自己批准）：
 
 ```bash
 python - <<PY
@@ -423,6 +428,7 @@ ClaimStore("output/claims").add(Claim(
     text="Demo baseline MAE",
     eval_ids=("$EVAL_ID",),
     metric="mae",
+    approved_by="<owner, date: 批准原话>",
 ))
 PY
 ```
@@ -439,17 +445,6 @@ cat output/reports/report.md
 ```
 
 报告先列 shortlist，再列 claims；每一行都能追到 run / eval → checkpoint → run。
-
-生成静态图表：
-
-```bash
-python core/tools/charts.py --output output
-# 或：make charts
-cat output/charts/index.md
-```
-
-图表视图在 `input/views/charts.yaml` 里声明（experiments / candidates /
-claims）；图表是派生结果，可随时重建，不是记录。学习曲线仍看 TensorBoard。
 
 ---
 

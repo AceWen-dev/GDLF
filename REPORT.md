@@ -14,10 +14,11 @@
 - 支持 **AMP、梯度累积、梯度裁剪、可选 DDP**。
 - 支持 **retention / gc**：默认 dry-run，引用检查、血缘保护、candidate/claim 保护。
 - 支持 **Candidate / shortlist**：在大量 run 和最终 claim 之间加一层人工判断；active candidate 受 gc 保护，promotion 之后才进入 test/claim。
-- 支持 **静态图表**：`make charts` 从 runs/candidates/claims 生成 SVG + `output/charts/index.md`，依赖为零，可重建。
+- **owner 批准制**：candidate/claim 的进入、晋升、否掉都需要 owner 的显式批准并记录在案（`approved_by`）；agent 只能提议，不能自批；report/INDEX 显示批准人。
+- `make index` 生成 **output/INDEX.md 门面**（漏斗、实验表、最近 run、shortlist、claims、批准人），视图全部可重建，禁止手写。
 - 支持 **Claim / Markdown report**：报告里的数字可以反向解析到 eval record；test split 按 `test_set_id` 计数，重复访问标 `WARN`；跨 benchmark 标为不可比。
 - 项目模板 `templates/research-project/` 可以直接复制，**依赖 core 包，不复制 core**。
-- 测试：主套件 **101 个**；模板 smoke **48 个**（torch 环境全过）。
+- 测试：主套件 **98 个**；模板 smoke **47 个**（torch 环境全过）。
 - 真实跑通：CUDA AMP、2 进程 CPU DDP、subprocess sweep、模板 train/eval/sweep。
 
 ---
@@ -99,7 +100,6 @@ core (dlef/)
   eval.py         # EvalSpec / EvalRecord
   benchmark.py    # test set + metric protocol -> benchmark id
   candidates.py   # Candidate / CandidateStore: run → candidate → claim
-  charts.py       # generic BarChart / SVG renderer (domain-free)
   claim.py        # Claim / ClaimStore / TestAccessLog
   sweep.py        # SweepSpec / trials / thread + subprocess queues
   retention.py    # plan / apply / reference checks
@@ -189,15 +189,20 @@ core ← adapters ← examples / templates
 
 ### 5.7 Candidate / Claim / report
 
-- `Candidate`：candidate_id、title、run_ids、status、reason、next、metric、experiment、claim_ids、priority、tags。
+- `Candidate`：candidate_id、title、run_ids、status、reason、next、metric、experiment、claim_ids、priority、tags、**approved_by**。
 - `CandidateStore`：一个 candidate 一个 JSON，放在 `output/candidates/`。
 - 状态：`candidate → promoted | rejected`；`promoted → archived`。
 - `candidate` / `promoted` 的 run 受 retention 保护；`rejected` / `archived` 不保护。
 - 候选在 val 上比较；test eval 和 `Claim` 只在 promotion 之后发生。
-- `Claim`：claim_id、text、eval_ids、metric、value、unit、notes、tags、benchmark_id。
+- **owner 批准是硬约束**：candidate/claim 没有 `approved_by` 会被 store 拒绝；
+  agent 只能提议（给出确切命令和期望记录），批准记录在案，report/INDEX 会显示批准人。
+- `Claim`：claim_id、text、eval_ids、metric、value、unit、notes、tags、benchmark_id、**approved_by**。
 - `ClaimStore`：一个 claim 一个 JSON。
-- `dlef report`：shortlist + claims + eval records → Markdown，先备选后结论。
-- 缺失 eval 会显示 `MISSING`；test access > 1 显示 `WARN`；claim 与 eval 的 benchmark 不一致显示 `MISMATCH`。
+- `dlef report`：shortlist + claims + eval records → Markdown，先备选后结论，带
+  "generated, rebuild" 戳；模板的 `make index` 另外生成 `output/INDEX.md` 门面
+  （漏斗 + 实验表 + 最近 run + shortlist + claims + 批准人）。
+- 缺失 eval 会显示 `MISSING`；test access > 1 显示 `WARN`；claim 与 eval 的 benchmark 不一致显示 `MISMATCH`；
+  没有 `approved_by` 的记录显示 `UNAPPROVED`。
 
 ### 5.8 CLI
 
@@ -207,19 +212,7 @@ python -m dlef.cli compare <eval-json-or-run-dir> ...
 python -m dlef.cli gc --runs runs --keep-last 3 --keep-best 1 --metric-key mae
 python -m dlef.cli report --runs output/runs --claims output/claims \
   --candidates output/candidates --out output/reports/report.md
-python core/tools/charts.py --output output   # -> output/charts/*.svg
 ```
-
-### 5.9 Charts
-
-- `output/charts/`：静态 SVG + `index.md`，由 `make charts` 生成。
-- `input/views/charts.yaml`：项目声明画什么指标、如何聚合、最多几条。
-- `experiments`：每个实验的最新 val 指标，带 seed 的 min/max。
-- `candidates`：每个备选的 val 均值，按状态着色。
-- `claims`：已报告的值，从 eval record 解析。
-- `dlef/charts.py` 只提供通用 `ChartBar` / `BarChart` / SVG 渲染；core 不知道
-  任何领域指标名。
-- 图表是派生投影，可随时重建；不是记录，不参与 claim 证据链。
 
 ---
 
@@ -395,6 +388,7 @@ ClaimStore("output/claims").add(
         text="Our method improves the main metric",
         eval_ids=("eval-id-from-a-run",),
         metric="mae",
+        approved_by="owner 2026-11-18: ok to report",
     )
 )
 ```
@@ -621,6 +615,24 @@ Claim 是“对外报的数 + 证据链”；Candidate 是“我认可、值得�
 
 ADR：`docs/adr/0006-candidates-between-runs-and-claims.md`。
 
+### 8.9 output 按来源分类，门面必须是生成的
+
+output 里文件的位置由**来源**决定：Recorded（runs/sweeps/test_access，不可变）、
+Judged（candidates/claims，owner 批准制）、Rendered（INDEX.md / reports，删除无损、
+命令重建）、Scratch（随时可消失，禁止被引用）。手写索引必然过期，过期即误导，
+所以门面 `INDEX.md` 只能由 `make index` 生成。
+
+ADR：`docs/adr/0010-output-provenance-classes.md`。
+
+### 8.10 candidate/claim 是 owner 批准的登记层
+
+判断的准入不放在聊天记录里，放在记录本身：`approved_by` 必填，store 层拒绝
+没有批准的写入；`add/promote/reject/archive` 都要求 `--approved-by` 引用 owner
+的原话；report/INDEX 渲染批准人，未批准记录标 `UNAPPROVED` 并锁住状态变更。
+agent 的固定动作是“提议 → 等待 → 记录批准”，永远不自我批准。
+
+ADR：`docs/adr/0011-owner-approved-registries.md`。
+
 ---
 
 ## 9. 目录导览
@@ -648,7 +660,7 @@ DLEF/
 3. 本报告 — 理解整体设计。
 4. `AGENTS.md` — 建新项目时 agent 必须读的规则（文件放哪、实验怎么组织）。
 5. `templates/research-project/AGENTS.md` — 项目复制后的本地规则。
-6. `docs/design/contracts-v0.md` — 看 20 个 contract。
+6. `docs/design/contracts-v0.md` — 看 19 个 contract。
 7. `templates/research-project/` — 看一个真实项目怎么接。
 8. `dlef/runner.py` / `dlef/policy.py` — 看训练循环和 AMP/DDP。
 9. `dlef/sweep.py` / `dlef/retention.py` — 看大量实验和清理。
@@ -693,9 +705,8 @@ DLEF/
 9. val 上选模；把值得继续看的 run 建成 candidate（val 上比较，不碰 test）。
 10. 对 candidate 跑 test（冻结 benchmark，只跑一次）；写 claim（带 benchmark_id）；
     把 candidate 标为 `promoted`。
-11. `make charts` 生成静态图；`dlef report` 生成报告；给要保留的 run 打
-    `reported` tag；用 `dlef gc` 清理其余。
-12. 归档：把 manifest、config、benchmark、报告、图表、关键 checkpoint 放到长期存储。
+11. `dlef report` 生成报告；给要保留的 run 打 `reported` tag；用 `dlef gc` 清理其余。
+12. 归档：把 manifest、config、benchmark、报告、关键 checkpoint 放到长期存储。
 
 ---
 
@@ -709,7 +720,6 @@ DLEF/
 | **Eval** | 独立评测 run：checkpoint × eval spec × benchmark |
 | **Benchmark** | 测试集 + 标签 + eval transform + 指标协议；可比较性的单位 |
 | **Candidate** | 一组值得继续研究的 run + reason/next；run → candidate → claim |
-| **Charts** | `output/charts/` 的派生 SVG + index；由 `input/views/charts.yaml` 声明，可重建 |
 | **Claim** | 报告里的一个数字/表/图，链接到 eval |
 | **Sweep** | 一组 trial；一个 trial = 一个 run |
 | **Trial** | sweep 里的一个 run |

@@ -14,6 +14,9 @@ from dlef.run import RunStore
 from core.tools import candidates as candidates_tool
 
 
+APPROVAL = "twj 2026-11-18: approved for tests"
+
+
 class CandidatesToolTests(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
@@ -48,6 +51,8 @@ class CandidatesToolTests(unittest.TestCase):
         try:
             with redirect_stdout(output):
                 code = candidates_tool.main()
+        except SystemExit as exc:  # argparse usage errors
+            return int(exc.code or 2), output.getvalue()
         finally:
             sys.argv = previous
         return code, output.getvalue()
@@ -78,15 +83,19 @@ class CandidatesToolTests(unittest.TestCase):
             "best val mae",
             "--metric",
             "mae",
+            "--approved-by",
+            APPROVAL,
         )
         self.assertEqual(code, 0)
         self.assertIn("candidate added", output)
+        self.assertIn(APPROVAL, output)
 
         payload = json.loads(
             (self.candidates_root / "ranksim.json").read_text(encoding="utf-8")
         )
         self.assertEqual(payload["status"], "candidate")
         self.assertEqual(payload["experiment"], "v11-ranksim")
+        self.assertEqual(payload["approved_by"], APPROVAL)
         self.assertEqual(len(payload["run_ids"]), 2)
 
         code, output = self._paths("list", "--json")
@@ -98,6 +107,22 @@ class CandidatesToolTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn(self.runs[0].run_id, output)
         self.assertIn("mae=2.5", output)
+        self.assertIn(APPROVAL, output)
+
+    def test_add_without_approval_is_refused(self) -> None:
+        code, _ = self._paths(
+            "add",
+            "--id",
+            "nope",
+            "--title",
+            "Nope",
+            "--run",
+            self.runs[0].run_id,
+            "--reason",
+            "test",
+        )
+        self.assertEqual(code, 2)
+        self.assertFalse((self.candidates_root / "nope.json").exists())
 
     def test_promote_and_reject(self) -> None:
         for candidate_id, run in (
@@ -116,6 +141,8 @@ class CandidatesToolTests(unittest.TestCase):
                 "test",
                 "--metric",
                 "mae",
+                "--approved-by",
+                APPROVAL,
             )
             self.assertEqual(code, 0)
 
@@ -125,11 +152,17 @@ class CandidatesToolTests(unittest.TestCase):
                 text="good result",
                 eval_ids=("eval-1",),
                 metric="mae",
+                approved_by=APPROVAL,
             )
         )
 
         code, output = self._paths(
-            "promote", "good", "--claim", "claim-good"
+            "promote",
+            "good",
+            "--claim",
+            "claim-good",
+            "--approved-by",
+            APPROVAL,
         )
         self.assertEqual(code, 0)
         self.assertIn("promoted", output)
@@ -138,9 +171,15 @@ class CandidatesToolTests(unittest.TestCase):
         )
         self.assertEqual(promoted["status"], "promoted")
         self.assertEqual(promoted["claim_ids"], ["claim-good"])
+        self.assertEqual(promoted["approved_by"], APPROVAL)
 
         code, output = self._paths(
-            "reject", "bad", "--reason", "regressed on the D cohort"
+            "reject",
+            "bad",
+            "--reason",
+            "regressed on the D cohort",
+            "--approved-by",
+            APPROVAL,
         )
         self.assertEqual(code, 0)
         rejected = json.loads(
@@ -169,27 +208,17 @@ class CandidatesToolTests(unittest.TestCase):
             self.runs[0].run_id,
             "--reason",
             "test",
+            "--approved-by",
+            APPROVAL,
         )
-        output = io.StringIO()
-        previous = sys.argv
-        sys.argv = [
-            "candidates.py",
-            "--runs",
-            str(self.runs_root),
-            "--candidates",
-            str(self.candidates_root),
-            "--claims",
-            str(self.claims_root),
+        code, _ = self._paths(
             "promote",
             "candidate",
             "--claim",
             "missing",
-        ]
-        try:
-            with redirect_stdout(output):
-                code = candidates_tool.main()
-        finally:
-            sys.argv = previous
+            "--approved-by",
+            APPROVAL,
+        )
         self.assertEqual(code, 2)
 
 

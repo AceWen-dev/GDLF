@@ -411,7 +411,9 @@ params={
 ## 9. Candidate + Claim + report
 
 实验多了以后，先用 candidate 把“值得继续看”的 run 抽出来；candidate 用 val
-指标比较，不消耗 test access：
+指标比较，不消耗 test access。**candidate/claim 都是 owner 批准制**：工具没有
+`--approved-by` 会拒绝执行；agent 只能准备好命令并提问，等 owner 明确点头后
+把批准原话记进去：
 
 ```bash
 python core/tools/candidates.py add \
@@ -420,20 +422,24 @@ python core/tools/candidates.py add \
   --run <run1> --run <run2> --run <run3> \
   --metric <val-metric> \
   --reason "worst_bin 最好；D 集略差，需要确认" \
-  --next "看 per-bin MAE，确认后再跑 test"
+  --next "看 per-bin MAE，确认后再跑 test" \
+  --approved-by "<owner, date: 批准原话>"
 
-python core/tools/candidates.py            # 只看备选
+python core/tools/candidates.py            # 只看备选（含批准人）
 python core/tools/candidates.py show ranksim-g20
-python core/tools/candidates.py reject ranksim-g20 --reason "D 集退化，放弃"
+python core/tools/candidates.py reject ranksim-g20 --reason "D 集退化，放弃" \
+  --approved-by "<owner, date: 批准原话>"
 ```
 
 确认后才跑 test eval、建 claim，然后把候选标记为 promoted：
 
 ```bash
-python core/tools/candidates.py promote ranksim-g20 --claim best-d-worst
+python core/tools/candidates.py promote ranksim-g20 --claim best-d-worst \
+  --approved-by "<owner, date: 批准原话>"
 ```
 
-一个 claim 引用至少一个 eval id，并建议 pin 住 `benchmark_id`：
+一个 claim 引用至少一个 eval id，建议 pin 住 `benchmark_id`，
+并且**必须带 owner 的批准**（`approved_by`，agent 只提议、不批准）：
 
 ```python
 from dlef.claim import Claim, ClaimStore
@@ -445,6 +451,7 @@ ClaimStore("output/claims").add(
         eval_ids=("eval-id",),
         metric="mae",
         benchmark_id="sha256:...",
+        approved_by="<owner, date: 批准原话>",
     )
 )
 ```
@@ -461,21 +468,12 @@ python -m dlef.cli report \
   --out output/reports/report.md
 ```
 
-报告先列 shortlist，再列 claims。不要手抄数字；让 claim/report 从
-eval → checkpoint → run 解析。
-
-生成静态图表（SVG + 一页 index）：
-
-```bash
-make charts
-# 或：
-python core/tools/charts.py --output output
-# 打开 output/charts/index.md
-```
-
-图表由 `input/views/charts.yaml` 声明：experiments（每个实验的 val 指标，
-带 seed 范围）、candidates（备选的 val 均值）、claims（已报告的值）。
-换主指标时改这个文件，不要手改 SVG。学习曲线仍在 TensorBoard。
+报告先列 shortlist，再列 claims，并带 “generated，用 make report 重建” 的戳。
+`make index` 会生成 `output/INDEX.md` 门面：漏斗数字、每实验一行、最近 run、
+shortlist、claims 和批准人——索引永远是生成的，不要手写。
+临时草稿（probe、导出 JSON、复制的 stdout）一律放 `output/scratch/`，
+claims/candidates/INDEX 永远不引用 scratch。
+不要手抄数字；让 claim/report 从 eval → checkpoint → run 解析。
 
 ---
 

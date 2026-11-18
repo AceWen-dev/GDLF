@@ -4,7 +4,7 @@ EXPERIMENT ?= baseline
 TENSORBOARD_PORT ?= 6006
 TENSORBOARD_ARGS ?=
 
-.PHONY: train eval inspect runs runs-all configs variants variants-runs sweep report gc-dry check audit new-experiment new-benchmark status handoff test doctor tensorboard
+.PHONY: train eval inspect runs runs-all configs variants variants-runs sweep report index gc-dry check audit new-experiment new-benchmark status handoff test doctor tensorboard
 
 train:
 	$(PYTHON) core/commands/train.py --config input/configs/base.yaml
@@ -55,11 +55,14 @@ handoff:
 sweep:
 	$(PYTHON) core/commands/sweep.py --config input/configs/base.yaml
 
-charts:
-	$(PYTHON) core/tools/charts.py --output $(OUTPUT) --views input/views/charts.yaml
+INDEX_METRIC ?= mae
 
 report:
 	$(PYTHON) -m dlef.cli report --runs $(OUTPUT)/runs --claims $(OUTPUT)/claims --candidates $(OUTPUT)/candidates --out $(OUTPUT)/reports/report.md
+	$(PYTHON) core/tools/index.py --runs $(OUTPUT)/runs --candidates $(OUTPUT)/candidates --claims $(OUTPUT)/claims --metric-key $(INDEX_METRIC) --out $(OUTPUT)/INDEX.md
+
+index:
+	$(PYTHON) core/tools/index.py --runs $(OUTPUT)/runs --candidates $(OUTPUT)/candidates --claims $(OUTPUT)/claims --metric-key $(INDEX_METRIC) --out $(OUTPUT)/INDEX.md
 
 # Change --metric-key to this project's primary metric before relying on it.
 gc-dry:
