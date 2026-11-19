@@ -101,6 +101,8 @@ def main() -> int:
     print(f"project/experiment: {run.manifest.project} / {run.manifest.experiment}")
     print(f"seed: {run.manifest.seed}")
     print(f"code_version: {run.manifest.code_version}")
+    if run.manifest.parent_run_id:
+        print(f"parent_run: {run.manifest.parent_run_id}")
     print(f"config_digest: {run.manifest.config_digest}")
     print(f"config_source: {run.manifest.config_source or run.config_path}")
     print(f"config_resolved: {run.config_path}")
@@ -181,6 +183,8 @@ def main() -> int:
             f"test_set={record.test_set_id or '-'} "
             f"metrics={dict(record.metrics)} test_access={record.test_access}"
         )
+        if record.predictions:
+            print(f"    predictions: {run.directory / record.predictions}")
     print()
 
     print("files:")
@@ -189,6 +193,9 @@ def main() -> int:
         print(f"  checkpoint: {checkpoint}")
     else:
         print("  checkpoint: (none)")
+    digests = run.directory / "checkpoints" / "digests.json"
+    if digests.is_file():
+        print(f"  checkpoint_digests: {digests}")
     if run.log_path.is_file():
         print(f"  training_log: {run.log_path}")
     else:

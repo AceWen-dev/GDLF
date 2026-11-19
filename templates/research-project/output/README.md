@@ -53,13 +53,14 @@ A run directory contains:
 
 ```text
 output/runs/<project>/<experiment>/<run_id>/
-  manifest.json
-  config.resolved.json
+  manifest.json          # config digest, code version, env (deps + git-dirty), data versions
+  config.resolved.json   # the config snapshot this run executed
   metrics.jsonl
   logs/train.log
   tensorboard/          # when tensorboard.enabled=true
-  checkpoints/
+  checkpoints/          # + digests.json (name -> sha256)
   evals/
+  predictions/          # eval runs: per-batch predictions per eval_id
 ```
 
 The `output_root` config field controls the top-level path (default

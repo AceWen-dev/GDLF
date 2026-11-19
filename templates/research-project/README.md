@@ -66,6 +66,7 @@ input/                    # layer 1: immutable inputs
   configs/sweeps/         # optional parameter-space specs
   benchmarks/             # one frozen JSON per benchmark
   datasets/               # dataset cards: version, manifest hash, split counts
+  weights/                # provenance cards for warm-start weight files
   README.md
 
 core/                     # layer 2: project source
@@ -253,6 +254,14 @@ python core/commands/eval.py \
   --benchmark input/benchmarks/synthetic-test-v1.json
 ```
 
+Eval runs record `parent_run_id` back to the training run and save per-batch
+predictions by default (`predictions/<eval_id>.jsonl`; disable with
+`--no-save-predictions`). To answer "which weights produced this number":
+
+```bash
+python core/tools/digests.py --find <checkpoint-digest-prefix>
+```
+
 If the test membership, labels, eval transform or metric protocol changes, the
 benchmark id changes. Create a new benchmark file; do not edit or overwrite the
 old one. Old runs keep their original benchmark id, and `dlef compare` warns
@@ -294,6 +303,7 @@ python core/commands/eval.py \
 python core/tools/runs.py                    # experiment summary
 python core/tools/runs.py --experiment <name>
 python core/tools/run_info.py --run <run_id>
+python core/tools/digests.py --find <sha256-prefix>   # digest -> run/weights/evals
 python core/tools/candidates.py              # the shortlist
 python core/tools/configs.py list
 python core/commands/sweep.py --config input/configs/base.yaml
@@ -610,12 +620,14 @@ Each run writes:
 
 ```text
 output/runs/<project>/<experiment>/<run_id>/
-  manifest.json
-  config.resolved.json
+  manifest.json            # config digest, code version, env (torch/cuda, git-dirty), data versions
+  config.resolved.json     # the config snapshot this run executed
   metrics.jsonl
   logs/train.log
   checkpoints/last.pt
+  checkpoints/digests.json # name -> sha256; digest lookups stay O(1)
   evals/<eval_id>.json
+  predictions/<eval_id>.jsonl   # eval runs only; what the model actually predicted
 ```
 
 Each sweep writes:

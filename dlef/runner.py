@@ -55,6 +55,7 @@ class Runner:
         training_policy: TrainingPolicy | None = None,
         test_access_log: TestAccessLog | None = None,
         ema_factory: Any | None = None,
+        env_extra: Mapping[str, Any] | None = None,
     ) -> None:
         self.run_store = run_store
         # Deprecated compatibility slot; the artifact store was removed.
@@ -67,6 +68,9 @@ class Runner:
         # EMA 的具体实现属于 torch 适配层；runner 只要求它提供
         # update/copy_to/state_dict 三个方法。这样核心仍然不 import torch。
         self.ema_factory = ema_factory
+        # Adapter-provided environment facts (dependency versions), recorded
+        # into every run manifest. The core stays stack-agnostic.
+        self.env_extra: dict[str, Any] = dict(env_extra or {})
 
     # ------------------------------------------------------------------
     # Public API
@@ -101,6 +105,7 @@ class Runner:
                 data_versions=_data_versions(train_data, val_data),
                 tags={"framework": "dlef", **dict(tags or {})},
                 config_source=config.source,
+                env_extra=self.env_extra or None,
             )
             run.save_json("config.resolved.json", config.resolved)
             run.log("=" * 78)
@@ -621,8 +626,6 @@ class Runner:
             f"Eval [{spec.split}] start benchmark={spec.benchmark_id or '-'} "
             f"test_set={spec.test_set_id or '-'}"
         )
-        values = self._validate(task, dataset, metrics, self.training_policy)
-
         eval_id = f"{run.run_id}-{spec.split}-{_short_id()}"
         data_version = _data_version(dataset)
         test_set_id = spec.test_set_id or data_version
@@ -631,6 +634,16 @@ class Runner:
             if spec.split == "test"
             else 0
         )
+        predictions_rel = ""
+        if spec.save_predictions:
+            predictions_rel = f"predictions/{eval_id}.jsonl"
+        values = self._validate(
+            task,
+            dataset,
+            metrics,
+            self.training_policy,
+            predictions_path=(run.dir / predictions_rel) if predictions_rel else None,
+        )
         record = EvalRecord(
             eval_id=eval_id,
             split=spec.split,
@@ -638,6 +651,7 @@ class Runner:
             data_version=data_version,
             eval_spec_digest=eval_spec_digest(spec),
             metrics=values,
+            predictions=predictions_rel or None,
             created_at=utc_now(),
             test_access=test_access,
             benchmark_id=spec.benchmark_id,
@@ -649,6 +663,8 @@ class Runner:
             f"Eval [{spec.split}] done eval_id={record.eval_id} "
             f"metrics={metric_text} test_access={test_access}"
         )
+        if predictions_rel:
+            run.log(f"Eval predictions: {predictions_rel}")
         return record
 
     def load_checkpoint(
@@ -684,6 +700,7 @@ class Runner:
         dataset: Any,
         metrics: Mapping[str, Metric],
         policy: TrainingPolicy,
+        predictions_path: Path | None = None,
     ) -> dict[str, float]:
         # 验证必须用 eval 模式：BN 用 running 统计（而非批统计），Dropout 关闭。
         # 此前漏掉 eval()，所有 in-run 验证与 eval 评估都在 train 模式下跑
@@ -692,18 +709,37 @@ class Runner:
         was_training = bool(getattr(model, "training", False))
         if hasattr(model, "eval"):
             model.eval()
+        sink = None
+        if predictions_path is not None:
+            predictions_path.parent.mkdir(parents=True, exist_ok=True)
+            sink = predictions_path.open("w", encoding="utf-8")
         try:
             for metric in metrics.values():
                 metric.reset()
 
             with policy.eval_context():
-                for batch in dataset:
+                for index, batch in enumerate(dataset):
                     with policy.forward_context():
                         step = task.val_step(batch)
                     output = ModelOutput(predictions=step.predictions, aux=step.meta)
                     for metric in metrics.values():
                         metric.update(output, batch)
+                    if sink is not None:
+                        sink.write(
+                            json.dumps(
+                                {
+                                    "batch": index,
+                                    "predictions": _jsonable(step.predictions),
+                                    "meta": _jsonable(step.meta),
+                                },
+                                ensure_ascii=False,
+                                default=str,
+                            )
+                            + "\n"
+                        )
         finally:
+            if sink is not None:
+                sink.close()
             if was_training and hasattr(model, "train"):
                 model.train()
 
@@ -741,6 +777,7 @@ class Runner:
         path = run.dir / "checkpoints" / f"{name}{self.checkpoint_codec.suffix}"
         path.parent.mkdir(parents=True, exist_ok=True)
         self.checkpoint_codec.dump(path, checkpoint)
+        _record_checkpoint_digest(run, path)
         run.log(f"Checkpoint: {name} -> {path.name}")
         return path
 
@@ -755,6 +792,52 @@ class Runner:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _record_checkpoint_digest(run: Run, path: Path) -> None:
+    """Keep ``checkpoints/digests.json`` so digest lookups stay O(1).
+
+    Eval records reference checkpoints by file sha256; without this index the
+    only way back is hashing every checkpoint in the store again.
+    """
+
+    index_path = run.dir / "checkpoints" / "digests.json"
+    data: dict[str, str] = {}
+    if index_path.is_file():
+        try:
+            payload = json.loads(index_path.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                data = {str(key): str(value) for key, value in payload.items()}
+        except (OSError, ValueError):
+            data = {}
+    data[path.name] = sha256_file(path)
+    index_path.write_text(
+        json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def _jsonable(value: Any) -> Any:
+    """Best-effort JSON conversion without importing a tensor library.
+
+    Tensors duck-type through ``.tolist()``; anything else falls back to str.
+    """
+
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Mapping):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(item) for item in value]
+    tolist = getattr(value, "tolist", None)
+    if callable(tolist):
+        try:
+            return _jsonable(tolist())
+        except Exception:  # noqa: BLE001 - fall through to str()
+            pass
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def _metric_values(metrics: Mapping[str, Metric]) -> dict[str, float]:

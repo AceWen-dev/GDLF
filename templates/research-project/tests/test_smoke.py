@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import tempfile
 import unittest
@@ -68,6 +70,21 @@ class SmokeTests(unittest.TestCase):
             self.assertTrue(run.checkpoint_path.is_file())
             self.assertTrue(run.log_path.is_file())
             self.assertIn("Status: completed", run.log_path.read_text(encoding="utf-8"))
+            # provenance: env carries adapter-declared dependency versions and
+            # the git-dirty fingerprint; checkpoints carry a digest index.
+            self.assertIn("torch", run.manifest.env)
+            self.assertIn("git_dirty", run.manifest.env)
+            digests = json.loads(
+                (run.dir / "checkpoints" / "digests.json").read_text(encoding="utf-8")
+            )
+            self.assertIn("last.pt", digests)
+            for name, digest in digests.items():
+                self.assertEqual(
+                    digest,
+                    hashlib.sha256(
+                        (run.dir / "checkpoints" / name).read_bytes()
+                    ).hexdigest(),
+                )
             if TENSORBOARD_AVAILABLE:
                 events = list((run.dir / "tensorboard").glob("events.out.tfevents.*"))
                 self.assertTrue(events, "TensorBoard event file was not written")

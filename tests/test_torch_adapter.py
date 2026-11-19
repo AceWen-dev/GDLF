@@ -35,6 +35,13 @@ except ImportError:
 
 @unittest.skipUnless(TORCH_AVAILABLE, "torch is not installed")
 class TorchAdapterTests(unittest.TestCase):
+    def test_policy_reports_env_facts(self) -> None:
+        policy = TorchTrainingPolicy()
+        extra = policy.env_extra()
+        self.assertIn("torch", extra)
+        self.assertTrue(str(extra["torch"]))
+        self.assertIn("cuda", extra)
+
     def test_components(self) -> None:
         module = torch.nn.Linear(1, 1)
         model = TorchModel(module, lambda module, batch: module(batch["x"]), device="cpu")

@@ -134,6 +134,14 @@ examples/toy/output/
 - The core is domain-agnostic: a batch is an opaque mapping.
 - Config is typed, strict, resolved, hashed, and dumped into the run directory.
 - The manifest is written before the first step; status is explicit.
+- The manifest `env` records the interpreter/platform, adapter-declared
+  dependency versions (torch/cuda via `Runner(env_extra=...)`), and a sha256
+  fingerprint of uncommitted git changes — two `-dirty` runs can be compared.
+- Every checkpoint save maintains `checkpoints/digests.json`, so
+  "which weights produced this number" is `digests.py --find <prefix>`, not a
+  re-hash of the store.
+- Eval runs link back to their training run (`parent_run_id`) and, with
+  `save_predictions`, write per-batch predictions into the eval run.
 - Each run keeps `metrics.jsonl` plus a human-readable `logs/train.log`; sweep
   child stdout/stderr is captured in the sweep trial log.
 - `dlef.seed.seed_everything` seeds Python, NumPy and Torch (including CUDA)
@@ -458,3 +466,4 @@ Markdown; there is no web UI.
 - `docs/adr/0007-remove-artifact-store.md` — why all files live in the run directory.
 - `docs/adr/0010-output-provenance-classes.md` — output organized by provenance; INDEX.md as the generated front door.
 - `docs/adr/0011-owner-approved-registries.md` — candidates and claims require the owner's recorded approval.
+- `docs/adr/0012-close-provenance-gaps.md` — parent links, dependency env facts, dirty fingerprints, predictions, cards, digest lookup.

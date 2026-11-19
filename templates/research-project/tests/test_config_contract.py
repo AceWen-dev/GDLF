@@ -48,6 +48,16 @@ class ConfigContractTests(unittest.TestCase):
         with self.assertRaises(ConfigError):
             resolve_config(ProjectConfig, {"tensorboard": {"flush_secs": 0}})
 
+    def test_init_checkpoint_must_be_data_root_relative(self) -> None:
+        config = resolve_config(
+            ProjectConfig, {"model": {"init_checkpoint": "warm/dir/model.pt"}}
+        )
+        self.assertEqual(config.schema.model.init_checkpoint, "warm/dir/model.pt")
+        with self.assertRaises(ConfigError):
+            resolve_config(ProjectConfig, {"model": {"init_checkpoint": "/abs/model.pt"}})
+        with self.assertRaises(ConfigError):
+            resolve_config(ProjectConfig, {"model": {"init_checkpoint": "~/model.pt"}})
+
     def test_output_root_resolution(self) -> None:
         relative = resolve_config(
             ProjectConfig,

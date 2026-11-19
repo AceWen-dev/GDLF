@@ -158,7 +158,7 @@ python -c "import dlef, torch; print('ok')"
 填完 `PROJECT.yaml` / `STATE.md` 后，先跑初始化和数据门禁：
 
 ```bash
-make audit    # 数据量、标签、NaN、重复 id、split/group overlap
+make audit    # 数据集卡/权重卡 + 数据量、标签、NaN、重复 id、split/group overlap
 make check    # brief + config + benchmark + STATE/DECISIONS + tests
 ```
 
@@ -346,6 +346,19 @@ eval record: .../evals/...json
 注意：**eval 不需要你重新传 config**。
 它从 checkpoint 的 manifest 找到训练 run，读回训练时的
 `config.resolved.json`，所以模型结构/loss 不会配错。
+
+eval run 会自动做两件事：
+
+- manifest 里 `parent_run_id` 指回训练 run，gc 的血缘闭包因此连带保护它；
+- 逐 batch 的预测写进 `predictions/<eval_id>.jsonl`（默认开，
+  `--no-save-predictions` 关），eval record 记录相对路径。
+
+"这个数到底是哪个权重文件跑出来的" 用 digest 反查：
+
+```bash
+python core/tools/digests.py --find <checkpoint-digest-prefix>
+# checkpoint 命中 run + 文件名，并列出引用它的 eval
+```
 
 ---
 

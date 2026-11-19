@@ -18,7 +18,7 @@
 - `make index` 生成 **output/INDEX.md 门面**（漏斗、实验表、最近 run、shortlist、claims、批准人），视图全部可重建，禁止手写。
 - 支持 **Claim / Markdown report**：报告里的数字可以反向解析到 eval record；test split 按 `test_set_id` 计数，重复访问标 `WARN`；跨 benchmark 标为不可比。
 - 项目模板 `templates/research-project/` 可以直接复制，**依赖 core 包，不复制 core**。
-- 测试：主套件 **98 个**；模板 smoke **47 个**（torch 环境全过）。
+- 测试：主套件 **102 个**；模板 smoke **57 个**（torch 环境全过）。
 - 真实跑通：CUDA AMP、2 进程 CPU DDP、subprocess sweep、模板 train/eval/sweep。
 
 ---
@@ -147,8 +147,13 @@ core ← adapters ← examples / templates
 ### 5.2 Run
 
 - `RunManifest`：run_id、project、experiment、config_digest、config_source、code_version、data_versions、env、seed、status、parent_run_id、tags、error。
+- `env` = 基础快照（python/platform/executable/cwd）+ adapter 注入的依赖版本
+  （torch/cuda/cudnn/gpu，走 `Runner(env_extra=...)`）+ `git_dirty`
+  （未提交改动的 sha256 指纹；干净树 false，无 git null）。
 - `RunStore`：`runs/<project>/<experiment>/<run_id>/`。
 - checkpoint、eval record、预测文件都写在 run 目录内；没有第二份 artifact 副本。
+- checkpoint 落盘同步写 `checkpoints/digests.json`（文件名 → sha256），
+  digest 反查是读小 JSON，不是全盘重哈希。
 - checkpoint 默认 JSON；torch adapter 用 `.pt`（`torch.save`）。
 - run 目录同时有 `metrics.jsonl`（机器可读）和 `logs/train.log`（epoch/step/eval/checkpoint 文本日志）；
   `tensorboard.enabled=true` 时还有 `tensorboard/` 事件文件（可选镜像）。
@@ -156,11 +161,15 @@ core ← adapters ← examples / templates
 
 ### 5.3 Eval / benchmark
 
-- `EvalSpec`：checkpoint、split、metrics、aggregation、ci_method、test_access_policy、benchmark_id、test_set_id。
+- `EvalSpec`：checkpoint、split、metrics、aggregation、ci_method、test_access_policy、benchmark_id、test_set_id、save_predictions。
 - `EvalRecord`：eval_id、split、checkpoint_digest、data_version、eval_spec_digest、metrics、predictions、test_access、benchmark_id、test_set_id。
+- eval 是独立 run，`parent_run_id` 指回训练 run（gc 血缘闭包连带保护）；模板
+  `eval.py` 默认保存逐 batch 预测到 `predictions/<eval_id>.jsonl`，
+  `EvalRecord.predictions` 记相对路径（张量走 duck-typing `.tolist()`）。
+- `core/tools/digests.py --find <prefix>`：digest → run + 权重文件 + 引用它的 eval。
 - `BenchmarkSpec`：test set（dataset + version + membership + label version）+ eval transform + metric versions + aggregation + thresholds + evaluator version。
 - `test_set_id` 用于防泄漏和 test access；`benchmark_id` 用于可比性；只有同一个 `benchmark_id` 的 eval 才能直接比较。
-- eval 是独立 run；`compare` 从 eval records 生成对比表，跨 benchmark 会提示不可比。
+- `compare` 从 eval records 生成对比表，跨 benchmark 会提示不可比。
 - test split 每次 eval 都按 `test_set_id` 写入 `TestAccessLog`；report 里访问次数 > 1 标 `WARN`。
 
 ### 5.4 Sweep
@@ -632,6 +641,18 @@ ADR：`docs/adr/0010-output-provenance-classes.md`。
 agent 的固定动作是“提议 → 等待 → 记录批准”，永远不自我批准。
 
 ADR：`docs/adr/0011-owner-approved-registries.md`。
+
+### 8.11 溯源链补全：让“这数哪来的”永远是一句话
+
+审计发现七个断点并全部闭合：eval run 挂 `parent_run_id`（gc 血缘连带保护训练
+run）；`env` 记录依赖版本（adapter 经 `env_extra` 注入 torch/cuda）和
+`git_dirty` 指纹（dirty run 之间可对比）；warm-start 权重走 `input/weights/`
+卡片（sha256 验字节）；eval 默认落盘逐 batch 预测
+（`predictions/<eval_id>.jsonl`）；数据集卡由 `make audit` 强制（当前配方
+FAIL、历史版本 WARN）；checkpoint 保存即写 `checkpoints/digests.json`，
+`digests.py --find` 一条命令反查 run+文件+eval。
+
+ADR：`docs/adr/0012-close-provenance-gaps.md`。
 
 ---
 

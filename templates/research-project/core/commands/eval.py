@@ -61,6 +61,11 @@ def main() -> int:
         metavar="KEY=VALUE",
         help="optional overrides applied on top of the training run config",
     )
+    parser.add_argument(
+        "--no-save-predictions",
+        action="store_true",
+        help="skip writing predictions/<eval_id>.jsonl (on by default)",
+    )
     args = parser.parse_args()
 
     checkpoint = Path(args.checkpoint)
@@ -158,6 +163,11 @@ def main() -> int:
             **({"benchmark_id": benchmark_id} if benchmark_id else {}),
         },
         config_source=source,
+        # Explicit lineage: the eval run hangs off the training run it
+        # evaluated, so `run_info` can walk back and `dlef gc` keeps the
+        # parent alive with the eval record.
+        parent_run_id=train_run_id or None,
+        env_extra=runner.env_extra or None,
     )
     run.save_json("config.resolved.json", config.resolved)
     try:
@@ -169,6 +179,10 @@ def main() -> int:
                 split=args.split,
                 benchmark_id=benchmark_id,
                 test_set_id=test_set_id,
+                # Predictions land in the eval run directory and the record
+                # keeps the relative path, so "what did it predict" is a
+                # file you can open, not a number you have to trust.
+                save_predictions=not args.no_save_predictions,
             ),
             run,
         )

@@ -59,12 +59,57 @@ def git_version(cwd: str | Path | None = None) -> str:
         return "no-git"
 
 
-def env_snapshot() -> dict[str, Any]:
-    return {
+def env_snapshot(extra: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Base environment record; adapters may add dependency versions via ``extra``."""
+
+    snapshot: dict[str, Any] = {
         "python": platform.python_version(),
         "platform": platform.platform(),
         "executable": sys.executable,
         "cwd": os.getcwd(),
+    }
+    snapshot.update(dict(extra or {}))
+    return snapshot
+
+
+def git_dirty_state(cwd: str | Path | None = None) -> dict[str, Any]:
+    """Fingerprint the uncommitted changes, without storing the diff itself.
+
+    ``diff_sha256`` hashes ``git status --porcelain`` + ``git diff HEAD``, so
+    two dirty runs can be checked for "same working tree?". It is ``None``
+    when the tree is clean, and the whole record is ``dirty=None`` without git.
+    """
+
+    cwd = Path(cwd or Path.cwd())
+    empty = {"dirty": None, "diff_sha256": None, "diff_bytes": 0, "untracked": 0}
+    try:
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return empty
+    if status.returncode != 0:
+        return empty
+    lines = [line for line in status.stdout.splitlines() if line.strip()]
+    if not lines:
+        return {"dirty": False, "diff_sha256": None, "diff_bytes": 0, "untracked": 0}
+    diff = subprocess.run(
+        ["git", "diff", "HEAD"],
+        cwd=cwd,
+        capture_output=True,
+        check=False,
+    ).stdout
+    blob = ("\n".join(lines) + "\n--\n").encode("utf-8", "replace") + diff
+    untracked = sum(1 for line in lines if line.startswith("??"))
+    return {
+        "dirty": True,
+        "diff_sha256": hashlib.sha256(blob).hexdigest(),
+        "diff_bytes": len(diff),
+        "untracked": untracked,
     }
 
 
@@ -300,6 +345,7 @@ class RunStore:
         tags: Mapping[str, str] | None = None,
         parent_run_id: str | None = None,
         config_source: str = "",
+        env_extra: Mapping[str, Any] | None = None,
     ) -> Run:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         run_id = f"{timestamp}_{config_digest[:8]}_s{seed}_{uuid.uuid4().hex[:6]}"
@@ -310,7 +356,7 @@ class RunStore:
             experiment=experiment,
             config_digest=config_digest,
             code_version=git_version(self.code_root),
-            env=env_snapshot(),
+            env={**env_snapshot(env_extra), "git_dirty": git_dirty_state(self.code_root)},
             seed=seed,
             data_versions=dict(data_versions or {}),
             tags=dict(tags or {}),

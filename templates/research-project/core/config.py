@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -49,12 +50,21 @@ class DataConfig(ConfigSchema):
 class ModelConfig(ConfigSchema):
     name: str = "mlp"
     hidden: int = 16
+    # Optional warm-start weights, relative to $DLEF_DATA_ROOT. The toy
+    # builders ignore it; real models load it in core/models/<name>.py.
+    # `make audit` requires a card in input/weights/ matching the file's
+    # sha256, so the weights that produced a run are provable, not assumed.
+    init_checkpoint: str = ""
 
     def validate(self) -> None:
         if self.name not in {"mlp", "linear"}:
             raise ConfigError(f"unknown model.name: {self.name!r}")
         if self.hidden <= 0:
             raise ConfigError("hidden must be > 0")
+        if self.init_checkpoint.startswith(("/", "~")) or os.path.isabs(self.init_checkpoint):
+            raise ConfigError(
+                "model.init_checkpoint must be a path relative to $DLEF_DATA_ROOT"
+            )
 
     def structural_signature(self) -> dict[str, Any]:
         """The fields that make two runs *different models*, not different sizes.

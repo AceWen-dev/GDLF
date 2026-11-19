@@ -378,6 +378,9 @@ Model:
 - Models do no I/O, do not read config, do not move devices, do not compute loss.
 - Device placement belongs to `TorchTask` / `TorchModel`.
 - Initialization must be reproducible; record the scheme if non-standard.
+- Warm-start weights are provable inputs: declare them as a path relative to
+  `$DLEF_DATA_ROOT` (e.g. `model.init_checkpoint`) and pin them with a card in
+  `input/weights/` (path + sha256). `make audit` verifies the bytes match.
 - **A topology change is a new `model.name` and a new file, never a new boolean
   flag.** N booleans describe 2**N structures but only N names, and the run
   record cannot tell them apart. Size knobs (width/depth/hidden) may stay in one
@@ -427,9 +430,16 @@ Metric:
 ## 9. Eval / claim conventions
 
 - Training eval is for model selection. Final evaluation is a separate run and
-  must use a frozen benchmark.
+  must use a frozen benchmark. Eval runs set `parent_run_id` to the training
+  run they evaluated, so lineage/gc closure reaches the training run too.
 - `EvalRecord` carries split, checkpoint digest, data version, eval spec digest,
-  metrics, test access, `benchmark_id` and `test_set_id`.
+  metrics, test access, `benchmark_id` and `test_set_id`. With
+  `EvalSpec.save_predictions`, the runner writes per-batch
+  `predictions/<eval_id>.jsonl` into the eval run and records the relative path;
+  the flag is covered by the eval spec digest.
+- Checkpoint saves maintain `checkpoints/digests.json` (name → sha256); the
+  template's `core/tools/digests.py --find <prefix>` resolves a digest to its
+  run, file and referencing evals without re-hashing the store.
 - Test split access is counted per `test_set_id` in `output/test_access/`;
   report shows `WARN` when count > 1. Changing the eval transform must not reset
   the count.
@@ -576,6 +586,7 @@ A project task is done when:
 - `docs/adr/0007-remove-artifact-store.md` — why all files live in the run directory and the artifact store was removed.
 - `docs/adr/0010-output-provenance-classes.md` — why output is organized by provenance (recorded / judged / rendered / scratch) with a generated INDEX as the front door.
 - `docs/adr/0011-owner-approved-registries.md` — why candidates and claims require the owner's recorded approval.
+- `docs/adr/0012-close-provenance-gaps.md` — eval parent links, env dependency facts, dirty-tree fingerprints, predictions, weights/dataset card enforcement, digest lookup.
 - `examples/torch_regression/` — a complete torch + sweep example.
 
 If a requirement is genuinely ambiguous, ask the human once, then follow the

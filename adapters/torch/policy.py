@@ -52,6 +52,21 @@ class TorchTrainingPolicy:
     def is_main_process(self) -> bool:
         return self._rank == 0
 
+    def env_extra(self) -> dict[str, Any]:
+        """Stack versions recorded into every run manifest via ``Runner(env_extra=...)``.
+
+        The core keeps its environment record stack-agnostic; this is where the
+        reference adapter contributes torch/CUDA facts.
+        """
+
+        cuda = torch.version.cuda or ""
+        return {
+            "torch": torch.__version__,
+            "cuda": cuda,
+            "cudnn": str(torch.backends.cudnn.version() or "") if torch.cuda.is_available() else "",
+            "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "",
+        }
+
     def setup(self) -> None:
         if not self.ddp:
             return

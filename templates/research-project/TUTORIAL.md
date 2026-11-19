@@ -130,7 +130,7 @@ output/runs/<project>/smoke/<run_id>/
 然后先跑数据和初始化门禁：
 
 ```bash
-make audit    # 数据量、标签、NaN、重复 id、split/group overlap
+make audit    # 数据集卡/权重卡 + 数据量、标签、NaN、重复 id、split/group overlap
 make check    # brief + config + benchmark + STATE/DECISIONS + tests
 ```
 
@@ -373,6 +373,15 @@ python core/commands/eval.py \
   --checkpoint output/runs/.../checkpoints/last.pt \
   --split test \
   --benchmark input/benchmarks/<name>.json
+```
+
+eval run 会自动：挂上 `parent_run_id` 指回训练 run（gc 的血缘闭包因此连带
+保护训练 run），并把逐 batch 的预测写进 `predictions/<eval_id>.jsonl`
+（`--no-save-predictions` 可关）。想知道“这个数到底是哪个权重跑出来的”，
+不需要写脚本全盘 hash：
+
+```bash
+python core/tools/digests.py --find <checkpoint-digest-prefix>
 ```
 
 规则：

@@ -381,7 +381,14 @@ class RunManifest:
 - 第一个 step 之前写 `status: running`；结束原子更新。
 - 完成的 run 不可变；修正用新的 run 或 append-only annotation。
 - checkpoint、eval record、预测文件都写在 run 目录内；没有第二份 artifact 副本。
+- `env` = 基础快照（python/platform/executable/cwd）+ adapter 注入的依赖版本
+  （`Runner(env_extra=...)`，torch adapter 提供 torch/cuda/cudnn/gpu）+
+  `git_dirty`（未提交改动的 diff sha256 指纹；干净树为 `dirty: false`，无 git 为
+  `dirty: null`）。core 不出现任何栈名。
 - 旧 manifest 里的 `artifacts` 字段读取时忽略，新 manifest 不再写。
+- checkpoint 落盘时同步维护 `checkpoints/digests.json`（文件名 → sha256），
+  digest 反查是读一个小 JSON，不是全盘重哈希。
+- eval run 的 `parent_run_id` 指向训练 run；血缘闭包因此覆盖 eval → train。
 - RunStore 是事实来源；Tracker 只是可选索引。
 - 本地优先；远程存储是 mirror，不是前提。
 
@@ -418,6 +425,7 @@ class EvalSpec:
     test_access_policy: str = "once_per_claim"
     benchmark_id: str = ""
     test_set_id: str = ""
+    save_predictions: bool = False
 
 @dataclass(frozen=True)
 class EvalRecord:
@@ -436,9 +444,14 @@ class EvalRecord:
 
 约束：
 
-- eval 是独立 run；有自己的 manifest。
+- eval 是独立 run；有自己的 manifest，且 `parent_run_id` 指向被评测的训练 run
+  （gc 的 lineage closure 因此连带保护训练 run）。
 - metrics 按 split 命名；train/val/test 不混。
 - test access 按 `test_set_id` 计数；同一 claim 重复访问要显式记录。
+- `save_predictions=True` 时 Runner 把逐 batch 预测写入 eval run 的
+  `predictions/<eval_id>.jsonl`（张量经 duck-typing 的 `.tolist()` 转 JSON，core 不
+  import torch），`EvalRecord.predictions` 记相对路径；该开关计入
+  `eval_spec_digest`。
 - 测试集 + 标签 + eval transform + metric 实现/聚合 = 一个 benchmark；
   `benchmark_id` 不同的 EvalRecord 不可直接比较。
 - 多 seed 聚合、CI 是 eval 层的能力，不是 metric 实现的责任。

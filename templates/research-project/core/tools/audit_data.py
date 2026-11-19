@@ -2,6 +2,9 @@
 
 Checks what can be checked generically from the configured loaders:
 
+- provenance cards: dataset card for the current recipe (and its manifest
+  hash), weights card for ``model.init_checkpoint``, and cards for every
+  version historical runs actually used;
 - split sizes and DataSpec;
 - numeric field statistics, NaNs/infs;
 - duplicate sample ids within a split;
@@ -12,16 +15,19 @@ It is not a proof of no leakage. If your batches do not expose `sample_id` or
 `group_by`, the audit reports a warning; add those keys to the dataset or audit
 the membership manifest manually.
 
-Read-only: it does not edit data, configs, runs, or manifests.
+Read-only: it does not edit data, configs, runs, or manifests. Weights cards
+are verified by hashing the referenced files, so large warm-start checkpoints
+make this step IO-heavy.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -40,6 +46,7 @@ ensure_core()
 from dlef.config import ConfigError, load_config  # noqa: E402
 from core.config import ProjectConfig  # noqa: E402
 from core.data import make_loader  # noqa: E402
+from core.data.paths import data_root  # noqa: E402
 
 ROLES = ("train", "val", "test")
 
@@ -179,6 +186,116 @@ def _audit_role(
     }
 
 
+def _dataset_card(name: str, version: str, input_root: Path | None = None) -> Path:
+    base = input_root if input_root is not None else ROOT
+    return base / "input" / "datasets" / name / f"{version}.yaml"
+
+
+def _weights_cards(input_root: Path | None = None) -> dict[str, dict[str, Any]]:
+    base = input_root if input_root is not None else ROOT
+    cards: dict[str, dict[str, Any]] = {}
+    for path in sorted((base / "input" / "weights").glob("*.yaml")):
+        try:
+            payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError):
+            continue
+        if isinstance(payload, dict) and payload.get("path"):
+            cards[str(payload["path"])] = payload
+    return cards
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _audit_cards(
+    config: ProjectConfig,
+    errors: list[str],
+    warnings: list[str],
+    input_root: Path | None = None,
+) -> None:
+    """Provenance cards for the current recipe: dataset + warm-start weights."""
+
+    name, version = config.data.name, config.data.version
+    card_path = _dataset_card(name, version, input_root)
+    if not card_path.is_file():
+        errors.append(
+            f"dataset card missing: input/datasets/{name}/{version}.yaml "
+            "(record the manifest path+sha256 and split counts)"
+        )
+    else:
+        try:
+            card = yaml.safe_load(card_path.read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError) as exc:
+            errors.append(f"dataset card unreadable: {exc}")
+            card = {}
+        if isinstance(card, dict):
+            rel = str(card.get("manifest", "") or "")
+            expected = str(card.get("manifest_sha256", "") or "")
+            if rel and expected:
+                try:
+                    manifest_file = data_root() / rel
+                except RuntimeError:
+                    warnings.append("DLEF_DATA_ROOT not set; skipped dataset manifest hash check")
+                else:
+                    if not manifest_file.is_file():
+                        errors.append(f"dataset card points to a missing manifest: {rel}")
+                    elif _sha256(manifest_file) != expected:
+                        errors.append(
+                            f"dataset manifest hash mismatch: {rel} changed since the card was written"
+                        )
+
+    init = str(getattr(config.model, "init_checkpoint", "") or "")
+    if not init:
+        return
+    try:
+        target = data_root() / init
+    except RuntimeError:
+        warnings.append("DLEF_DATA_ROOT not set; skipped weights card check")
+        return
+    if not target.is_file():
+        errors.append(f"model.init_checkpoint not found under $DLEF_DATA_ROOT: {init}")
+        return
+    card = _weights_cards(input_root).get(init)
+    if card is None:
+        errors.append(
+            f"weights card missing for model.init_checkpoint {init}: "
+            "add input/weights/<name>.yaml with its sha256"
+        )
+    elif str(card.get("sha256", "")) != _sha256(target):
+        errors.append(f"weights card hash mismatch: {init} changed since the card was written")
+
+
+def _audit_run_data_versions(
+    runs_root: Path,
+    warnings: list[str],
+    input_root: Path | None = None,
+) -> None:
+    """Historical runs must stay explainable: every used version needs a card."""
+
+    if not runs_root.is_dir():
+        return
+    missing: Counter[str] = Counter()
+    for manifest_path in runs_root.rglob("manifest.json"):
+        try:
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for version in (payload.get("data_versions") or {}).values():
+            text = str(version)
+            if "@" not in text:
+                continue
+            name, _, ver = text.partition("@")
+            if not _dataset_card(name, ver, input_root).is_file():
+                missing[text] += 1
+    for version, count in sorted(missing.items()):
+        warnings.append(f"{count} run(s) use {version} without a dataset card")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -190,6 +307,11 @@ def main() -> int:
         type=int,
         default=20,
         help="max batches per split; 0 = all (default: 20)",
+    )
+    parser.add_argument(
+        "--runs",
+        default=str(ROOT / "output" / "runs"),
+        help="run store root for the historical dataset-card check",
     )
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
@@ -223,6 +345,11 @@ def main() -> int:
     except (OSError, ConfigError, ValueError) as exc:
         print(f"ERROR: cannot load config {args.config}: {exc}", file=sys.stderr)
         return 1
+
+    # Provenance cards first: cheap checks that fail fast before any data
+    # iteration, so a missing card is never buried under batch statistics.
+    _audit_cards(config, errors, warnings)
+    _audit_run_data_versions(Path(args.runs), warnings)
 
     results: dict[str, Any] = {}
     try:

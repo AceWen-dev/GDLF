@@ -234,7 +234,8 @@ If you rename `core`, update:
 | You are adding... | Put it here | Also update |
 |---|---|---|
 | dataset reader / acquisition library code | `core/data/` | `data/build.py` if selectable |
-| dataset card (name/version/manifest hash/counts) | `input/datasets/<name>/<version>.yaml` | match `data.name` / `data.version`; run `core/tools/audit_data.py` |
+| dataset card (name/version/manifest hash/counts) | `input/datasets/<name>/<version>.yaml` | match `data.name` / `data.version`; `make audit` fails without it |
+| weights card (warm-start/pretrained inputs) | `input/weights/<name>.yaml` | matches `model.init_checkpoint` path + sha256; `make audit` verifies bytes |
 | project-specific automation (acquisition, cleaning, query, export) | `scripts/` | no fixed structure; promote reusable logic |
 | transform | `core/data/transforms/<name>.py` | `data/build.py`, `DataConfig.validate` |
 | split strategy | `core/data/splits.py` | `SPLITTERS`, `DataConfig.validate` |
@@ -299,12 +300,13 @@ python core/commands/eval.py \
 python core/tools/runs.py                    # experiment summary
 python core/tools/runs.py --experiment <name>
 python core/tools/run_info.py --run <run_id>
+python core/tools/digests.py --find <sha256-prefix>   # which run/weights/evals
 python core/tools/configs.py list
 python core/tools/variants.py configs      # declared variants per model.name
 python core/tools/variants.py runs         # observed structures + drift
 python core/commands/sweep.py --config input/configs/base.yaml
 tensorboard --logdir output/runs --port 6006
-make audit                                  # data / split / leakage first pass
+make audit                                  # cards + data / split / leakage
 make check                                  # initialization + config gate
 ```
 
@@ -612,7 +614,13 @@ Rules:
 - `custom_train_step` is only for genuine escapes (GAN, multi-optimizer,
   custom backward). Document why.
 - Checkpoints are written by `Runner` + `TorchCheckpointCodec`; do not hand-write
-  `.pt` files.
+  `.pt` files. Every save also updates `checkpoints/digests.json`
+  (name → sha256); do not edit or delete it.
+- Provenance records are automatic — never bypass them: `manifest.env` carries
+  torch/cuda/cudnn/gpu (via `build_runner` → `policy.env_extra()`) and the
+  `git_dirty` fingerprint of uncommitted changes; `model_structure.json`
+  records the network that actually ran. Commit before official runs so the
+  dirty fingerprint stays quiet.
 - Resume must restore model, optimizer, scheduler, scaler, RNG, epoch/step,
   policy state. Loading only model weights is not a resume.
 - DDP training: `torchrun --nproc_per_node=N core/commands/train.py ...`; rank 0 writes
@@ -720,6 +728,18 @@ hand, never make TensorBoard the only record, and never tune on test metrics.
   `eval.py` verifies the current test membership/metric protocol against the
   manifest and refuses to run on a mismatch. `--config` is only a fallback when
   the original run directory is gone.
+- Eval runs record `parent_run_id` = the training run (read from the manifest
+  embedded in the checkpoint), so `run_info` walks back and `dlef gc` keeps the
+  training run alive with its eval record.
+- Eval saves per-batch predictions by default into
+  `predictions/<eval_id>.jsonl`; `EvalRecord.predictions` keeps the relative
+  path. Pass `--no-save-predictions` only for throwaway checks. Never re-export
+  numbers by hand — the predictions file is the product.
+- "Which weights produced this number" is a lookup, not a script:
+  ```bash
+  python core/tools/digests.py --find <checkpoint-digest-prefix>
+  python core/tools/digests.py --run <run_id>
+  ```
 - Test access is counted under `output/test_access/` by `test_set_id`; report
   shows `WARN` when the same test set is accessed more than once.
 - A `Claim` must reference at least one eval id, should pin the benchmark

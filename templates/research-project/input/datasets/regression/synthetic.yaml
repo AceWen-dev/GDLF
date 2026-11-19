@@ -1,0 +1,20 @@
+name: regression
+version: synthetic
+# Generated in memory by core/data/datasets/regression.py (torch.randn, seeded
+# by data.seed per role); there is no on-disk manifest to hash, so the
+# manifest fields stay empty on purpose.
+manifest: ""
+manifest_sha256: ""
+rows: 768
+splits:
+  train: 512
+  val: 128
+  test: 128
+sample_id: index
+group_by: none
+label:
+  field: y
+  unit: ""
+provenance:
+  source: "generated: y = 2x + 1 + noise, torch.randn seeded per role"
+  created: "2026-11-19"

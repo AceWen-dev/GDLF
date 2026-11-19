@@ -18,6 +18,10 @@ class EvalSpec:
     test_access_policy: str = "once_per_claim"
     benchmark_id: str = ""
     test_set_id: str = ""
+    # When true, the runner also writes ``predictions/<eval_id>.jsonl`` into
+    # the eval run directory (one row per batch) and records the relative path
+    # in ``EvalRecord.predictions``. Covered by ``eval_spec_digest``.
+    save_predictions: bool = False
 
 
 @dataclass(frozen=True)

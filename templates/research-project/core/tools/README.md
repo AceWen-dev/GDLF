@@ -7,7 +7,7 @@ experiment commands and not project-specific scripts.
 core/tools/
   benchmark.py   # create / verify a frozen benchmark manifest
   check.py       # initialization + phase gate
-  audit_data.py  # data/split/leakage first pass
+  audit_data.py  # provenance cards + data/split/leakage first pass
   configs.py     # list / validate experiment configs
   new_experiment.py  # create a variant from base.yaml
   new_benchmark.py   # freeze a named benchmark manifest
@@ -15,6 +15,7 @@ core/tools/
   runs.py        # experiment summary / run index (filters, --all, --json)
   run_info.py    # one run: config -> benchmark -> source files
   candidates.py  # shortlist: add / list / show / promote / reject / archive (owner-approved)
+  digests.py    # checkpoint digests: --find <sha256-prefix> / --run <id>
   index.py       # regenerate output/INDEX.md: funnel + experiments + shortlist + claims
   variants.py    # variant count: declared (configs) / observed (runs) + drift
   _bootstrap.py  # internal: find the core when running in-repo

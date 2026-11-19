@@ -58,6 +58,8 @@ def build_runner(outputs: str | Path, policy: TorchTrainingPolicy) -> Runner:
         run_store, #数据记录
         checkpoint_codec=TorchCheckpointCodec(),
         training_policy=policy,
+        # torch/CUDA 版本进 manifest.env；core 本身保持与栈无关
+        env_extra=policy.env_extra(),
     )
 
 
